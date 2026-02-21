@@ -97,4 +97,28 @@ public static class WindowInterop
     {
         return PInvoke.IsWindow(hwnd);
     }
+
+    public static string GetWindowText(HWND hwnd)
+    {
+        var length = PInvoke.GetWindowTextLength(hwnd);
+        if (length == 0) return string.Empty;
+
+        unsafe
+        {
+            var buffer = stackalloc char[length + 1];
+            PInvoke.GetWindowText(hwnd, buffer, length + 1);
+            return new string(buffer);
+        }
+    }
+
+    public static uint GetWindowThreadProcessId(HWND hwnd, out uint processId)
+    {
+        unsafe
+        {
+            uint pid;
+            var threadId = PInvoke.GetWindowThreadProcessId(hwnd, &pid);
+            processId = pid;
+            return threadId;
+        }
+    }
 }

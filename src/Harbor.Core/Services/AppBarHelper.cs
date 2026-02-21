@@ -43,7 +43,8 @@ public static class AppBarHelper
         ShellServices shellServices,
         AppBarScreen screen,
         AppBarEdge edge,
-        double desiredHeight) where T : AppBarWindow
+        double desiredHeight,
+        AppBarMode mode = AppBarMode.Normal) where T : AppBarWindow
     {
         var window = (T)Activator.CreateInstance(
             typeof(T),
@@ -52,6 +53,7 @@ public static class AppBarHelper
             shellServices.FullScreenHelper,
             screen,
             edge,
+            mode,
             desiredHeight)!;
 
         return window;

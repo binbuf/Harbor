@@ -10,6 +10,9 @@ GetWindowLong
 SetWindowLong
 MonitorFromWindow
 IsWindow
+GetWindowText
+GetWindowTextLength
+GetWindowThreadProcessId
 
 // Event Hooks
 SetWinEventHook

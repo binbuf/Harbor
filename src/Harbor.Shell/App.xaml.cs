@@ -1,12 +1,16 @@
 using System.Diagnostics;
 using System.Windows;
 using Harbor.Core.Services;
+using ManagedShell.AppBar;
+using ManagedShell.Common.Helpers;
 
 namespace Harbor.Shell;
 
 public partial class App : Application
 {
     private ShellServices? _shellServices;
+    private ForegroundWindowService? _foregroundService;
+    private AppBarRegistration? _menuBarRegistration;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -19,12 +23,31 @@ public partial class App : Application
         Trace.WriteLine($"[Harbor] App: NotificationArea initialized = {!_shellServices.NotificationArea.IsFailed}");
         Trace.WriteLine($"[Harbor] App: TrayIcons count = {_shellServices.NotificationArea.TrayIcons.Count}");
 
+        // Create foreground window tracking service
+        _foregroundService = new ForegroundWindowService();
+
+        // Create and register the top menu bar as an AppBar
+        var menuBar = AppBarHelper.CreateAppBar<TopMenuBar>(
+            _shellServices,
+            AppBarScreen.FromPrimaryScreen(),
+            AppBarEdge.Top,
+            24);
+
+        _menuBarRegistration = AppBarHelper.Register(menuBar, AppBarEdge.Top);
+        menuBar.Initialize(_foregroundService);
+
         Trace.WriteLine("[Harbor] App: Startup complete.");
     }
 
     protected override void OnExit(ExitEventArgs e)
     {
         Trace.WriteLine("[Harbor] App: Shutting down...");
+
+        _menuBarRegistration?.Dispose();
+        _menuBarRegistration = null;
+
+        _foregroundService?.Dispose();
+        _foregroundService = null;
 
         _shellServices?.Dispose();
         _shellServices = null;

@@ -1,0 +1,57 @@
+<appbar:AppBarWindow x:Class="Harbor.Shell.Dock"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:appbar="clr-namespace:ManagedShell.AppBar;assembly=ManagedShell.AppBar"
+        Title="Harbor Dock"
+        AllowsTransparency="True"
+        WindowStyle="None"
+        ShowInTaskbar="False"
+        Topmost="True"
+        Background="Transparent">
+
+    <Grid x:Name="DockRoot" Height="62" VerticalAlignment="Bottom">
+        <!-- Dock container: centered, auto-width, rounded corners, acrylic background -->
+        <Border x:Name="DockContainer"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Margin="0,0,0,4"
+                CornerRadius="16"
+                Background="#801E1E1E"
+                BorderBrush="#1FFFFFFF"
+                BorderThickness="1"
+                Padding="4,8">
+
+            <StackPanel x:Name="DockPanel" Orientation="Horizontal">
+                <!-- Running application icons -->
+                <ItemsControl x:Name="TaskIconsControl"
+                              VerticalAlignment="Center">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Width="48" Height="48"
+                                  Margin="4,0"
+                                  Cursor="Hand"
+                                  ToolTip="{Binding Title}"
+                                  MouseLeftButtonUp="DockIcon_MouseLeftButtonUp">
+                                <!-- Application icon -->
+                                <Image Source="{Binding Icon}"
+                                       Width="48" Height="48"
+                                       RenderOptions.BitmapScalingMode="HighQuality" />
+                                <!-- Active indicator dot -->
+                                <Ellipse Width="4" Height="4"
+                                         Fill="#FFFFFF"
+                                         HorizontalAlignment="Center"
+                                         VerticalAlignment="Bottom"
+                                         Margin="0,0,0,-2" />
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </Border>
+    </Grid>
+</appbar:AppBarWindow>

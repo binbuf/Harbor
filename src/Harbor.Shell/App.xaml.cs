@@ -11,6 +11,7 @@ public partial class App : Application
     private ShellServices? _shellServices;
     private ForegroundWindowService? _foregroundService;
     private AppBarRegistration? _menuBarRegistration;
+    private AppBarRegistration? _dockRegistration;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -36,12 +37,25 @@ public partial class App : Application
         _menuBarRegistration = AppBarHelper.Register(menuBar, AppBarEdge.Top);
         menuBar.Initialize(_foregroundService, _shellServices.NotificationArea);
 
+        // Create and register the Dock as a bottom AppBar
+        var dock = AppBarHelper.CreateAppBar<Dock>(
+            _shellServices,
+            AppBarScreen.FromPrimaryScreen(),
+            AppBarEdge.Bottom,
+            62);
+
+        _dockRegistration = AppBarHelper.Register(dock, AppBarEdge.Bottom);
+        dock.Initialize(_shellServices.Tasks);
+
         Trace.WriteLine("[Harbor] App: Startup complete.");
     }
 
     protected override void OnExit(ExitEventArgs e)
     {
         Trace.WriteLine("[Harbor] App: Shutting down...");
+
+        _dockRegistration?.Dispose();
+        _dockRegistration = null;
 
         _menuBarRegistration?.Dispose();
         _menuBarRegistration = null;

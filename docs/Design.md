@@ -23,7 +23,7 @@ This document (v2.0) expands on the original design to address overlay synchroni
 | :---- | :---- |
 | **Language** | C\# (.NET 8 or .NET 9\) |
 | **Core Shell Library** | ManagedShell (cairoshell/ManagedShell) — Apache 2.0 licensed, community-maintained. Handles AppBar screen reservation, system tray interception, and task enumeration. |
-| **UI Framework** | WPF (Windows Presentation Foundation) for shell chrome; Win2D/DirectComposition evaluated as fallback for overlay layer (see Section 6). |
+| **UI Framework** | WPF (Windows Presentation Foundation) for shell chrome; Win2D/DirectComposition evaluated as fallback for overlay layer (see Section 7). |
 | **Automation** | UIAutomationClient / UIAutomationTypes — the native Windows accessibility API used by screen readers to enumerate bounding boxes of windows and controls. |
 | **DPI Awareness** | DPI\_AWARENESS\_CONTEXT\_PER\_MONITOR\_AWARE\_V2 declared in application manifest. |
 
@@ -63,7 +63,7 @@ Instead of modifying the target application, Harbor draws a mask over it.
 
 **Step 1 — Event Subscription:** Harbor subscribes to SetWinEventHook for EVENT\_SYSTEM\_FOREGROUND and EVENT\_OBJECT\_LOCATIONCHANGE. When an application becomes active or moves, Harbor queries the UIA tree.
 
-**Step 2 — Title Bar Discovery:** Harbor uses the UIA client API to walk the target window's automation element tree, locating the element with ControlType.TitleBar. It reads BoundingRectangle to get the exact (X, Y, Width, Height) of the native title bar. If UIA discovery fails (see Section 5A), Harbor falls back to NONCLIENT area heuristics.
+**Step 2 — Title Bar Discovery:** Harbor uses the UIA client API to walk the target window's automation element tree, locating the element with ControlType.TitleBar. It reads BoundingRectangle to get the exact (X, Y, Width, Height) of the native title bar. If UIA discovery fails (see Section 6A), Harbor falls back to NONCLIENT area heuristics.
 
 **Step 3 — Overlay Spawn:** Harbor creates a borderless, transparent WPF Window with extended styles WS\_EX\_LAYERED | WS\_EX\_NOACTIVATE. This ensures clicking the overlay does not steal focus from the underlying application.
 
@@ -83,15 +83,151 @@ Because Harbor controls the click event on the overlay buttons, it controls the 
 
 * **1\. Bitmap Capture:** Harbor captures a live bitmap of the target window using the DwmRegisterThumbnail API.
 
-* **2\. Instant Hide:** Harbor sends ShowWindow(SW\_HIDE) to the native window to make it vanish instantly. The HWND is recorded in the Hidden Window Registry (see Section 7B).
+* **2\. Instant Hide:** Harbor sends ShowWindow(SW\_HIDE) to the native window to make it vanish instantly. The HWND is recorded in the Hidden Window Registry (see Section 10B).
 
 * **3\. Animation Canvas:** Harbor spawns a fullscreen transparent overlay and animates the bitmap thumbnail along a bezier curve, shrinking it toward the precise coordinates of its Dock icon.
 
 * **4\. Completion:** On animation end, Harbor sends the actual SW\_MINIMIZE command and removes the animation canvas.
 
-# **5\. Edge Cases & Application Compatibility**
+# **5\. UI/UX Specification**
 
-## **5A. Per-Application UIA Tree Variability**
+This section defines the visual design and interaction behavior for Harbor's three MVP components. All specs target macOS Sequoia's appearance as the reference. Measurements are given in device-independent pixels (DIPs) at 1× scale; Harbor's per-monitor DPI logic (Section 8A) applies the appropriate multiplier at runtime.
+
+## **5A. Top Menu Bar (System Bar)**
+
+**Dimensions & Material**
+
+| Property | Value |
+| :---- | :---- |
+| **Height** | 24 DIP |
+| **Background** | Dark mode: `#1E1E1E` at 80% opacity with 30px Gaussian blur (Acrylic). Light mode: `#F6F6F6` at 80% opacity with 30px Gaussian blur. |
+| **Font** | `SF Pro Text` mapped to `Segoe UI Variable` on Windows, 13px, regular weight (400). |
+| **Text color** | Dark mode: `#FFFFFF`. Light mode: `#000000`. |
+| **Bottom border** | 1px solid `#3A3A3A` (dark) / `#D1D1D1` (light). |
+
+**Left Side — Harbor Icon & App Name**
+
+* Harbor icon: 16×16 DIP, 8px left padding.
+* Active app name: bold weight (600), 8px left of icon.
+* Menu items (File, Edit, View…): regular weight (400), 16px horizontal padding each.
+
+**Right Side — System Tray & Clock**
+
+* System tray icons: 18×18 DIP, 8px spacing between icons, 8px right margin.
+* Clock: right-aligned, 12px right padding. Format: `h:mm AM/PM` (follows Windows regional setting).
+* Control Center indicator: chevron glyph `›`, 10px left of clock.
+
+**Interaction States**
+
+| State | Appearance |
+| :---- | :---- |
+| **Default** | Text only, no background highlight. |
+| **Hover** | Rounded rectangle highlight `#FFFFFF` at 10% opacity (dark) / `#000000` at 8% opacity (light), 4px corner radius, 120ms fade-in (`ease-out`). |
+| **Pressed** | Highlight at 20% opacity, immediate (no transition). |
+| **Disabled / inactive menu** | Text at 50% opacity. |
+
+## **5B. Dock**
+
+**Dimensions & Material**
+
+| Property | Value |
+| :---- | :---- |
+| **Bar height** | 62 DIP (includes padding). |
+| **Icon size** | 48×48 DIP (default). |
+| **Padding** | 8px vertical, 4px horizontal between icons. |
+| **Corner radius** | 16px (overall Dock container). |
+| **Bottom margin** | 4px from screen edge. |
+| **Background** | `#1E1E1E` at 50% opacity with 40px Gaussian blur (Acrylic). Light mode: `#F6F6F6` at 50% opacity with 40px blur. |
+| **Border** | 1px solid `#FFFFFF` at 12% opacity (dark) / `#000000` at 8% opacity (light). |
+
+**Separator**
+
+* 1px wide vertical line, `#FFFFFF` at 20% opacity (dark) / `#000000` at 12% opacity (light), 24 DIP tall, centered vertically. Separates pinned apps from running (unpinned) apps.
+
+**Icon States**
+
+| State | Behavior |
+| :---- | :---- |
+| **Default** | 48×48 DIP icon, no transform. |
+| **Hover** | Scale to 56×56 DIP (1.167×), 150ms `ease-out`. Tooltip appears after 500ms hover delay: app name in a rounded pill (`#1E1E1E` background, `#FFFFFF` text, 6px 12px padding, 8px corner radius), positioned 8px above the icon. |
+| **Active (running)** | Small indicator dot below the icon: 4px diameter circle, `#FFFFFF` (dark) / `#000000` (light), centered, 2px below icon bottom edge. |
+| **Launching** | Bounce animation: icon translates 12 DIP upward then returns to rest, repeated 3 times. Each bounce: 300ms total (150ms up `ease-out`, 150ms down `ease-in`). Total duration: 900ms. |
+| **Pressed** | Scale to 44×44 DIP (0.917×), 80ms `ease-in`. Returns to 48×48 on release, 100ms `ease-out`. |
+
+**Auto-Hide Behavior**
+
+* Trigger zone: 2px tall invisible hit-test region at screen bottom edge.
+* Reveal delay: 200ms after cursor enters trigger zone.
+* Show animation: slide up from below screen edge, 250ms, `cubic-bezier(0.16, 1, 0.3, 1)`.
+* Hide delay: 1000ms after cursor leaves the Dock area.
+* Hide animation: slide down below screen edge, 200ms, `cubic-bezier(0.7, 0, 0.84, 0)`.
+
+**Right-Click Context Menu**
+
+* Items for pinned apps: "Open", "Remove from Dock", separator, "Options ▸" (submenu: "Keep in Dock", "Open at Login").
+* Items for running apps: "Open", separator, "Options ▸" (submenu: "Keep in Dock", "Open at Login"), separator, "Quit".
+* Menu style: matches system context menu styling with Acrylic background.
+
+## **5C. Traffic Light Window Controls**
+
+**Dimensions & Positioning**
+
+| Property | Value |
+| :---- | :---- |
+| **Button diameter** | 12 DIP |
+| **Spacing between buttons** | 8 DIP (center to center: 20 DIP) |
+| **Padding from left edge** | 8 DIP from overlay left edge to first button center |
+| **Vertical centering** | Centered vertically within the title bar overlay |
+
+**Button Colors**
+
+| Button | Default | Hover glyph | Pressed | Inactive window |
+| :---- | :---- | :---- | :---- | :---- |
+| **Close** | `#FF5F57` | `×` (cross) | `#E0443E` | `#CDCDCD` |
+| **Minimize** | `#FEBC2E` | `−` (minus) | `#D4A528` | `#CDCDCD` |
+| **Maximize** | `#28C840` | `+` (plus) / `⤢` (fullscreen) | `#1AAB29` | `#CDCDCD` |
+
+**Interaction States**
+
+| State | Appearance |
+| :---- | :---- |
+| **Default** | Solid colored circles, no glyphs visible. |
+| **Hover (any button)** | All three buttons simultaneously show their glyphs. Glyph color: `#4D0000` (close), `#6B4400` (minimize), `#003D00` (maximize). Glyph fade-in: 80ms `ease-out`. |
+| **Pressed** | Button fill shifts to pressed color (see table above). Glyph remains visible. |
+| **Inactive window** | All three buttons display as `#CDCDCD` with no glyphs. On hover, colors and glyphs restore. |
+| **Glyph font** | Rendered as vector paths (not a font) to ensure pixel-perfect rendering at all DPI levels. Stroke width: 1.5 DIP. |
+
+## **5D. Animation Specifications**
+
+| Animation | Duration | Easing | Details |
+| :---- | :---- | :---- | :---- |
+| **Genie minimize** | 400ms | `cubic-bezier(0.2, 0, 0, 1)` | Bitmap captured via DwmRegisterThumbnail; animated along a quadratic bezier curve toward Dock icon position. See Section 4B for full pipeline. |
+| **Genie restore** | 350ms | `cubic-bezier(0.2, 0, 0, 1)` | Reverse of minimize — bitmap expands from Dock icon to window's restored position, then ShowWindow(SW\_SHOW). |
+| **Dock icon bounce** | 900ms total | Up: `ease-out`, Down: `ease-in` | 3 bounces × 300ms. Translation: 12 DIP vertical. See Section 5B icon states. |
+| **Dock show** | 250ms | `cubic-bezier(0.16, 1, 0.3, 1)` | Slide up from below screen edge. |
+| **Dock hide** | 200ms | `cubic-bezier(0.7, 0, 0.84, 0)` | Slide down below screen edge. |
+| **Traffic light glyph** | 80ms | `ease-out` | Opacity 0 → 1 for glyph paths. |
+| **Menu bar hover** | 120ms | `ease-out` | Background highlight fade-in. |
+| **Window open** | 250ms | `cubic-bezier(0.16, 1, 0.3, 1)` | Scale from 0.92 → 1.0 with opacity 0 → 1. |
+
+## **5E. macOS → Windows Visual Mapping**
+
+| macOS Visual Element | Windows Implementation in Harbor |
+| :---- | :---- |
+| **Menu bar translucency** | WPF Window with `SetWindowCompositionAttribute` using `ACCENT_ENABLE_ACRYLICBLURBEHIND`. Fallback: `DwmSetWindowAttribute` with `DWMWA_SYSTEMBACKDROP_TYPE = DWMSBT_TRANSIENTWINDOW` (Acrylic). |
+| **Dock frosted glass** | Same Acrylic API as menu bar, with higher blur radius (40px). Shell uses `AllowsTransparency=True` and a `VisualBrush` clipped to the Dock's rounded rectangle. |
+| **SF Pro font** | `Segoe UI Variable` — Microsoft's variable font with similar optical sizing. Installed by default on Windows 11. |
+| **Traffic light buttons** | WPF `Ellipse` elements with `Fill` bound to button state. Glyphs rendered as `Path` geometries inside each ellipse. |
+| **Genie effect** | `DwmRegisterThumbnail` for bitmap capture → animated on a WPF `Canvas` overlay using `CompositionTarget.Rendering` for frame-synced updates. |
+| **Dock magnification (hover)** | WPF `ScaleTransform` with `RenderTransformOrigin` at icon center. Animated via `DoubleAnimation` on `ScaleX`/`ScaleY`. |
+| **System tray icons** | ManagedShell `TrayService` — natively hosts Shell_NotifyIcon items. Icons rendered at 18×18 DIP. |
+| **Dark/Light mode** | Reads `AppsUseLightTheme` registry key (see Section 9B). Harbor's resource dictionaries swap between dark and light `SolidColorBrush` / `AcrylicBrush` sets. |
+| **Window open animation** | `Storyboard` combining `DoubleAnimation` on `ScaleTransform` (0.92→1.0) and `Opacity` (0→1), applied to a fullscreen transparent overlay hosting a `DwmRegisterThumbnail` capture. |
+| **Rounded corners** | Handled natively by Windows 11 DWM (`DwmSetWindowAttribute` with `DWMWA_WINDOW_CORNER_PREFERENCE = DWMWCP_ROUND`). No Harbor intervention needed for app windows. Dock container uses `Border.CornerRadius="16"`. |
+
+# **6\. Edge Cases & Application Compatibility**
+
+## **6A. Per-Application UIA Tree Variability**
 
 The UIA tree structure varies dramatically across UI frameworks. The document's overlay strategy assumes a discoverable TitleBar control type, but this assumption does not hold universally.
 
@@ -117,7 +253,7 @@ titleBarRect.Height \= windowRect.Top \- clientRect.Top  // NONCLIENT height
 
 If the computed NONCLIENT height is zero or negative, the window uses custom chrome and Harbor should not attach an overlay. These windows are added to a session-scoped skip list.
 
-## **5B. Fullscreen & Exclusive Mode Applications**
+## **6B. Fullscreen & Exclusive Mode Applications**
 
 Games and media players using exclusive fullscreen or borderless-fullscreen will conflict with AppBar reservations and overlays.
 
@@ -133,15 +269,15 @@ Games and media players using exclusive fullscreen or borderless-fullscreen will
 
 * When the fullscreen application exits or loses focus, Harbor restores AppBar reservations and re-enables overlay tracking.
 
-# **6\. Overlay Synchronization (Critical Path)**
+# **7\. Overlay Synchronization (Critical Path)**
 
 **Overlay synchronization is the single hardest engineering challenge in Harbor. The overlay must track the target window's position at display refresh rate. Any lag between the real title bar and the overlay during a window drag will be immediately visible and jarring to users.**
 
-## **6A. The Problem**
+## **7A. The Problem**
 
 EVENT\_OBJECT\_LOCATIONCHANGE fires asynchronously and at inconsistent intervals across applications. Some applications (notably Chromium-based apps) batch location-change events. WPF's layout engine introduces additional latency: dispatching a position update through the WPF Dispatcher, computing layout, and rendering can add 2–8ms per frame. On a 60Hz display, the total frame budget is 16.6ms. Losing even 4ms to dispatch overhead means the overlay visibly lags during fast drags.
 
-## **6B. Mitigation Architecture: Dual-Layer Tracking**
+## **7B. Mitigation Architecture: Dual-Layer Tracking**
 
 Harbor implements a two-layer synchronization strategy:
 
@@ -169,7 +305,7 @@ To minimize visual tearing between the overlay and the target window, Harbor sho
 
 * Use DwmGetCompositionTimingInfo to retrieve the precise VBlank timestamp and schedule overlay updates to arrive just before the next composition deadline.
 
-## **6C. Performance Budget**
+## **7C. Performance Budget**
 
 | Operation | Target Latency | Notes |
 | :---- | :---- | :---- |
@@ -178,15 +314,15 @@ To minimize visual tearing between the overlay and the target window, Harbor sho
 | DwmFlush | \~8ms average (blocks) | Aligns to next compositor frame |
 | Total per-frame budget | \< 16.6ms (60Hz) | Must leave headroom for application rendering |
 
-## **6D. Escape Hatch: DirectComposition Overlay Layer**
+## **7D. Escape Hatch: DirectComposition Overlay Layer**
 
 If WPF proves fundamentally unable to achieve acceptable synchronization (the primary risk), Harbor should be architected to swap the overlay rendering layer. The overlay windows could be reimplemented using Windows.UI.Composition (the Visual Layer recommended by Microsoft as the successor to DirectComposition) or raw DirectComposition. These APIs operate independently of the UI thread and achieve native compositor-level frame rates. The tradeoff is significantly more complex C++/C\# interop and loss of WPF's declarative XAML tooling for the overlay controls.
 
 **Decision Point:** Prototype the WPF overlay approach first. If drag-tracking latency exceeds 2 frames (33ms at 60Hz) in profiling, escalate to the DirectComposition fallback. Budget two additional sprints for this contingency.
 
-# **7\. Multi-Monitor & DPI Scaling**
+# **8\. Multi-Monitor & DPI Scaling**
 
-## **7A. Per-Monitor DPI Awareness**
+## **8A. Per-Monitor DPI Awareness**
 
 On mixed-DPI setups (common with laptops connected to external displays), overlay positioning math will silently produce incorrect results unless the Harbor process is declared per-monitor DPI aware. Without this, Windows transparently scales coordinates through a virtualization layer, causing overlays to appear offset or incorrectly sized when a window moves between monitors.
 
@@ -198,17 +334,17 @@ On mixed-DPI setups (common with laptops connected to external displays), overla
 
 * When a window is dragged across a monitor boundary (detected by a change in MonitorFromWindow return value), destroy and recreate the overlay on the new monitor's DPI context. WPF windows cannot change their DPI context after creation.
 
-## **7B. Multi-Monitor AppBar Behavior**
+## **8B. Multi-Monitor AppBar Behavior**
 
 * Register separate AppBar instances for each connected monitor. The Top Menu and Dock should appear on the primary monitor by default, with a user preference to extend to all monitors.
 
 * Handle WM\_DISPLAYCHANGE to detect monitor connect/disconnect events and rebuild AppBar registrations dynamically.
 
-# **8\. Title Bar Color Detection**
+# **9\. Title Bar Color Detection**
 
 Harbor must draw a solid block on the right side of the overlay to obscure native window controls. This block must match the title bar's background color, or it will appear as a visible rectangle to the user.
 
-## **8A. Detection Strategy (Cascading)**
+## **9A. Detection Strategy (Cascading)**
 
 **Priority 1 — DwmGetColorizationColor:** Query the system-wide DWM colorization. This works for all applications using the default Windows title bar (the majority of Win32 apps). Returns a single ARGB value.
 
@@ -218,23 +354,23 @@ Harbor must draw a solid block on the right side of the overlay to obscure nativ
 
 **Priority 4 — User Override:** Expose a per-application color override in Harbor's settings. Users can manually specify the title bar color for problematic applications.
 
-## **8B. Dark Mode / Light Mode**
+## **9B. Dark Mode / Light Mode**
 
 * Subscribe to the Windows registry key HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize\\AppsUseLightTheme. When this value changes, invalidate all cached title bar colors and re-query.
 
 * Harbor's own shell chrome (Top Menu, Dock) should respect this setting and offer both dark and light themes.
 
-# **9\. Crash Recovery & Graceful Degradation**
+# **10\. Crash Recovery & Graceful Degradation**
 
 **Because Harbor replaces explorer.exe and actively hides windows (via SW\_HIDE during genie animations), an unhandled crash can leave the user with no taskbar, no system tray, and invisible windows. This section describes the safety net architecture.**
 
-## **9A. Watchdog Process**
+## **10A. Watchdog Process**
 
 * Harbor launches a lightweight native watchdog process (harbor-watchdog.exe) on startup. This process is independent of the .NET runtime and is kept deliberately simple (\< 500 lines of C).
 
 * The watchdog monitors the Harbor main process via a heartbeat mechanism: Harbor writes to a shared memory-mapped file every 500ms. If the watchdog detects 3 consecutive missed heartbeats (1.5 seconds), it executes the recovery sequence.
 
-## **9B. Hidden Window Registry**
+## **10B. Hidden Window Registry**
 
 Harbor maintains a persistent registry of all window handles (HWNDs) that it has hidden via SW\_HIDE:
 
@@ -244,7 +380,7 @@ Harbor maintains a persistent registry of all window handles (HWNDs) that it has
 
 * On Recovery: The watchdog (or Harbor itself on restart) iterates the registry and calls ShowWindow(SW\_SHOW) on every recorded HWND. Invalid handles (from processes that exited) are silently skipped using IsWindow() checks.
 
-## **9C. Recovery Sequence**
+## **10C. Recovery Sequence**
 
 When the watchdog detects Harbor has crashed:
 
@@ -258,15 +394,15 @@ When the watchdog detects Harbor has crashed:
 
 * **5\.** Write a crash dump to %LOCALAPPDATA%\\Harbor\\CrashDumps\\ for post-mortem analysis.
 
-## **9D. Safe Startup**
+## **10D. Safe Startup**
 
 * On launch, Harbor always checks for and clears any stale Hidden Window Registry entries from a previous session.
 
 * Harbor registers an AppDomain.UnhandledException handler and a TaskScheduler.UnobservedTaskException handler that trigger the recovery sequence before process exit.
 
-# **10\. Security & Performance**
+# **11\. Security & Performance**
 
-## **10A. Security Posture**
+## **11A. Security Posture**
 
 | Aspect | Assessment |
 | :---- | :---- |
@@ -274,7 +410,7 @@ When the watchdog detects Harbor has crashed:
 | **Attack Surface** | Low. Harbor runs as a standard user-mode process. The watchdog runs with identical privileges. No kernel-mode components, no driver installation, no elevated privileges required. |
 | **Data Handling** | Harbor reads only window geometry and control metadata via UIA. It does not read or log application content, keystrokes, or user data. |
 
-## **10B. Performance Profile**
+## **11B. Performance Profile**
 
 | Component | Overhead | Mitigation |
 | :---- | :---- | :---- |
@@ -283,9 +419,9 @@ When the watchdog detects Harbor has crashed:
 | **Genie Animation** | Burst (GPU) | DwmRegisterThumbnail is GPU-accelerated. Animation canvas is a short-lived overlay (\< 500ms). Negligible steady-state cost. |
 | **Memory (Idle)** | \~60–100 MB | WPF runtime \+ ManagedShell \+ overlay windows. Comparable to explorer.exe baseline. |
 
-# **11\. Testing Strategy**
+# **12\. Testing Strategy**
 
-## **11A. Overlay Accuracy Matrix**
+## **12A. Overlay Accuracy Matrix**
 
 Maintain a curated list of 20+ applications spanning all major UI frameworks. For each application, automated tests verify:
 
@@ -297,7 +433,7 @@ Maintain a curated list of 20+ applications spanning all major UI frameworks. Fo
 
 * The native window controls are fully obscured by the color-matched mask.
 
-## **11B. Target Application List (Minimum)**
+## **12B. Target Application List (Minimum)**
 
 | Category | Applications | Framework |
 | :---- | :---- | :---- |
@@ -309,7 +445,7 @@ Maintain a curated list of 20+ applications spanning all major UI frameworks. Fo
 | **Qt** | VLC, Telegram Desktop | Qt Widgets / QML |
 | **Fullscreen** | Any DirectX game, VLC fullscreen | DXGI Exclusive / Borderless |
 
-## **11C. Synchronization Profiling**
+## **12C. Synchronization Profiling**
 
 * Instrument the overlay tracking loop with high-resolution timestamps (QueryPerformanceCounter).
 
@@ -319,7 +455,7 @@ Maintain a curated list of 20+ applications spanning all major UI frameworks. Fo
 
 * Test on both integrated graphics (Intel UHD) and discrete GPUs (NVIDIA/AMD) to catch driver-specific DWM synchronization differences.
 
-# **12\. Open Questions & Future Work**
+# **13\. Open Questions & Future Work**
 
 * Global Menu Bar: Should Harbor attempt to read and replicate the active application's menu structure via UIA, providing a functional macOS-style global menu? This would significantly increase UIA query complexity and per-app compatibility surface.
 

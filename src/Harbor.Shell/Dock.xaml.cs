@@ -4,6 +4,8 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Interop;
 using Harbor.Core.Interop;
+using Harbor.Core.Services;
+using Harbor.Shell.Converters;
 using ManagedShell.AppBar;
 using ManagedShell.Common.Helpers;
 using ManagedShell.WindowsTasks;
@@ -14,6 +16,7 @@ namespace Harbor.Shell;
 public partial class Dock : AppBarWindow
 {
     private Tasks? _tasks;
+    private readonly IconExtractionService _iconService = new();
 
     public Dock(
         AppBarManager appBarManager,
@@ -26,6 +29,7 @@ public partial class Dock : AppBarWindow
         : base(appBarManager, explorerHelper, fullScreenHelper, screen, edge, mode, desiredHeight)
     {
         InitializeComponent();
+        WireUpIconConverter();
     }
 
     /// <summary>
@@ -37,7 +41,15 @@ public partial class Dock : AppBarWindow
         _tasks = tasks;
         TaskIconsControl.ItemsSource = _tasks.GroupedWindows;
 
-        Trace.WriteLine("[Harbor] Dock: Initialized with task binding.");
+        Trace.WriteLine("[Harbor] Dock: Initialized with task binding and icon extraction.");
+    }
+
+    private void WireUpIconConverter()
+    {
+        if (Resources["AppIconConverter"] is AppIconConverter converter)
+        {
+            converter.IconService = _iconService;
+        }
     }
 
     protected override void OnSourceInitialized(EventArgs e)
@@ -93,6 +105,7 @@ public partial class Dock : AppBarWindow
     {
         TaskIconsControl.ItemsSource = null;
         _tasks = null;
+        _iconService.ClearCache();
 
         base.OnClosing(e);
     }

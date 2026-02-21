@@ -2,12 +2,17 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:appbar="clr-namespace:ManagedShell.AppBar;assembly=ManagedShell.AppBar"
+        xmlns:converters="clr-namespace:Harbor.Shell.Converters"
         Title="Harbor Dock"
         AllowsTransparency="True"
         WindowStyle="None"
         ShowInTaskbar="False"
         Topmost="True"
         Background="Transparent">
+
+    <appbar:AppBarWindow.Resources>
+        <converters:AppIconConverter x:Key="AppIconConverter" />
+    </appbar:AppBarWindow.Resources>
 
     <Grid x:Name="DockRoot" Height="62" VerticalAlignment="Bottom">
         <!-- Dock container: centered, auto-width, rounded corners, acrylic background -->
@@ -38,7 +43,7 @@
                                   ToolTip="{Binding Title}"
                                   MouseLeftButtonUp="DockIcon_MouseLeftButtonUp">
                                 <!-- Application icon -->
-                                <Image Source="{Binding Icon}"
+                                <Image Source="{Binding Converter={StaticResource AppIconConverter}}"
                                        Width="48" Height="48"
                                        RenderOptions.BitmapScalingMode="HighQuality" />
                                 <!-- Active indicator dot -->

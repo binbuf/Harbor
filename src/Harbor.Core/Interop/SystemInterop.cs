@@ -41,4 +41,9 @@ public static class SystemInterop
             0);
         return value;
     }
+
+    public static uint GetDoubleClickTime()
+    {
+        return PInvoke.GetDoubleClickTime();
+    }
 }

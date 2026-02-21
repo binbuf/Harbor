@@ -34,3 +34,4 @@ GetDpiForWindow
 SystemParametersInfo
 SHGetFileInfo
 GetSystemMetrics
+GetDoubleClickTime

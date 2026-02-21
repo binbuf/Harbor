@@ -11,6 +11,7 @@ using Harbor.Core.Interop;
 using Harbor.Core.Services;
 using ManagedShell.AppBar;
 using ManagedShell.Common.Helpers;
+using ManagedShell.WindowsTray;
 using Windows.Win32.Foundation;
 
 namespace Harbor.Shell;
@@ -18,6 +19,7 @@ namespace Harbor.Shell;
 public partial class TopMenuBar : AppBarWindow
 {
     private ForegroundWindowService? _foregroundService;
+    private NotificationArea? _notificationArea;
     private DispatcherTimer? _clockTimer;
 
     // Hover animation colors
@@ -43,7 +45,7 @@ public partial class TopMenuBar : AppBarWindow
     /// Initializes services after the window source is available.
     /// Called after Show() so we have an HWND for acrylic.
     /// </summary>
-    public void Initialize(ForegroundWindowService foregroundService)
+    public void Initialize(ForegroundWindowService foregroundService, NotificationArea notificationArea)
     {
         _foregroundService = foregroundService;
         _foregroundService.PropertyChanged += OnForegroundChanged;
@@ -52,6 +54,10 @@ public partial class TopMenuBar : AppBarWindow
         AppNameText.Text = string.IsNullOrEmpty(_foregroundService.ActiveAppName)
             ? "Harbor"
             : _foregroundService.ActiveAppName;
+
+        // Bind system tray icons
+        _notificationArea = notificationArea;
+        TrayIconsControl.ItemsSource = _notificationArea.TrayIcons;
 
         StartClock();
     }
@@ -187,10 +193,72 @@ public partial class TopMenuBar : AppBarWindow
 
     #endregion
 
+    #region System Tray Icon Interaction
+
+    private static uint GetPackedMousePosition(MouseEventArgs e, FrameworkElement relativeTo)
+    {
+        var pos = relativeTo.PointToScreen(e.GetPosition(relativeTo));
+        var x = (ushort)pos.X;
+        var y = (ushort)pos.Y;
+        return (uint)((y << 16) | x);
+    }
+
+    private static NotifyIcon? GetNotifyIcon(object sender)
+    {
+        return (sender as FrameworkElement)?.DataContext as NotifyIcon;
+    }
+
+    private void TrayIcon_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        var icon = GetNotifyIcon(sender);
+        if (icon == null) return;
+
+        var mouse = GetPackedMousePosition(e, (FrameworkElement)sender);
+        var doubleClickTime = SystemInterop.GetDoubleClickTime();
+        icon.IconMouseUp(MouseButton.Left, mouse, (int)doubleClickTime);
+
+        Trace.WriteLine($"[Harbor] TopMenuBar: Tray icon left-clicked: {icon.Title}");
+    }
+
+    private void TrayIcon_MouseRightButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        var icon = GetNotifyIcon(sender);
+        if (icon == null) return;
+
+        var mouse = GetPackedMousePosition(e, (FrameworkElement)sender);
+        var doubleClickTime = SystemInterop.GetDoubleClickTime();
+        icon.IconMouseUp(MouseButton.Right, mouse, (int)doubleClickTime);
+
+        Trace.WriteLine($"[Harbor] TopMenuBar: Tray icon right-clicked: {icon.Title}");
+    }
+
+    private void TrayIcon_MouseEnter(object sender, MouseEventArgs e)
+    {
+        var icon = GetNotifyIcon(sender);
+        if (icon == null) return;
+
+        var mouse = GetPackedMousePosition(e, (FrameworkElement)sender);
+        icon.IconMouseEnter(mouse);
+    }
+
+    private void TrayIcon_MouseLeave(object sender, MouseEventArgs e)
+    {
+        var icon = GetNotifyIcon(sender);
+        if (icon == null) return;
+
+        var mouse = GetPackedMousePosition(e, (FrameworkElement)sender);
+        icon.IconMouseLeave(mouse);
+    }
+
+    #endregion
+
     protected override void OnClosing(CancelEventArgs e)
     {
         _clockTimer?.Stop();
         _clockTimer = null;
+
+        TrayIconsControl.ItemsSource = null;
+        _notificationArea = null;
 
         if (_foregroundService != null)
             _foregroundService.PropertyChanged -= OnForegroundChanged;

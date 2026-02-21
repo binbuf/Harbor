@@ -34,7 +34,7 @@ public partial class App : Application
             24);
 
         _menuBarRegistration = AppBarHelper.Register(menuBar, AppBarEdge.Top);
-        menuBar.Initialize(_foregroundService);
+        menuBar.Initialize(_foregroundService, _shellServices.NotificationArea);
 
         Trace.WriteLine("[Harbor] App: Startup complete.");
     }

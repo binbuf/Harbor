@@ -31,6 +31,45 @@
                            FontWeight="Regular" />
             </Border>
 
+            <!-- Control Center chevron (visual placeholder) -->
+            <TextBlock DockPanel.Dock="Right"
+                       Text="›"
+                       VerticalAlignment="Center"
+                       Margin="0,0,10,0"
+                       Foreground="#FFFFFF"
+                       FontFamily="Segoe UI Variable"
+                       FontSize="13"
+                       FontWeight="Regular" />
+
+            <!-- System tray icons -->
+            <ItemsControl DockPanel.Dock="Right"
+                          x:Name="TrayIconsControl"
+                          VerticalAlignment="Center"
+                          Margin="0,0,8,0">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel Orientation="Horizontal" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Width="18" Height="18"
+                                Margin="4,0"
+                                VerticalAlignment="Center"
+                                Cursor="Hand"
+                                ToolTip="{Binding Title}"
+                                MouseLeftButtonUp="TrayIcon_MouseLeftButtonUp"
+                                MouseRightButtonUp="TrayIcon_MouseRightButtonUp"
+                                MouseEnter="TrayIcon_MouseEnter"
+                                MouseLeave="TrayIcon_MouseLeave">
+                            <Image Source="{Binding Icon}"
+                                   Width="18" Height="18"
+                                   RenderOptions.BitmapScalingMode="HighQuality" />
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
             <!-- Left side: Icon + App Name + Menu Items -->
             <StackPanel Orientation="Horizontal"
                         VerticalAlignment="Stretch">

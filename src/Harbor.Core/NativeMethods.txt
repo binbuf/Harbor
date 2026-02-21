@@ -1,16 +1,33 @@
-SetWinEventHook
+// Window Management
 GetForegroundWindow
 GetWindowRect
 GetClientRect
 SetWindowPos
+ShowWindow
+SendMessage
+PostMessage
+GetWindowLong
+SetWindowLong
+MonitorFromWindow
+IsWindow
+
+// Event Hooks
+SetWinEventHook
+UnhookWinEvent
+
+// DWM
 DwmRegisterThumbnail
+DwmUnregisterThumbnail
+DwmUpdateThumbnailProperties
 DwmFlush
+DwmGetColorizationColor
 DwmGetWindowAttribute
 DwmSetWindowAttribute
+
+// DPI
 GetDpiForWindow
-SHGetFileInfo
+
+// System
 SystemParametersInfo
-ShowWindow
-MonitorFromWindow
+SHGetFileInfo
 GetSystemMetrics
-IsWindow

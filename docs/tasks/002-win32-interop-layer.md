@@ -53,9 +53,9 @@ Create static classes in `Harbor.Core` under a `NativeMethods` or `Interop` name
 
 ## Acceptance Criteria / Tests
 
-- [ ] All P/Invoke signatures compile without warnings
-- [ ] Unit tests verify struct sizes/layouts match expected native sizes using `Marshal.SizeOf`
-- [ ] Integration test calls `GetForegroundWindow()` and returns a non-zero `IntPtr`
-- [ ] Integration test calls `GetWindowRect()` on a known window and returns a valid `RECT`
-- [ ] Integration test calls `GetDpiForWindow()` and returns a value >= 96
-- [ ] Constants are verified against documented Windows SDK values
+- [x] All P/Invoke signatures compile without warnings
+- [x] Unit tests verify struct sizes/layouts match expected native sizes using `Marshal.SizeOf`
+- [x] Integration test calls `GetForegroundWindow()` and returns a non-zero `IntPtr`
+- [x] Integration test calls `GetWindowRect()` on a known window and returns a valid `RECT`
+- [x] Integration test calls `GetDpiForWindow()` and returns a value >= 96
+- [x] Constants are verified against documented Windows SDK values

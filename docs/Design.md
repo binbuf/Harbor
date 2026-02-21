@@ -21,7 +21,7 @@ This document (v2.0) expands on the original design to address overlay synchroni
 
 | Component | Selection |
 | :---- | :---- |
-| **Language** | C\# (.NET 8 or .NET 9\) |
+| **Language** | C\# (.NET 10 LTS\) |
 | **Core Shell Library** | ManagedShell (cairoshell/ManagedShell) — Apache 2.0 licensed, community-maintained. Handles AppBar screen reservation, system tray interception, and task enumeration. |
 | **UI Framework** | WPF (Windows Presentation Foundation) for shell chrome; Win2D/DirectComposition evaluated as fallback for overlay layer (see Section 7). |
 | **Automation** | UIAutomationClient / UIAutomationTypes — the native Windows accessibility API used by screen readers to enumerate bounding boxes of windows and controls. |

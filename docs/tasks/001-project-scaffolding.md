@@ -14,7 +14,7 @@ Refer to `docs/Design.md` Sections 2 (Technical Stack) and 8A (Per-Monitor DPI A
 
 ## Requirements
 
-1. Create a .NET 8 (or .NET 9) solution (`Harbor.sln`) with the following projects:
+1. Create a .NET 10 solution (`Harbor.sln`) with the following projects:
    - `Harbor.Shell` — WPF Application (main shell executable)
    - `Harbor.Core` — Class Library (shared models, interfaces, Win32 interop)
    - `Harbor.Shell.Tests` — xUnit test project for Harbor.Shell

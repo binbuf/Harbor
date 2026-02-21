@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Harbor.Core/Harbor.Core.csproj" />
+    <Project Path="src/Harbor.Shell/Harbor.Shell.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Harbor.Core.Tests/Harbor.Core.Tests.csproj" />
+    <Project Path="tests/Harbor.Shell.Tests/Harbor.Shell.Tests.csproj" />
+  </Folder>
+</Solution>

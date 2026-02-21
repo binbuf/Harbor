@@ -1,0 +1,16 @@
+SetWinEventHook
+GetForegroundWindow
+GetWindowRect
+GetClientRect
+SetWindowPos
+DwmRegisterThumbnail
+DwmFlush
+DwmGetWindowAttribute
+DwmSetWindowAttribute
+GetDpiForWindow
+SHGetFileInfo
+SystemParametersInfo
+ShowWindow
+MonitorFromWindow
+GetSystemMetrics
+IsWindow

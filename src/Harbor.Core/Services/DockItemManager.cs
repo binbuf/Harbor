@@ -11,6 +11,7 @@ namespace Harbor.Core.Services;
 /// <summary>
 /// Merges pinned apps and running apps into a unified collection for the Dock UI.
 /// Pinned apps appear first, then a separator, then unpinned running apps.
+/// Multiple windows of the same application are grouped under a single DockItem.
 /// </summary>
 public sealed class DockItemManager : IDisposable
 {
@@ -74,14 +75,14 @@ public sealed class DockItemManager : IDisposable
 
         foreach (var pin in _pinningService.Pins)
         {
-            var runningWindow = FindRunningWindow(pin.ExecutablePath);
+            var runningWindows = FindRunningWindows(pin.ExecutablePath);
             PinnedItems.Add(new DockItem
             {
                 ExecutablePath = pin.ExecutablePath,
                 DisplayName = pin.DisplayName,
                 IsPinned = true,
-                IsRunning = runningWindow is not null,
-                Window = runningWindow,
+                IsRunning = runningWindows.Count > 0,
+                Windows = runningWindows,
                 Icon = _iconService.GetIcon(pin.ExecutablePath),
             });
         }
@@ -93,35 +94,50 @@ public sealed class DockItemManager : IDisposable
 
         if (_tasks?.GroupedWindows is null) return;
 
+        // Group windows by executable path (case-insensitive)
+        var windowGroups = new Dictionary<string, List<ApplicationWindow>>(StringComparer.OrdinalIgnoreCase);
+
         foreach (ApplicationWindow window in _tasks.GroupedWindows)
         {
             var exePath = window.WinFileName;
             if (string.IsNullOrEmpty(exePath)) continue;
             if (_pinningService.IsPinned(exePath)) continue;
 
+            if (!windowGroups.TryGetValue(exePath, out var group))
+            {
+                group = [];
+                windowGroups[exePath] = group;
+            }
+            group.Add(window);
+        }
+
+        // Create one DockItem per unique executable
+        foreach (var (exePath, windows) in windowGroups)
+        {
             RunningItems.Add(new DockItem
             {
                 ExecutablePath = exePath,
-                DisplayName = window.Title ?? Path.GetFileNameWithoutExtension(exePath),
+                DisplayName = Path.GetFileNameWithoutExtension(exePath),
                 IsPinned = false,
                 IsRunning = true,
-                Window = window,
+                Windows = windows,
                 Icon = _iconService.GetIcon(exePath),
             });
         }
     }
 
-    private ApplicationWindow? FindRunningWindow(string executablePath)
+    private List<ApplicationWindow> FindRunningWindows(string executablePath)
     {
-        if (_tasks?.GroupedWindows is null) return null;
+        var windows = new List<ApplicationWindow>();
+        if (_tasks?.GroupedWindows is null) return windows;
 
         foreach (ApplicationWindow window in _tasks.GroupedWindows)
         {
             if (string.Equals(window.WinFileName, executablePath, StringComparison.OrdinalIgnoreCase))
-                return window;
+                windows.Add(window);
         }
 
-        return null;
+        return windows;
     }
 
     private void OnPinsChanged(object? sender, EventArgs e)
@@ -150,6 +166,7 @@ public sealed class DockItemManager : IDisposable
 
 /// <summary>
 /// Represents a single item in the dock (pinned, running, or both).
+/// Multiple windows of the same application are grouped under one DockItem.
 /// </summary>
 public class DockItem : INotifyPropertyChanged
 {
@@ -174,7 +191,17 @@ public class DockItem : INotifyPropertyChanged
         set { if (_isLaunching != value) { _isLaunching = value; OnPropertyChanged(); } }
     }
 
-    public ApplicationWindow? Window { get; set; }
+    /// <summary>
+    /// All windows belonging to this application, grouped under this dock icon.
+    /// The first window is typically the most recently active.
+    /// </summary>
+    public List<ApplicationWindow> Windows { get; set; } = [];
+
+    /// <summary>
+    /// The most recently active window, or null if no windows are open.
+    /// </summary>
+    public ApplicationWindow? ActiveWindow => Windows.Count > 0 ? Windows[0] : null;
+
     public System.Windows.Media.ImageSource? Icon { get; set; }
 
     public event PropertyChangedEventHandler? PropertyChanged;

@@ -142,4 +142,144 @@ public class DockContextMenuServiceTests
         var items = DockContextMenuService.GetRunningAppMenuItems(TestExe, TestName);
         Assert.Equal(5, items.Count); // Open, Sep, Options, Sep, Quit
     }
+
+    #region Window Grouping Tests
+
+    [Fact]
+    public void GetMenuItems_WithMultipleWindows_PrependsWindowList()
+    {
+        var windows = new List<(string Title, IntPtr Handle)>
+        {
+            ("Document 1", new IntPtr(100)),
+            ("Document 2", new IntPtr(200)),
+        };
+
+        var items = DockContextMenuService.GetMenuItems(
+            TestExe, TestName, isPinned: false, isRunning: true, windows: windows);
+
+        // First two items should be window titles
+        Assert.Equal("Document 1", items[0].Label);
+        Assert.Equal(DockMenuAction.SwitchToWindow, items[0].Action);
+        Assert.Equal("Document 2", items[1].Label);
+        Assert.Equal(DockMenuAction.SwitchToWindow, items[1].Action);
+
+        // Third item should be a separator between window list and regular menu
+        Assert.True(items[2].IsSeparator);
+
+        // Regular menu items follow after the separator
+        Assert.Equal("Open", items[3].Label);
+    }
+
+    [Fact]
+    public void GetMenuItems_WithMultipleWindows_HasCorrectWindowHandles()
+    {
+        var windows = new List<(string Title, IntPtr Handle)>
+        {
+            ("Window A", new IntPtr(111)),
+            ("Window B", new IntPtr(222)),
+        };
+
+        var items = DockContextMenuService.GetMenuItems(
+            TestExe, TestName, isPinned: false, isRunning: true, windows: windows);
+
+        Assert.Equal(new IntPtr(111), items[0].WindowHandle);
+        Assert.Equal(new IntPtr(222), items[1].WindowHandle);
+    }
+
+    [Fact]
+    public void GetMenuItems_WithSingleWindow_DoesNotPrependWindowList()
+    {
+        var windows = new List<(string Title, IntPtr Handle)>
+        {
+            ("Only Window", new IntPtr(100)),
+        };
+
+        var items = DockContextMenuService.GetMenuItems(
+            TestExe, TestName, isPinned: false, isRunning: true, windows: windows);
+
+        // Should be the same as without windows — no window list prepended
+        Assert.Equal("Open", items[0].Label);
+        Assert.DoesNotContain(items, i => i.Action == DockMenuAction.SwitchToWindow);
+    }
+
+    [Fact]
+    public void GetMenuItems_WithoutWindows_BackwardCompatible()
+    {
+        // Calling without the windows parameter should work as before
+        var items = DockContextMenuService.GetMenuItems(
+            TestExe, TestName, isPinned: false, isRunning: true);
+
+        Assert.Equal("Open", items[0].Label);
+        Assert.DoesNotContain(items, i => i.Action == DockMenuAction.SwitchToWindow);
+    }
+
+    [Fact]
+    public void GetWindowListItems_CreatesCorrectItems()
+    {
+        var windows = new List<(string Title, IntPtr Handle)>
+        {
+            ("First", new IntPtr(1)),
+            ("Second", new IntPtr(2)),
+            ("Third", new IntPtr(3)),
+        };
+
+        var items = DockContextMenuService.GetWindowListItems(windows);
+
+        Assert.Equal(3, items.Count);
+        Assert.All(items, i => Assert.Equal(DockMenuAction.SwitchToWindow, i.Action));
+        Assert.Equal("First", items[0].Label);
+        Assert.Equal(new IntPtr(1), items[0].WindowHandle);
+        Assert.Equal("Second", items[1].Label);
+        Assert.Equal(new IntPtr(2), items[1].WindowHandle);
+        Assert.Equal("Third", items[2].Label);
+        Assert.Equal(new IntPtr(3), items[2].WindowHandle);
+    }
+
+    [Fact]
+    public void GetWindowListItems_EmptyTitle_ShowsUntitled()
+    {
+        var windows = new List<(string Title, IntPtr Handle)>
+        {
+            ("", new IntPtr(1)),
+            ("  ", new IntPtr(2)),
+        };
+
+        var items = DockContextMenuService.GetWindowListItems(windows);
+
+        Assert.Equal("(Untitled)", items[0].Label);
+        Assert.Equal("(Untitled)", items[1].Label);
+    }
+
+    [Fact]
+    public void DockMenuItem_WindowHandle_DefaultsToZero()
+    {
+        var item = new DockMenuItem("Test", DockMenuAction.Open);
+        Assert.Equal(IntPtr.Zero, item.WindowHandle);
+    }
+
+    [Fact]
+    public void GetMenuItems_WithMultipleWindows_PinnedRunning_PrependsWindowList()
+    {
+        var windows = new List<(string Title, IntPtr Handle)>
+        {
+            ("Win 1", new IntPtr(10)),
+            ("Win 2", new IntPtr(20)),
+        };
+
+        var items = DockContextMenuService.GetMenuItems(
+            TestExe, TestName, isPinned: true, isRunning: true, windows: windows);
+
+        // Window list at top
+        Assert.Equal("Win 1", items[0].Label);
+        Assert.Equal(DockMenuAction.SwitchToWindow, items[0].Action);
+        Assert.Equal("Win 2", items[1].Label);
+        Assert.True(items[2].IsSeparator);
+
+        // Regular pinned+running items follow
+        Assert.Equal("Open", items[3].Label);
+        Assert.Contains(items, i => i.Action == DockMenuAction.Quit);
+        Assert.Contains(items, i => i.Action == DockMenuAction.RemoveFromDock);
+    }
+
+    #endregion
 }

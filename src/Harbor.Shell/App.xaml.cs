@@ -23,6 +23,7 @@ public partial class App : Application
     private FullscreenDetectionService? _fullscreenDetectionService;
     private FullscreenRetreatCoordinator? _fullscreenCoordinator;
     private DockPinningService? _dockPinningService;
+    private DockSettingsService? _dockSettingsService;
     private DisplayChangeService? _displayChangeService;
     private ThemeService? _themeService;
     private HiddenWindowRegistry? _hiddenWindowRegistry;
@@ -92,18 +93,19 @@ public partial class App : Application
         _menuBarRegistration = AppBarHelper.Register(_menuBar, AppBarEdge.Top);
         _menuBar.Initialize(_foregroundService, _shellServices.NotificationArea);
 
-        // Create dock pinning service for persistent app pinning
+        // Create dock pinning and settings services
         _dockPinningService = new DockPinningService();
+        _dockSettingsService = new DockSettingsService();
 
         // Create and register the Dock as a bottom AppBar
         _dock = AppBarHelper.CreateAppBar<Dock>(
             _shellServices,
             AppBarScreen.FromPrimaryScreen(),
             AppBarEdge.Bottom,
-            62);
+            68);
 
         _dockRegistration = AppBarHelper.Register(_dock, AppBarEdge.Bottom);
-        _dock.Initialize(_shellServices.Tasks, _dockPinningService);
+        _dock.Initialize(_shellServices.Tasks, _dockPinningService, _dockSettingsService);
 
         // Create fullscreen detection and retreat coordination
         _fullscreenDetectionService = new FullscreenDetectionService();
@@ -292,6 +294,9 @@ public partial class App : Application
 
         _windowEventManager?.Dispose();
         _windowEventManager = null;
+
+        _dockSettingsService?.Dispose();
+        _dockSettingsService = null;
 
         _dockPinningService?.Dispose();
         _dockPinningService = null;

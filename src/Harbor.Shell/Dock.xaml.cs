@@ -21,6 +21,7 @@ public partial class Dock : AppBarWindow
     private DockItemManager? _itemManager;
     private readonly IconExtractionService _iconService = new();
     private DockAutoHideService? _autoHideService;
+    private DockSettingsService? _settingsService;
     private bool _isAutoHideEnabled;
 
     // Animation constants (match Design.md Section 5B / 5D)
@@ -62,8 +63,18 @@ public partial class Dock : AppBarWindow
     }
 
     /// <summary>
+    /// Initializes the Dock with task data, pinning service, and settings service.
+    /// Called after Show() so we have an HWND.
+    /// </summary>
+    public void Initialize(Tasks tasks, DockPinningService pinningService, DockSettingsService settingsService)
+    {
+        _settingsService = settingsService;
+        Initialize(tasks, pinningService);
+    }
+
+    /// <summary>
     /// Initializes the Dock with task data and pinning service.
-    /// Called after Show() so we have an HWND for acrylic.
+    /// Called after Show() so we have an HWND.
     /// </summary>
     public void Initialize(Tasks tasks, DockPinningService pinningService)
     {
@@ -113,34 +124,16 @@ public partial class Dock : AppBarWindow
     protected override void OnSourceInitialized(EventArgs e)
     {
         base.OnSourceInitialized(e);
-        ApplyAcrylic();
-    }
-
-    // Acrylic color constants (AABBGGRR format for SetWindowCompositionAttribute)
-    public const uint DarkAcrylicColor = 0x801E1E1E;  // #1E1E1E @ 50%
-    public const uint LightAcrylicColor = 0x80F6F6F6; // #F6F6F6 @ 50%
-
-    private void ApplyAcrylic()
-    {
-        ApplyThemedAcrylic(ThemeService.ReadThemeFromRegistry());
+        // Window-level acrylic removed — DockContainer uses DynamicResource DockBackground
+        // for its semi-transparent fill, keeping the dock content-sized (not full-width).
     }
 
     /// <summary>
-    /// Applies acrylic blur with the correct background tint for the given theme.
-    /// Called on startup and when the system theme changes.
+    /// No-op: dock uses DynamicResource background on DockContainer only,
+    /// not window-level acrylic (which would make the full-width AppBar visible).
     /// </summary>
     public void ApplyThemedAcrylic(AppTheme theme)
     {
-        var hwnd = new WindowInteropHelper(this).Handle;
-        if (hwnd == IntPtr.Zero) return;
-
-        var acrylicColor = theme == AppTheme.Light ? LightAcrylicColor : DarkAcrylicColor;
-        var result = CompositionInterop.EnableAcrylic(new HWND(hwnd), acrylicColor);
-
-        if (result)
-            Trace.WriteLine($"[Harbor] Dock: Acrylic applied for {theme} theme.");
-        else
-            Trace.WriteLine("[Harbor] Dock: Acrylic failed, using solid fallback.");
     }
 
     private void OnItemsChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -279,7 +272,7 @@ public partial class Dock : AppBarWindow
         Dispatcher.Invoke(() =>
         {
             DockContainer.Visibility = Visibility.Visible;
-            var slideUp = new DoubleAnimation(62, 0, ShowAnimationDuration)
+            var slideUp = new DoubleAnimation(68, 0, ShowAnimationDuration)
             {
                 EasingFunction = ShowEasing,
             };
@@ -292,7 +285,7 @@ public partial class Dock : AppBarWindow
     {
         Dispatcher.Invoke(() =>
         {
-            var slideDown = new DoubleAnimation(0, 62, HideAnimationDuration)
+            var slideDown = new DoubleAnimation(0, 68, HideAnimationDuration)
             {
                 EasingFunction = HideEasing,
             };
@@ -311,20 +304,32 @@ public partial class Dock : AppBarWindow
 
     /// <summary>
     /// Click-to-activate / click-to-minimize / launch logic.
+    /// Supports grouped windows: brings all windows to front or minimizes all.
     /// </summary>
     public static void HandleDockIconClick(DockItem dockItem)
     {
-        if (dockItem.IsRunning && dockItem.Window is not null)
+        if (dockItem.IsRunning && dockItem.Windows.Count > 0)
         {
-            if (dockItem.Window.State == ApplicationWindow.WindowState.Active)
+            // Check if any window in the group is currently active
+            bool anyActive = dockItem.Windows.Exists(w => w.State == ApplicationWindow.WindowState.Active);
+
+            if (anyActive)
             {
-                Trace.WriteLine($"[Harbor] Dock: Minimizing active window: {dockItem.DisplayName}");
-                dockItem.Window.Minimize();
+                // Minimize all windows in the group
+                Trace.WriteLine($"[Harbor] Dock: Minimizing all windows for: {dockItem.DisplayName}");
+                foreach (var window in dockItem.Windows)
+                {
+                    window.Minimize();
+                }
             }
             else
             {
-                Trace.WriteLine($"[Harbor] Dock: Activating window: {dockItem.DisplayName}");
-                dockItem.Window.BringToFront();
+                // Bring all windows to front, most recently active (first) ends up on top
+                Trace.WriteLine($"[Harbor] Dock: Activating all windows for: {dockItem.DisplayName}");
+                for (int i = dockItem.Windows.Count - 1; i >= 0; i--)
+                {
+                    dockItem.Windows[i].BringToFront();
+                }
             }
         }
         else if (dockItem.IsPinned && !dockItem.IsRunning)
@@ -369,12 +374,23 @@ public partial class Dock : AppBarWindow
         if (_itemManager is null) return;
 
         var isOpenAtLogin = StartupShortcutService.IsOpenAtLogin(dockItem.ExecutablePath);
+
+        // Build window list for grouped icons with multiple windows
+        List<(string Title, IntPtr Handle)>? windowList = null;
+        if (dockItem.Windows.Count > 1)
+        {
+            windowList = dockItem.Windows
+                .Select(w => (Title: w.Title ?? "(Untitled)", Handle: w.Handle))
+                .ToList();
+        }
+
         var menuItems = DockContextMenuService.GetMenuItems(
             dockItem.ExecutablePath,
             dockItem.DisplayName,
             dockItem.IsPinned,
             dockItem.IsRunning,
-            isOpenAtLogin);
+            isOpenAtLogin,
+            windowList);
 
         var contextMenu = BuildContextMenu(menuItems, dockItem);
         contextMenu.PlacementTarget = (UIElement)sender;
@@ -417,22 +433,41 @@ public partial class Dock : AppBarWindow
 
             var menuItem = new MenuItem { Header = item.Label };
             var action = item.Action;
-            menuItem.Click += (_, _) => HandleMenuAction(action, dockItem);
+            var windowHandle = item.WindowHandle;
+            menuItem.Click += (_, _) => HandleMenuAction(action, dockItem, windowHandle);
             menu.Items.Add(menuItem);
         }
 
         return menu;
     }
 
-    private void HandleMenuAction(DockMenuAction action, DockItem dockItem)
+    private void HandleMenuAction(DockMenuAction action, DockItem dockItem, IntPtr windowHandle = default)
     {
         switch (action)
         {
             case DockMenuAction.Open:
-                if (dockItem.IsRunning && dockItem.Window is not null)
-                    dockItem.Window.BringToFront();
+                if (dockItem.IsRunning && dockItem.Windows.Count > 0)
+                {
+                    // Bring all windows to front, most recent on top
+                    for (int i = dockItem.Windows.Count - 1; i >= 0; i--)
+                    {
+                        dockItem.Windows[i].BringToFront();
+                    }
+                }
                 else
+                {
                     LaunchApplication(dockItem.ExecutablePath);
+                }
+                break;
+
+            case DockMenuAction.SwitchToWindow:
+                // Find the specific window by handle and bring it to front
+                var targetWindow = dockItem.Windows.Find(w => w.Handle == windowHandle);
+                if (targetWindow is not null)
+                {
+                    Trace.WriteLine($"[Harbor] Dock: Switching to window: {targetWindow.Title}");
+                    targetWindow.BringToFront();
+                }
                 break;
 
             case DockMenuAction.KeepInDock:
@@ -460,25 +495,28 @@ public partial class Dock : AppBarWindow
     }
 
     /// <summary>
-    /// Sends a close message to the application's main window.
+    /// Sends a close message to all windows belonging to the application.
     /// If the app doesn't close within 3 seconds, offers to force-kill.
     /// </summary>
     private static async void QuitApplication(DockItem dockItem)
     {
-        if (dockItem.Window is null) return;
+        if (dockItem.Windows.Count == 0) return;
 
-        var hwnd = dockItem.Window.Handle;
-        Trace.WriteLine($"[Harbor] Dock: Sending close to {dockItem.DisplayName}");
+        Trace.WriteLine($"[Harbor] Dock: Sending close to all windows of {dockItem.DisplayName}");
 
-        // Send SC_CLOSE via WM_SYSCOMMAND to the main window
-        WindowInterop.PostSysCommand(new HWND(hwnd), WindowInterop.SC_CLOSE);
+        // Send SC_CLOSE to all windows in the group
+        var handles = dockItem.Windows.Select(w => w.Handle).ToList();
+        foreach (var hwnd in handles)
+        {
+            WindowInterop.PostSysCommand(new HWND(hwnd), WindowInterop.SC_CLOSE);
+        }
 
-        // Wait up to 3 seconds for the app to close
+        // Wait up to 3 seconds for all windows to close
         var deadline = DateTime.UtcNow.AddSeconds(3);
         while (DateTime.UtcNow < deadline)
         {
             await Task.Delay(200);
-            if (!WindowInterop.IsWindow(new HWND(hwnd)))
+            if (handles.All(h => !WindowInterop.IsWindow(new HWND(h))))
             {
                 Trace.WriteLine($"[Harbor] Dock: {dockItem.DisplayName} closed gracefully.");
                 return;
@@ -497,12 +535,23 @@ public partial class Dock : AppBarWindow
         {
             try
             {
-                WindowInterop.GetWindowThreadProcessId(new HWND(hwnd), out var processId);
-                if (processId != 0)
+                // Get unique process IDs from remaining windows
+                var processIds = new HashSet<uint>();
+                foreach (var hwnd in handles)
                 {
-                    var process = Process.GetProcessById((int)processId);
+                    if (WindowInterop.IsWindow(new HWND(hwnd)))
+                    {
+                        WindowInterop.GetWindowThreadProcessId(new HWND(hwnd), out var processId);
+                        if (processId != 0)
+                            processIds.Add(processId);
+                    }
+                }
+
+                foreach (var pid in processIds)
+                {
+                    var process = Process.GetProcessById((int)pid);
                     process.Kill();
-                    Trace.WriteLine($"[Harbor] Dock: Force-killed {dockItem.DisplayName} (PID {processId}).");
+                    Trace.WriteLine($"[Harbor] Dock: Force-killed {dockItem.DisplayName} (PID {pid}).");
                 }
             }
             catch (Exception ex)

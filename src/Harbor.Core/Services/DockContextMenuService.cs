@@ -64,9 +64,31 @@ public static class DockContextMenuService
     }
 
     /// <summary>
-    /// Gets the appropriate menu items based on the pinned/running state.
+    /// Creates menu items for individual windows in a grouped dock icon.
+    /// Each item has the SwitchToWindow action and the window's handle.
     /// </summary>
-    public static List<DockMenuItem> GetMenuItems(string executablePath, string displayName, bool isPinned, bool isRunning, bool isOpenAtLogin = false)
+    public static List<DockMenuItem> GetWindowListItems(List<(string Title, IntPtr Handle)> windows)
+    {
+        var items = new List<DockMenuItem>();
+        foreach (var (title, handle) in windows)
+        {
+            var label = string.IsNullOrWhiteSpace(title) ? "(Untitled)" : title;
+            items.Add(new DockMenuItem(label, DockMenuAction.SwitchToWindow, WindowHandle: handle));
+        }
+        return items;
+    }
+
+    /// <summary>
+    /// Gets the appropriate menu items based on the pinned/running state.
+    /// When multiple windows are provided, window list items are prepended at the top.
+    /// </summary>
+    public static List<DockMenuItem> GetMenuItems(
+        string executablePath,
+        string displayName,
+        bool isPinned,
+        bool isRunning,
+        bool isOpenAtLogin = false,
+        List<(string Title, IntPtr Handle)>? windows = null)
     {
         List<DockMenuItem> items;
 
@@ -79,6 +101,15 @@ public static class DockContextMenuService
 
         // Update "Open at Login" checked state
         SetOpenAtLoginState(items, isOpenAtLogin);
+
+        // Prepend window list items when there are multiple windows
+        if (windows is not null && windows.Count > 1)
+        {
+            var windowItems = GetWindowListItems(windows);
+            windowItems.Add(DockMenuItem.Separator);
+            windowItems.AddRange(items);
+            items = windowItems;
+        }
 
         return items;
     }
@@ -116,7 +147,8 @@ public record DockMenuItem(
     bool IsSubmenuHeader = false,
     bool IsSeparator = false,
     bool IsChecked = false,
-    List<DockMenuItem>? Children = null)
+    List<DockMenuItem>? Children = null,
+    IntPtr WindowHandle = default)
 {
     public static DockMenuItem Separator { get; } = new("", DockMenuAction.None, IsSeparator: true);
 }
@@ -132,4 +164,5 @@ public enum DockMenuAction
     KeepInDock,
     OpenAtLogin,
     Quit,
+    SwitchToWindow,
 }

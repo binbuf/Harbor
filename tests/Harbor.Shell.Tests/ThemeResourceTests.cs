@@ -42,31 +42,8 @@ public class ThemeResourceTests
         Assert.Equal(0xCCF6F6F6u, TopMenuBar.LightAcrylicColor);
     }
 
-    [Fact]
-    public void Dock_DarkAcrylicColor_50PercentOpacity_1E1E1E()
-    {
-        Assert.Equal(0x801E1E1Eu, Dock.DarkAcrylicColor);
-    }
-
-    [Fact]
-    public void Dock_LightAcrylicColor_50PercentOpacity_F6F6F6()
-    {
-        Assert.Equal(0x80F6F6F6u, Dock.LightAcrylicColor);
-    }
-
-    // --- Opacity difference between menu bar (80%) and dock (50%) ---
-
-    [Fact]
-    public void MenuBarAndDock_HaveDifferentOpacities()
-    {
-        // Extract alpha bytes: mask top byte
-        var menuBarAlpha = (TopMenuBar.DarkAcrylicColor >> 24) & 0xFF;
-        var dockAlpha = (Dock.DarkAcrylicColor >> 24) & 0xFF;
-
-        Assert.Equal(0xCCu, menuBarAlpha); // 80%
-        Assert.Equal(0x80u, dockAlpha);     // 50%
-        Assert.NotEqual(menuBarAlpha, dockAlpha);
-    }
+    // Dock acrylic constants removed — dock now uses DynamicResource background
+    // on DockContainer only (not window-level acrylic) for content-sized dock appearance.
 
     // --- Verify dark theme XAML color values ---
 

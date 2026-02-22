@@ -1,0 +1,67 @@
+<Window x:Class="Harbor.Shell.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Harbor Settings"
+        Width="420" Height="400"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="NoResize"
+        Background="{DynamicResource SettingsBackground}">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="24,20">
+        <StackPanel>
+            <!-- Dock Section -->
+            <TextBlock Text="Dock"
+                       FontSize="18" FontWeight="SemiBold"
+                       Foreground="{DynamicResource SettingsTextBrush}"
+                       Margin="0,0,0,12" />
+
+            <!-- Auto-Hide Mode -->
+            <TextBlock Text="Auto-hide"
+                       Foreground="{DynamicResource SettingsTextBrush}"
+                       Margin="0,0,0,4" />
+            <ComboBox x:Name="AutoHideModeCombo"
+                      Width="200" HorizontalAlignment="Left"
+                      SelectionChanged="AutoHideModeCombo_SelectionChanged">
+                <ComboBoxItem Content="Never" />
+                <ComboBoxItem Content="When Overlapped" />
+                <ComboBoxItem Content="Always" />
+            </ComboBox>
+
+            <!-- Icon Size -->
+            <TextBlock x:Name="IconSizeLabel"
+                       Text="Icon size: 48 px"
+                       Foreground="{DynamicResource SettingsTextBrush}"
+                       Margin="0,16,0,4" />
+            <Slider x:Name="IconSizeSlider"
+                    Minimum="32" Maximum="128"
+                    Width="200" HorizontalAlignment="Left"
+                    IsSnapToTickEnabled="True" TickFrequency="4"
+                    ValueChanged="IconSizeSlider_ValueChanged" />
+
+            <!-- Magnification -->
+            <CheckBox x:Name="MagnificationCheckBox"
+                      Content="Magnification (fishbowl effect)"
+                      Foreground="{DynamicResource SettingsTextBrush}"
+                      Margin="0,16,0,0"
+                      Checked="MagnificationCheckBox_Changed"
+                      Unchecked="MagnificationCheckBox_Changed" />
+
+            <!-- Shell Section -->
+            <TextBlock Text="Shell"
+                       FontSize="18" FontWeight="SemiBold"
+                       Foreground="{DynamicResource SettingsTextBrush}"
+                       Margin="0,28,0,12" />
+
+            <CheckBox x:Name="ReplaceExplorerCheckBox"
+                      Content="Replace explorer.exe"
+                      Foreground="{DynamicResource SettingsTextBrush}"
+                      Checked="ReplaceExplorerCheckBox_Changed"
+                      Unchecked="ReplaceExplorerCheckBox_Changed" />
+            <TextBlock Text="Requires restart to take effect."
+                       Foreground="{DynamicResource SettingsTextBrush}"
+                       Opacity="0.6"
+                       FontSize="11"
+                       Margin="20,2,0,0" />
+        </StackPanel>
+    </ScrollViewer>
+</Window>

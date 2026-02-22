@@ -49,6 +49,25 @@ public sealed class WorkAreaService : IDisposable
     }
 
     /// <summary>
+    /// Re-applies the work area with new insets without resetting the saved original work area.
+    /// </summary>
+    public void Reapply(int topInset, int bottomInset)
+    {
+        if (!_applied) return;
+
+        var reduced = new RECT
+        {
+            left = _originalWorkArea.left,
+            top = _originalWorkArea.top + topInset,
+            right = _originalWorkArea.right,
+            bottom = _originalWorkArea.bottom - bottomInset,
+        };
+
+        SetWorkArea(reduced);
+        Trace.WriteLine($"[Harbor] WorkAreaService: Reapplied work area: L={reduced.left} T={reduced.top} R={reduced.right} B={reduced.bottom}");
+    }
+
+    /// <summary>
     /// Restores the original work area. Safe to call multiple times.
     /// </summary>
     public void Restore()

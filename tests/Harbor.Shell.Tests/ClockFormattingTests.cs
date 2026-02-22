@@ -16,6 +16,20 @@ public class ClockFormattingTests
     }
 
     [Fact]
+    public void FormatClock_ContainsDate()
+    {
+        var time = new DateTime(2026, 2, 20, 14, 30, 0); // a Friday
+        var result = TopMenuBar.FormatClock(time);
+
+        // Should contain abbreviated day-of-week and month
+        var dayName = time.ToString("ddd", CultureInfo.CurrentCulture);
+        var monthName = time.ToString("MMM", CultureInfo.CurrentCulture);
+        Assert.Contains(dayName, result);
+        Assert.Contains(monthName, result);
+        Assert.Contains("20", result); // day of month
+    }
+
+    [Fact]
     public void FormatClock_MorningTime_ShowsAM()
     {
         var time = new DateTime(2026, 2, 20, 9, 15, 0);
@@ -41,7 +55,7 @@ public class ClockFormattingTests
         var time = new DateTime(2026, 2, 20, 0, 0, 0);
         var result = TopMenuBar.FormatClock(time);
 
-        Assert.StartsWith("12:", result);
+        Assert.Contains("12:", result);
     }
 
     [Fact]
@@ -50,7 +64,7 @@ public class ClockFormattingTests
         var time = new DateTime(2026, 2, 20, 12, 0, 0);
         var result = TopMenuBar.FormatClock(time);
 
-        Assert.StartsWith("12:", result);
+        Assert.Contains("12:", result);
     }
 
     [Fact]

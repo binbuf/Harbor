@@ -38,6 +38,9 @@ public partial class App : Application
     private AppSwitcherOverlay? _appSwitcherOverlay;
     private HarborTrayIcon? _harborTrayIcon;
     private RecycleBinService? _recycleBinService;
+    private WallpaperService? _wallpaperService;
+    private DesktopBackgroundWindow? _desktopBackground;
+    private DockOverlapMonitorService? _overlapMonitor;
     private AppBarRegistration? _menuBarRegistration;
     private AppBarRegistration? _dockRegistration;
     private TopMenuBar? _menuBar;
@@ -69,6 +72,12 @@ public partial class App : Application
         if (_shellSettingsService.ReplaceExplorer)
         {
             KillExplorer();
+
+            // Render the desktop wallpaper to prevent black screen
+            _wallpaperService = new WallpaperService();
+            _desktopBackground = new DesktopBackgroundWindow();
+            _desktopBackground.Show();
+            _desktopBackground.Initialize(_wallpaperService);
         }
 
         _shellServices = new ShellServices();
@@ -132,6 +141,12 @@ public partial class App : Application
             _workAreaService.Apply(topInset: 24, bottomInset: 82);
         }
 
+        // Apply initial auto-hide mode
+        ApplyAutoHideMode(_dockSettingsService.AutoHideMode);
+
+        // Subscribe to settings changes for runtime mode switching
+        _dockSettingsService.SettingsChanged += OnDockSettingsChanged;
+
         // Register ProcessExit to restore explorer even on forced termination (e.g. VS debugger stop)
         AppDomain.CurrentDomain.ProcessExit += OnProcessExit;
 
@@ -166,7 +181,7 @@ public partial class App : Application
             Dispatcher.Invoke(() => _appSwitcherOverlay.Hide());
 
         // Create system tray icon
-        _harborTrayIcon = new HarborTrayIcon();
+        _harborTrayIcon = new HarborTrayIcon(_dockSettingsService, _shellSettingsService);
 
         // Create recycle bin service and connect to dock
         _recycleBinService = new RecycleBinService();
@@ -225,6 +240,62 @@ public partial class App : Application
         // ManagedShell's AppBarWindow.UpdatePosition() handles re-querying the screen bounds.
         _menuBar?.UpdatePosition();
         _dock?.UpdatePosition();
+    }
+
+    private void OnDockSettingsChanged(object? sender, EventArgs e)
+    {
+        Dispatcher.Invoke(() =>
+        {
+            if (_dockSettingsService is not null)
+                ApplyAutoHideMode(_dockSettingsService.AutoHideMode);
+        });
+    }
+
+    private void ApplyAutoHideMode(DockAutoHideMode mode)
+    {
+        // Dispose existing overlap monitor if any
+        _overlapMonitor?.Dispose();
+        _overlapMonitor = null;
+
+        switch (mode)
+        {
+            case DockAutoHideMode.Never:
+                _dock?.SetAutoHide(false);
+                _workAreaService?.Reapply(topInset: 24, bottomInset: 82);
+                break;
+
+            case DockAutoHideMode.Always:
+                _dock?.SetAutoHide(true, startHidden: true);
+                _workAreaService?.Reapply(topInset: 24, bottomInset: 0);
+                break;
+
+            case DockAutoHideMode.WhenOverlapped:
+                _dock?.SetAutoHide(false);
+                _workAreaService?.Reapply(topInset: 24, bottomInset: 82);
+                if (_windowEventManager is not null)
+                {
+                    _overlapMonitor = new DockOverlapMonitorService(_windowEventManager);
+                    _overlapMonitor.OverlapChanged += OnOverlapChanged;
+                }
+                break;
+        }
+
+        Trace.WriteLine($"[Harbor] App: Applied auto-hide mode: {mode}");
+    }
+
+    private void OnOverlapChanged(bool isOverlapped)
+    {
+        Dispatcher.Invoke(() =>
+        {
+            if (isOverlapped)
+            {
+                _dock?.SetAutoHide(true, startHidden: true);
+            }
+            else
+            {
+                _dock?.SetAutoHide(false);
+            }
+        });
     }
 
     /// <summary>
@@ -424,7 +495,14 @@ public partial class App : Application
         _windowEventManager?.Dispose();
         _windowEventManager = null;
 
-        _dockSettingsService?.Dispose();
+        _overlapMonitor?.Dispose();
+        _overlapMonitor = null;
+
+        if (_dockSettingsService is not null)
+        {
+            _dockSettingsService.SettingsChanged -= OnDockSettingsChanged;
+            _dockSettingsService.Dispose();
+        }
         _dockSettingsService = null;
 
         _dockPinningService?.Dispose();
@@ -435,6 +513,13 @@ public partial class App : Application
 
         _hiddenWindowRegistry?.Dispose();
         _hiddenWindowRegistry = null;
+
+        // Close desktop background and wallpaper service
+        _desktopBackground?.Close();
+        _desktopBackground = null;
+
+        _wallpaperService?.Dispose();
+        _wallpaperService = null;
 
         // Restore work area before restarting explorer
         _workAreaService?.Dispose();

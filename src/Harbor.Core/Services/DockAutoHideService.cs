@@ -55,6 +55,17 @@ public sealed class DockAutoHideService : IDisposable
     public event Action<AutoHideState>? StateChanged;
 
     /// <summary>
+    /// Immediately transitions to Hidden state without animation.
+    /// Used when starting in "Always" auto-hide mode.
+    /// </summary>
+    public void ForceHidden()
+    {
+        if (_disposed) return;
+        CancelPendingDelay();
+        TransitionTo(AutoHideState.Hidden);
+    }
+
+    /// <summary>
     /// Call when the cursor enters the trigger zone at the bottom of the screen.
     /// </summary>
     public void OnTriggerZoneEnter()

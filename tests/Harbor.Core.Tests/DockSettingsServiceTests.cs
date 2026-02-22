@@ -188,4 +188,90 @@ public class DockSettingsServiceTests : IDisposable
         svc.IconSize = 128;
         Assert.Equal(128, svc.IconSize);
     }
+
+    [Fact]
+    public void NewService_HasDefaultAutoHideMode()
+    {
+        using var svc = new DockSettingsService(_configPath);
+        Assert.Equal(DockAutoHideMode.Never, svc.AutoHideMode);
+    }
+
+    [Fact]
+    public void NewService_HasDefaultMagnificationEnabled()
+    {
+        using var svc = new DockSettingsService(_configPath);
+        Assert.False(svc.MagnificationEnabled);
+    }
+
+    [Fact]
+    public void SaveLoad_RoundTrip_AutoHideMode()
+    {
+        using (var svc = new DockSettingsService(_configPath))
+        {
+            svc.AutoHideMode = DockAutoHideMode.Always;
+        }
+
+        using var svc2 = new DockSettingsService(_configPath);
+        Assert.Equal(DockAutoHideMode.Always, svc2.AutoHideMode);
+    }
+
+    [Fact]
+    public void SaveLoad_RoundTrip_MagnificationEnabled()
+    {
+        using (var svc = new DockSettingsService(_configPath))
+        {
+            svc.MagnificationEnabled = true;
+        }
+
+        using var svc2 = new DockSettingsService(_configPath);
+        Assert.True(svc2.MagnificationEnabled);
+    }
+
+    [Fact]
+    public void SettingsChanged_FiresOnAutoHideModeChange()
+    {
+        using var svc = new DockSettingsService(_configPath);
+        var fired = false;
+        svc.SettingsChanged += (_, _) => fired = true;
+
+        svc.AutoHideMode = DockAutoHideMode.WhenOverlapped;
+
+        Assert.True(fired);
+    }
+
+    [Fact]
+    public void SettingsChanged_DoesNotFireWhenSameAutoHideMode()
+    {
+        using var svc = new DockSettingsService(_configPath);
+        var fired = false;
+        svc.SettingsChanged += (_, _) => fired = true;
+
+        svc.AutoHideMode = DockAutoHideMode.Never; // same as default
+
+        Assert.False(fired);
+    }
+
+    [Fact]
+    public void SettingsChanged_FiresOnMagnificationEnabledChange()
+    {
+        using var svc = new DockSettingsService(_configPath);
+        var fired = false;
+        svc.SettingsChanged += (_, _) => fired = true;
+
+        svc.MagnificationEnabled = true;
+
+        Assert.True(fired);
+    }
+
+    [Fact]
+    public void SettingsChanged_DoesNotFireWhenSameMagnificationEnabled()
+    {
+        using var svc = new DockSettingsService(_configPath);
+        var fired = false;
+        svc.SettingsChanged += (_, _) => fired = true;
+
+        svc.MagnificationEnabled = false; // same as default
+
+        Assert.False(fired);
+    }
 }

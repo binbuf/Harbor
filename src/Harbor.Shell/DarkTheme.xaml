@@ -22,4 +22,8 @@
     <SolidColorBrush x:Key="AppSwitcherForeground" Color="#FFFFFF" />
     <SolidColorBrush x:Key="AppSwitcherAccentBrush" Color="#0078D4" />
 
+    <!-- Settings Window -->
+    <SolidColorBrush x:Key="SettingsBackground" Color="#FF1E1E1E" />
+    <SolidColorBrush x:Key="SettingsTextBrush" Color="#FFFFFF" />
+
 </ResourceDictionary>

@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Windows;
+using Harbor.Core.Services;
 
 namespace Harbor.Shell;
 
@@ -12,10 +13,15 @@ namespace Harbor.Shell;
 public sealed class HarborTrayIcon : IDisposable
 {
     private System.Windows.Forms.NotifyIcon? _notifyIcon;
+    private readonly DockSettingsService? _dockSettings;
+    private readonly ShellSettingsService? _shellSettings;
     private bool _disposed;
 
-    public HarborTrayIcon()
+    public HarborTrayIcon(DockSettingsService dockSettings, ShellSettingsService shellSettings)
     {
+        _dockSettings = dockSettings;
+        _shellSettings = shellSettings;
+
         _notifyIcon = new System.Windows.Forms.NotifyIcon
         {
             Icon = LoadIcon(),
@@ -45,14 +51,19 @@ public sealed class HarborTrayIcon : IDisposable
                ?? SystemIcons.Application;
     }
 
-    private static System.Windows.Forms.ContextMenuStrip BuildContextMenu()
+    private System.Windows.Forms.ContextMenuStrip BuildContextMenu()
     {
         var menu = new System.Windows.Forms.ContextMenuStrip();
 
         var settingsItem = new System.Windows.Forms.ToolStripMenuItem("Settings");
         settingsItem.Click += (_, _) =>
         {
-            Trace.WriteLine("[Harbor] HarborTrayIcon: Settings clicked (placeholder).");
+            Trace.WriteLine("[Harbor] HarborTrayIcon: Settings clicked.");
+            if (_dockSettings is not null && _shellSettings is not null)
+            {
+                Application.Current.Dispatcher.Invoke(() =>
+                    SettingsWindow.ShowSingleton(_dockSettings, _shellSettings));
+            }
         };
         menu.Items.Add(settingsItem);
 

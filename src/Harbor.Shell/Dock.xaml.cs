@@ -24,6 +24,7 @@ public partial class Dock : AppBarWindow
     private DockAutoHideService? _autoHideService;
     private DockSettingsService? _settingsService;
     private bool _isAutoHideEnabled;
+    private bool _magnificationEnabled;
 
     // Long-press detection for window picker
     private DispatcherTimer? _longPressTimer;
@@ -61,6 +62,11 @@ public partial class Dock : AppBarWindow
     public static readonly Duration ShowAnimationDuration = new(TimeSpan.FromMilliseconds(250));
     public static readonly Duration HideAnimationDuration = new(TimeSpan.FromMilliseconds(200));
 
+    // Magnification constants
+    public const double MagnificationMaxScale = 1.5;
+    public const double MagnificationEffectRadius = 3.0;
+    public const double MagnificationIconPitch = 56.0; // 48 + 8 margin
+
     // Easing functions matching the spec cubic-bezier curves
     private static readonly IEasingFunction EaseOut = new QuadraticEase { EasingMode = EasingMode.EaseOut };
     private static readonly IEasingFunction EaseIn = new QuadraticEase { EasingMode = EasingMode.EaseIn };
@@ -87,7 +93,20 @@ public partial class Dock : AppBarWindow
     public void Initialize(Tasks tasks, DockPinningService pinningService, DockSettingsService settingsService)
     {
         _settingsService = settingsService;
+        _magnificationEnabled = settingsService.MagnificationEnabled;
+        settingsService.SettingsChanged += OnSettingsChanged;
         Initialize(tasks, pinningService);
+    }
+
+    private void OnSettingsChanged(object? sender, EventArgs e)
+    {
+        if (_settingsService is null) return;
+        Dispatcher.Invoke(() =>
+        {
+            _magnificationEnabled = _settingsService.MagnificationEnabled;
+            if (!_magnificationEnabled)
+                ResetMagnification();
+        });
     }
 
     /// <summary>
@@ -126,7 +145,9 @@ public partial class Dock : AppBarWindow
     /// <summary>
     /// Enables or disables auto-hide behavior.
     /// </summary>
-    public void SetAutoHide(bool enabled)
+    /// <param name="enabled">Whether auto-hide is enabled.</param>
+    /// <param name="startHidden">If true, the dock starts in the hidden state immediately.</param>
+    public void SetAutoHide(bool enabled, bool startHidden = false)
     {
         _isAutoHideEnabled = enabled;
         AutoHideTriggerZone.Visibility = enabled ? Visibility.Visible : Visibility.Collapsed;
@@ -136,6 +157,13 @@ public partial class Dock : AppBarWindow
             // Restore dock if it was hidden
             DockSlideTransform.Y = 0;
             DockContainer.Visibility = Visibility.Visible;
+        }
+
+        if (enabled && startHidden && _autoHideService is not null)
+        {
+            _autoHideService.ForceHidden();
+            DockSlideTransform.Y = 68;
+            DockContainer.Visibility = Visibility.Collapsed;
         }
     }
 
@@ -171,6 +199,7 @@ public partial class Dock : AppBarWindow
 
     private void DockIcon_MouseEnter(object sender, MouseEventArgs e)
     {
+        if (_magnificationEnabled) return; // Magnification handles scaling globally
         if (sender is not FrameworkElement element) return;
 
         var scaleTransform = FindScaleTransform(element);
@@ -189,6 +218,8 @@ public partial class Dock : AppBarWindow
             CancelLongPress();
             element.MouseMove -= DockIcon_MouseMove;
         }
+
+        if (_magnificationEnabled) return; // Magnification handles scaling globally
 
         var scaleTransform = FindScaleTransform(element);
         if (scaleTransform is null) return;
@@ -323,6 +354,9 @@ public partial class Dock : AppBarWindow
     {
         if (_isAutoHideEnabled)
             _autoHideService?.OnDockAreaLeave();
+
+        if (_magnificationEnabled && !_isDragging)
+            AnimateResetMagnification();
     }
 
     private void OnAutoHideShowRequested()
@@ -354,6 +388,200 @@ public partial class Dock : AppBarWindow
             };
             DockSlideTransform.BeginAnimation(TranslateTransform.YProperty, slideDown);
         });
+    }
+
+    #endregion
+
+    #region Magnification
+
+    /// <summary>
+    /// Handles mouse movement over the dock container when magnification is enabled.
+    /// </summary>
+    private void DockContainer_MouseMove(object sender, MouseEventArgs e)
+    {
+        if (!_magnificationEnabled || _isDragging) return;
+
+        var mousePos = e.GetPosition(DockPanel);
+        ApplyMagnification(mousePos.X);
+    }
+
+    private void ApplyMagnification(double mouseX)
+    {
+        // Collect all icon centers from pinned and running items, plus trash
+        var centers = new List<double>();
+        var elements = new List<FrameworkElement>();
+
+        CollectIconElements(PinnedIconsControl, centers, elements);
+        CollectIconElements(RunningIconsControl, centers, elements);
+
+        // Add trash icon
+        var trashPoint = TrashIcon.TranslatePoint(new Point(TrashIcon.ActualWidth / 2, 0), DockPanel);
+        centers.Add(trashPoint.X);
+        elements.Add(TrashIcon);
+
+        if (centers.Count == 0) return;
+
+        var scales = DockMagnificationCalculator.ComputeScales(
+            mouseX,
+            centers.ToArray(),
+            MagnificationMaxScale,
+            MagnificationEffectRadius,
+            MagnificationIconPitch);
+
+        for (int i = 0; i < elements.Count; i++)
+        {
+            var element = elements[i];
+            var scale = scales[i];
+
+            var scaleTransform = FindScaleTransform(element);
+            var translateTransform = FindTranslateTransform(element);
+
+            if (scaleTransform is not null)
+            {
+                scaleTransform.ScaleX = scale;
+                scaleTransform.ScaleY = scale;
+            }
+
+            if (translateTransform is not null)
+            {
+                translateTransform.Y = DockMagnificationCalculator.ComputeVerticalOffset(scale, IconDefaultSize);
+            }
+        }
+
+        // Adjust DockRoot height to accommodate magnified icons
+        DockRoot.Height = 68 + (MagnificationMaxScale - 1) * IconDefaultSize;
+    }
+
+    private void ResetMagnification()
+    {
+        ResetItemsControlScales(PinnedIconsControl);
+        ResetItemsControlScales(RunningIconsControl);
+
+        // Reset trash icon (no TransformGroup)
+        DockRoot.Height = 68;
+    }
+
+    /// <summary>
+    /// Called from DockContainer_MouseLeave when magnification is active — resets all scales smoothly.
+    /// </summary>
+    private void AnimateResetMagnification()
+    {
+        var duration = new Duration(TimeSpan.FromMilliseconds(150));
+
+        void AnimateElement(FrameworkElement element)
+        {
+            var scaleTransform = FindScaleTransform(element);
+            var translateTransform = FindTranslateTransform(element);
+
+            if (scaleTransform is not null)
+            {
+                AnimateScale(scaleTransform, 1.0, duration, EaseOut);
+            }
+
+            if (translateTransform is not null)
+            {
+                var anim = new DoubleAnimation(0, duration) { EasingFunction = EaseOut };
+                translateTransform.BeginAnimation(TranslateTransform.YProperty, anim);
+            }
+        }
+
+        AnimateItemsControlElements(PinnedIconsControl, AnimateElement);
+        AnimateItemsControlElements(RunningIconsControl, AnimateElement);
+
+        // Animate DockRoot height back
+        var heightAnim = new DoubleAnimation(68, duration) { EasingFunction = EaseOut };
+        DockRoot.BeginAnimation(HeightProperty, heightAnim);
+    }
+
+    private static void CollectIconElements(ItemsControl itemsControl, List<double> centers, List<FrameworkElement> elements)
+    {
+        for (int i = 0; i < itemsControl.Items.Count; i++)
+        {
+            var container = itemsControl.ItemContainerGenerator.ContainerFromIndex(i) as FrameworkElement;
+            if (container is null) continue;
+
+            // Find the Grid inside the DataTemplate
+            var grid = FindVisualChild<Grid>(container);
+            if (grid is null) continue;
+
+            var panel = VisualTreeHelper.GetParent(grid) as FrameworkElement ?? grid;
+            var point = grid.TranslatePoint(new Point(grid.ActualWidth / 2, 0),
+                (FrameworkElement)VisualTreeHelper.GetParent(VisualTreeHelper.GetParent(VisualTreeHelper.GetParent(grid)!)!)!);
+
+            // Get position relative to the DockPanel (which is the StackPanel containing all)
+            var dockPanel = FindVisualParent<StackPanel>(grid);
+            if (dockPanel is null) continue;
+
+            var centerPoint = grid.TranslatePoint(new Point(grid.ActualWidth / 2, 0), dockPanel);
+            centers.Add(centerPoint.X);
+            elements.Add(grid);
+        }
+    }
+
+    private static void AnimateItemsControlElements(ItemsControl itemsControl, Action<FrameworkElement> animate)
+    {
+        for (int i = 0; i < itemsControl.Items.Count; i++)
+        {
+            var container = itemsControl.ItemContainerGenerator.ContainerFromIndex(i) as FrameworkElement;
+            if (container is null) continue;
+            var grid = FindVisualChild<Grid>(container);
+            if (grid is not null)
+                animate(grid);
+        }
+    }
+
+    private static void ResetItemsControlScales(ItemsControl itemsControl)
+    {
+        for (int i = 0; i < itemsControl.Items.Count; i++)
+        {
+            var container = itemsControl.ItemContainerGenerator.ContainerFromIndex(i) as FrameworkElement;
+            if (container is null) continue;
+            var grid = FindVisualChild<Grid>(container);
+            if (grid is null) continue;
+
+            var scaleTransform = FindScaleTransform(grid);
+            var translateTransform = FindTranslateTransform(grid);
+
+            if (scaleTransform is not null)
+            {
+                scaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+                scaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+                scaleTransform.ScaleX = 1.0;
+                scaleTransform.ScaleY = 1.0;
+            }
+
+            if (translateTransform is not null)
+            {
+                translateTransform.BeginAnimation(TranslateTransform.YProperty, null);
+                translateTransform.Y = 0;
+            }
+        }
+    }
+
+    private static T? FindVisualChild<T>(DependencyObject parent) where T : DependencyObject
+    {
+        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
+        {
+            var child = VisualTreeHelper.GetChild(parent, i);
+            if (child is T typedChild)
+                return typedChild;
+            var result = FindVisualChild<T>(child);
+            if (result is not null)
+                return result;
+        }
+        return null;
+    }
+
+    private static T? FindVisualParent<T>(DependencyObject child) where T : DependencyObject
+    {
+        var parent = VisualTreeHelper.GetParent(child);
+        while (parent is not null)
+        {
+            if (parent is T typedParent)
+                return typedParent;
+            parent = VisualTreeHelper.GetParent(parent);
+        }
+        return null;
     }
 
     #endregion
@@ -874,6 +1102,12 @@ public partial class Dock : AppBarWindow
             _itemManager.RunningItems.CollectionChanged -= OnItemsChanged;
             _itemManager.Dispose();
             _itemManager = null;
+        }
+
+        if (_settingsService is not null)
+        {
+            _settingsService.SettingsChanged -= OnSettingsChanged;
+            _settingsService = null;
         }
 
         if (_autoHideService is not null)

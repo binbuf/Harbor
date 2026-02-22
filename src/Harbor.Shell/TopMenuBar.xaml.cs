@@ -162,7 +162,7 @@ public partial class TopMenuBar : AppBarWindow
     /// </summary>
     public static string FormatClock(DateTime time)
     {
-        return time.ToString("h:mm tt", CultureInfo.CurrentCulture);
+        return time.ToString("ddd MMM d  h:mm tt", CultureInfo.CurrentCulture);
     }
 
     #endregion

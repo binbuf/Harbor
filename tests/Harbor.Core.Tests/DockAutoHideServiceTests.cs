@@ -149,6 +149,36 @@ public class DockAutoHideServiceTests
     }
 
     [Fact]
+    public void ForceHidden_TransitionsDirectlyToHidden()
+    {
+        using var service = new DockAutoHideService();
+        Assert.Equal(DockAutoHideService.AutoHideState.Visible, service.State);
+
+        service.ForceHidden();
+
+        Assert.Equal(DockAutoHideService.AutoHideState.Hidden, service.State);
+    }
+
+    [Fact]
+    public void ForceHidden_FromRevealing_GoesToHidden()
+    {
+        using var service = new DockAutoHideService();
+
+        // Get to Hidden first
+        service.OnDockAreaLeave();
+        service.OnHideAnimationCompleted();
+        Assert.Equal(DockAutoHideService.AutoHideState.Hidden, service.State);
+
+        // Start revealing
+        service.OnTriggerZoneEnter();
+        Assert.Equal(DockAutoHideService.AutoHideState.Revealing, service.State);
+
+        // Force back to hidden
+        service.ForceHidden();
+        Assert.Equal(DockAutoHideService.AutoHideState.Hidden, service.State);
+    }
+
+    [Fact]
     public void FullStateMachineCycle_HiddenToRevealingToVisibleToHidingToHidden()
     {
         using var service = new DockAutoHideService();

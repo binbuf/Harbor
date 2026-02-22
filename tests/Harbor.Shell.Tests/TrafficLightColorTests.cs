@@ -1,4 +1,5 @@
 using System.Windows.Media;
+using Harbor.Core.Services;
 
 namespace Harbor.Shell.Tests;
 

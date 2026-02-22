@@ -12,6 +12,7 @@ public partial class App : Application
     private WindowEventManager? _windowEventManager;
     private ForegroundWindowService? _foregroundService;
     private TitleBarDiscoveryService? _titleBarService;
+    private WindowCommandService? _windowCommandService;
     private OverlayManager? _overlayManager;
     private DockPinningService? _dockPinningService;
     private AppBarRegistration? _menuBarRegistration;
@@ -34,9 +35,10 @@ public partial class App : Application
         // Create foreground window tracking service
         _foregroundService = new ForegroundWindowService();
 
-        // Create title bar discovery and overlay management
+        // Create title bar discovery, command service, and overlay management
         _titleBarService = new TitleBarDiscoveryService(_windowEventManager);
-        _overlayManager = new OverlayManager(_windowEventManager, _titleBarService);
+        _windowCommandService = new WindowCommandService();
+        _overlayManager = new OverlayManager(_windowEventManager, _titleBarService, _windowCommandService);
 
         // Create and register the top menu bar as an AppBar
         var menuBar = AppBarHelper.CreateAppBar<TopMenuBar>(

@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Shapes;
+using Harbor.Core.Services;
 using Windows.Win32.Foundation;
 
 namespace Harbor.Shell;
@@ -30,13 +31,23 @@ public partial class TrafficLightButtons : UserControl
     private static readonly SolidColorBrush MinimizePressed = new(Color.FromRgb(0xD4, 0xA5, 0x28));
     private static readonly SolidColorBrush MaximizePressed = new(Color.FromRgb(0x1A, 0xAB, 0x29));
 
+    // Disabled color (same as inactive)
+    private static readonly SolidColorBrush DisabledBrush = new(Color.FromRgb(0xCD, 0xCD, 0xCD));
+
     // Inactive color
     private static readonly SolidColorBrush InactiveBrush = new(Color.FromRgb(0xCD, 0xCD, 0xCD));
+
+    // Maximize glyph path data
+    private const string MaximizeGlyphData = "M 3,6 L 6,3 L 9,6 M 3,6 L 6,9 L 9,6";
+    private const string RestoreGlyphData = "M 4,4 L 8,4 L 8,8 L 4,8 Z";
 
     private static readonly Duration GlyphFadeDuration = new(TimeSpan.FromMilliseconds(80));
 
     private bool _isActive = true;
     private bool _isHovered;
+    private bool _canMinimize = true;
+    private bool _canMaximize = true;
+    private bool _isTargetMaximized;
 
     /// <summary>
     /// The target HWND whose window commands will be triggered.
@@ -60,6 +71,7 @@ public partial class TrafficLightButtons : UserControl
         ClosePressed.Freeze();
         MinimizePressed.Freeze();
         MaximizePressed.Freeze();
+        DisabledBrush.Freeze();
         InactiveBrush.Freeze();
     }
 
@@ -103,6 +115,43 @@ public partial class TrafficLightButtons : UserControl
         if (_isActive == isActive) return;
         _isActive = isActive;
         UpdateButtonColors();
+    }
+
+    /// <summary>
+    /// Sets whether the minimize button is enabled (window has WS_MINIMIZEBOX).
+    /// Disabled buttons show as gray and don't fire click events.
+    /// </summary>
+    public void SetCanMinimize(bool canMinimize)
+    {
+        if (_canMinimize == canMinimize) return;
+        _canMinimize = canMinimize;
+        MinimizeButton.IsHitTestVisible = canMinimize;
+        UpdateButtonColors();
+    }
+
+    /// <summary>
+    /// Sets whether the maximize button is enabled (window has WS_MAXIMIZEBOX).
+    /// Disabled buttons show as gray and don't fire click events.
+    /// </summary>
+    public void SetCanMaximize(bool canMaximize)
+    {
+        if (_canMaximize == canMaximize) return;
+        _canMaximize = canMaximize;
+        MaximizeButton.IsHitTestVisible = canMaximize;
+        UpdateButtonColors();
+    }
+
+    /// <summary>
+    /// Updates the maximize button glyph based on whether the target window is maximized.
+    /// Shows restore glyph (rectangle) when maximized, plus/expand glyph when normal.
+    /// </summary>
+    public void SetMaximized(bool isMaximized)
+    {
+        if (_isTargetMaximized == isMaximized) return;
+        _isTargetMaximized = isMaximized;
+
+        var data = isMaximized ? RestoreGlyphData : MaximizeGlyphData;
+        MaximizeGlyph.Data = Geometry.Parse(data);
     }
 
     /// <summary>
@@ -164,8 +213,8 @@ public partial class TrafficLightButtons : UserControl
         if (_isActive || _isHovered)
         {
             CloseCircle.Fill = CloseDefault;
-            MinimizeCircle.Fill = MinimizeDefault;
-            MaximizeCircle.Fill = MaximizeDefault;
+            MinimizeCircle.Fill = _canMinimize ? MinimizeDefault : DisabledBrush;
+            MaximizeCircle.Fill = _canMaximize ? MaximizeDefault : DisabledBrush;
         }
         else
         {
@@ -182,13 +231,10 @@ public partial class TrafficLightButtons : UserControl
     {
         _isHovered = true;
 
-        // Restore active colors if window is inactive
-        if (!_isActive)
-        {
-            CloseCircle.Fill = CloseDefault;
-            MinimizeCircle.Fill = MinimizeDefault;
-            MaximizeCircle.Fill = MaximizeDefault;
-        }
+        // Restore active colors if window is inactive (disabled buttons stay gray)
+        CloseCircle.Fill = CloseDefault;
+        MinimizeCircle.Fill = _canMinimize ? MinimizeDefault : DisabledBrush;
+        MaximizeCircle.Fill = _canMaximize ? MaximizeDefault : DisabledBrush;
 
         // Show all glyphs simultaneously with fade-in
         SetGlyphOpacity(1.0, immediate: false);
@@ -198,10 +244,10 @@ public partial class TrafficLightButtons : UserControl
     {
         _isHovered = false;
 
-        // Restore pressed buttons to default
+        // Restore buttons to default/inactive state
         CloseCircle.Fill = _isActive ? CloseDefault : InactiveBrush;
-        MinimizeCircle.Fill = _isActive ? MinimizeDefault : InactiveBrush;
-        MaximizeCircle.Fill = _isActive ? MaximizeDefault : InactiveBrush;
+        MinimizeCircle.Fill = _isActive ? (_canMinimize ? MinimizeDefault : DisabledBrush) : InactiveBrush;
+        MaximizeCircle.Fill = _isActive ? (_canMaximize ? MaximizeDefault : DisabledBrush) : InactiveBrush;
 
         // Hide all glyphs
         SetGlyphOpacity(0, immediate: true);
@@ -245,12 +291,14 @@ public partial class TrafficLightButtons : UserControl
 
     private void OnMinimizePressed(object sender, System.Windows.Input.MouseButtonEventArgs e)
     {
+        if (!_canMinimize) { e.Handled = true; return; }
         MinimizeCircle.Fill = MinimizePressed;
         e.Handled = true;
     }
 
     private void OnMinimizeReleased(object sender, System.Windows.Input.MouseButtonEventArgs e)
     {
+        if (!_canMinimize) { e.Handled = true; return; }
         MinimizeCircle.Fill = MinimizeDefault;
         Trace.WriteLine($"[Harbor] TrafficLight: Minimize clicked for HWND {TargetHwnd}");
         ButtonClicked?.Invoke(TargetHwnd, TrafficLightAction.Minimize);
@@ -259,25 +307,17 @@ public partial class TrafficLightButtons : UserControl
 
     private void OnMaximizePressed(object sender, System.Windows.Input.MouseButtonEventArgs e)
     {
+        if (!_canMaximize) { e.Handled = true; return; }
         MaximizeCircle.Fill = MaximizePressed;
         e.Handled = true;
     }
 
     private void OnMaximizeReleased(object sender, System.Windows.Input.MouseButtonEventArgs e)
     {
+        if (!_canMaximize) { e.Handled = true; return; }
         MaximizeCircle.Fill = MaximizeDefault;
         Trace.WriteLine($"[Harbor] TrafficLight: Maximize clicked for HWND {TargetHwnd}");
         ButtonClicked?.Invoke(TargetHwnd, TrafficLightAction.Maximize);
         e.Handled = true;
     }
-}
-
-/// <summary>
-/// The three traffic light button actions.
-/// </summary>
-public enum TrafficLightAction
-{
-    Close,
-    Minimize,
-    Maximize,
 }

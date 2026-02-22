@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Windows;
 using System.Windows.Interop;
 using Harbor.Core.Interop;
+using Harbor.Core.Services;
 using Windows.Win32.Foundation;
 using Windows.Win32.UI.WindowsAndMessaging;
 
@@ -33,12 +34,38 @@ public partial class OverlayWindow : Window
     }
 
     /// <summary>
+    /// The ButtonClicked event from the traffic light buttons.
+    /// </summary>
+    public event Action<HWND, TrafficLightAction>? ButtonClicked
+    {
+        add => TrafficLights.ButtonClicked += value;
+        remove => TrafficLights.ButtonClicked -= value;
+    }
+
+    /// <summary>
     /// Sets whether the target window is active (foreground).
     /// Controls traffic light button colors (active vs inactive gray).
     /// </summary>
     public void SetActive(bool isActive)
     {
         TrafficLights.SetActive(isActive);
+    }
+
+    /// <summary>
+    /// Updates button capabilities based on the target window's styles.
+    /// </summary>
+    public void SetCapabilities(bool canMinimize, bool canMaximize)
+    {
+        TrafficLights.SetCanMinimize(canMinimize);
+        TrafficLights.SetCanMaximize(canMaximize);
+    }
+
+    /// <summary>
+    /// Updates the maximize button glyph based on the target window's maximized state.
+    /// </summary>
+    public void SetMaximized(bool isMaximized)
+    {
+        TrafficLights.SetMaximized(isMaximized);
     }
 
     private void OnSourceInitialized(object? sender, EventArgs e)

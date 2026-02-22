@@ -8,12 +8,13 @@ public class OverlayManagerTests : IDisposable
 {
     private readonly WindowEventManager _eventManager = new();
     private readonly TitleBarDiscoveryService _titleBarService;
+    private readonly WindowCommandService _commandService = new();
     private readonly OverlayManager _manager;
 
     public OverlayManagerTests()
     {
         _titleBarService = new TitleBarDiscoveryService(_eventManager);
-        _manager = new OverlayManager(_eventManager, _titleBarService);
+        _manager = new OverlayManager(_eventManager, _titleBarService, _commandService);
     }
 
     public void Dispose()
@@ -72,7 +73,7 @@ public class OverlayManagerTests : IDisposable
     {
         var eventManager = new WindowEventManager();
         var titleBarService = new TitleBarDiscoveryService(eventManager);
-        var manager = new OverlayManager(eventManager, titleBarService);
+        var manager = new OverlayManager(eventManager, titleBarService, new WindowCommandService());
 
         manager.Dispose();
         manager.Dispose(); // should not throw
@@ -87,7 +88,7 @@ public class OverlayManagerTests : IDisposable
         // After dispose, overlay count should be zero
         var eventManager = new WindowEventManager();
         var titleBarService = new TitleBarDiscoveryService(eventManager);
-        var manager = new OverlayManager(eventManager, titleBarService);
+        var manager = new OverlayManager(eventManager, titleBarService, new WindowCommandService());
 
         manager.Dispose();
         Assert.Equal(0, manager.OverlayCount);

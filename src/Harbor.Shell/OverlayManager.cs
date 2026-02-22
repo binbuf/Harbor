@@ -1,6 +1,5 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
-using System.Windows;
 using Harbor.Core.Interop;
 using Harbor.Core.Services;
 using Windows.Win32.Foundation;
@@ -10,11 +9,13 @@ namespace Harbor.Shell;
 /// <summary>
 /// Manages the lifecycle of overlay windows that sit on top of application title bars.
 /// One overlay per tracked window, keyed by HWND.
+/// Routes traffic light button clicks to the target window via WindowCommandService.
 /// </summary>
 public sealed class OverlayManager : IDisposable
 {
     private readonly WindowEventManager _eventManager;
     private readonly TitleBarDiscoveryService _titleBarService;
+    private readonly WindowCommandService _commandService;
     private readonly ConcurrentDictionary<HWND, OverlayWindow> _overlays = new();
 
     private Guid _foregroundSubscription;
@@ -25,10 +26,12 @@ public sealed class OverlayManager : IDisposable
 
     public OverlayManager(
         WindowEventManager eventManager,
-        TitleBarDiscoveryService titleBarService)
+        TitleBarDiscoveryService titleBarService,
+        WindowCommandService commandService)
     {
         _eventManager = eventManager;
         _titleBarService = titleBarService;
+        _commandService = commandService;
 
         _foregroundSubscription = _eventManager.Subscribe(new WindowEventSubscription
         {
@@ -100,9 +103,11 @@ public sealed class OverlayManager : IDisposable
 
         // Create new overlay
         var overlay = new OverlayWindow(hwnd);
+        overlay.ButtonClicked += OnButtonClicked;
         overlay.Show();
         overlay.Reposition(titleBarInfo.Rect);
         overlay.UpdateZOrder();
+        UpdateOverlayState(overlay, hwnd);
 
         if (_overlays.TryAdd(hwnd, overlay))
         {
@@ -123,9 +128,43 @@ public sealed class OverlayManager : IDisposable
     {
         if (_overlays.TryRemove(hwnd, out var overlay))
         {
+            overlay.ButtonClicked -= OnButtonClicked;
             overlay.Close();
             Trace.WriteLine($"[Harbor] OverlayManager: Destroyed overlay for HWND {hwnd}");
         }
+    }
+
+    private void OnButtonClicked(HWND hwnd, TrafficLightAction action)
+    {
+        _commandService.Execute(hwnd, action);
+
+        if (action == TrafficLightAction.Close)
+        {
+            // Remove the overlay after sending close — the window will handle its own lifecycle
+            DestroyOverlay(hwnd);
+        }
+        else
+        {
+            // After minimize/maximize/restore, update the overlay state
+            // Use a short delay to allow the window to process the command
+            System.Windows.Application.Current?.Dispatcher.BeginInvoke(
+                System.Windows.Threading.DispatcherPriority.Background,
+                () =>
+                {
+                    if (_overlays.TryGetValue(hwnd, out var overlay))
+                    {
+                        UpdateOverlayState(overlay, hwnd);
+                    }
+                });
+        }
+    }
+
+    private static void UpdateOverlayState(OverlayWindow overlay, HWND hwnd)
+    {
+        overlay.SetCapabilities(
+            WindowCommandService.CanMinimize(hwnd),
+            WindowCommandService.CanMaximize(hwnd));
+        overlay.SetMaximized(WindowCommandService.IsMaximized(hwnd));
     }
 
     private void OnForegroundChanged(WindowEventArgs args)
@@ -169,6 +208,9 @@ public sealed class OverlayManager : IDisposable
         }
 
         overlay.Reposition(titleBarInfo.Rect);
+
+        // Update maximized state on location change (fires when window is maximized/restored)
+        overlay.SetMaximized(WindowCommandService.IsMaximized(args.WindowHandle));
     }
 
     private void OnWindowDestroyed(WindowEventArgs args)
@@ -190,6 +232,7 @@ public sealed class OverlayManager : IDisposable
         {
             try
             {
+                kvp.Value.ButtonClicked -= OnButtonClicked;
                 kvp.Value.Close();
             }
             catch (Exception ex)

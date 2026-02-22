@@ -19,7 +19,11 @@ public static class WindowInterop
     public const uint WM_SYSCOMMAND = 0x0112;
 
     // Window style constants
+    public const int GWL_STYLE = -16;
     public const int GWL_EXSTYLE = -20;
+    public const uint WS_MINIMIZEBOX = 0x00020000;
+    public const uint WS_MAXIMIZEBOX = 0x00010000;
+    public const uint WS_MAXIMIZE = 0x01000000;
     public const uint WS_EX_LAYERED = 0x00080000;
     public const uint WS_EX_NOACTIVATE = 0x08000000;
     public const uint WS_EX_TOOLWINDOW = 0x00000080;
@@ -131,5 +135,25 @@ public static class WindowInterop
             processId = pid;
             return threadId;
         }
+    }
+
+    public static uint GetWindowStyle(HWND hwnd)
+    {
+        return (uint)GetWindowLongPtr(hwnd, WINDOW_LONG_PTR_INDEX.GWL_STYLE);
+    }
+
+    public static bool HasMinimizeBox(HWND hwnd)
+    {
+        return (GetWindowStyle(hwnd) & WS_MINIMIZEBOX) != 0;
+    }
+
+    public static bool HasMaximizeBox(HWND hwnd)
+    {
+        return (GetWindowStyle(hwnd) & WS_MAXIMIZEBOX) != 0;
+    }
+
+    public static bool IsMaximized(HWND hwnd)
+    {
+        return (GetWindowStyle(hwnd) & WS_MAXIMIZE) != 0;
     }
 }

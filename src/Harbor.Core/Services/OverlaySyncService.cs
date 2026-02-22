@@ -55,6 +55,12 @@ internal sealed class TrackedOverlay
     public TitleBarOffset Offset { get; set; }
     public RECT LastWindowRect { get; set; }
     public volatile bool IsMinimized;
+
+    /// <summary>
+    /// The monitor handle hosting this window at last check.
+    /// Used to detect cross-monitor drag boundary crossings.
+    /// </summary>
+    public IntPtr LastMonitor { get; set; }
 }
 
 /// <summary>
@@ -93,6 +99,13 @@ public sealed class OverlaySyncService : IDisposable
     private readonly CancellationTokenSource _cts = new();
     private readonly Stopwatch _perfTimer = Stopwatch.StartNew();
 
+    /// <summary>
+    /// Fired when a tracked window crosses a monitor boundary during drag.
+    /// The HWND is the target window that changed monitors.
+    /// WPF overlays must be destroyed and recreated on the new monitor's DPI context.
+    /// </summary>
+    public event Action<HWND>? MonitorChanged;
+
     // Instrumentation
     private long _totalUpdates;
     private long _pollingUpdates;
@@ -123,16 +136,19 @@ public sealed class OverlaySyncService : IDisposable
     /// </summary>
     public void Track(HWND target, HWND overlay, RECT windowRect, TitleBarOffset offset)
     {
+        var monitor = DisplayInterop.GetMonitorForWindow(target);
+
         var tracked = new TrackedOverlay
         {
             TargetHwnd = target,
             OverlayHwnd = overlay,
             Offset = offset,
             LastWindowRect = windowRect,
+            LastMonitor = monitor,
         };
 
         _tracked[target] = tracked;
-        Trace.WriteLine($"[Harbor] OverlaySyncService: Tracking HWND {target}");
+        Trace.WriteLine($"[Harbor] OverlaySyncService: Tracking HWND {target} on monitor {monitor}");
     }
 
     /// <summary>
@@ -180,6 +196,17 @@ public sealed class OverlaySyncService : IDisposable
         }
 
         tracked.IsMinimized = false;
+
+        // Check for monitor boundary crossing
+        var currentMonitor = DisplayInterop.GetMonitorForWindow(target);
+        if (currentMonitor != tracked.LastMonitor)
+        {
+            Trace.WriteLine($"[Harbor] OverlaySyncService: HWND {target} crossed monitor boundary ({tracked.LastMonitor} → {currentMonitor})");
+            tracked.LastMonitor = currentMonitor;
+            MonitorChanged?.Invoke(target);
+            // Don't reposition — the overlay will be destroyed and recreated by the handler
+            return null;
+        }
 
         // Compute title bar rect from offset
         var titleBarRect = tracked.Offset.Apply(windowRect);
@@ -290,6 +317,17 @@ public sealed class OverlaySyncService : IDisposable
             // Compare with last known position
             if (RectsEqual(currentRect, tracked.LastWindowRect))
                 continue;
+
+            // Check for monitor boundary crossing
+            var currentMonitor = DisplayInterop.GetMonitorForWindow(tracked.TargetHwnd);
+            if (currentMonitor != tracked.LastMonitor)
+            {
+                Trace.WriteLine($"[Harbor] OverlaySyncService: Poll detected monitor change for HWND {tracked.TargetHwnd}");
+                tracked.LastMonitor = currentMonitor;
+                tracked.LastWindowRect = currentRect;
+                MonitorChanged?.Invoke(tracked.TargetHwnd);
+                continue;
+            }
 
             // Position changed — reposition overlay (Layer 2 catch)
             var startTicks = _perfTimer.ElapsedTicks;

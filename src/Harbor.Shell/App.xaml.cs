@@ -18,8 +18,11 @@ public partial class App : Application
     private OverlaySyncService? _overlaySyncService;
     private OverlayManager? _overlayManager;
     private DockPinningService? _dockPinningService;
+    private DisplayChangeService? _displayChangeService;
     private AppBarRegistration? _menuBarRegistration;
     private AppBarRegistration? _dockRegistration;
+    private TopMenuBar? _menuBar;
+    private Dock? _dock;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -46,30 +49,47 @@ public partial class App : Application
         _overlaySyncService = new OverlaySyncService();
         _overlayManager = new OverlayManager(_windowEventManager, _titleBarService, _windowCommandService, _overlaySyncService, _titleBarColorService);
 
+        // Create display change monitoring
+        _displayChangeService = new DisplayChangeService();
+        _displayChangeService.DisplayChanged += OnDisplayChanged;
+
         // Create and register the top menu bar as an AppBar
-        var menuBar = AppBarHelper.CreateAppBar<TopMenuBar>(
+        _menuBar = AppBarHelper.CreateAppBar<TopMenuBar>(
             _shellServices,
             AppBarScreen.FromPrimaryScreen(),
             AppBarEdge.Top,
             24);
 
-        _menuBarRegistration = AppBarHelper.Register(menuBar, AppBarEdge.Top);
-        menuBar.Initialize(_foregroundService, _shellServices.NotificationArea);
+        _menuBarRegistration = AppBarHelper.Register(_menuBar, AppBarEdge.Top);
+        _menuBar.Initialize(_foregroundService, _shellServices.NotificationArea);
 
         // Create dock pinning service for persistent app pinning
         _dockPinningService = new DockPinningService();
 
         // Create and register the Dock as a bottom AppBar
-        var dock = AppBarHelper.CreateAppBar<Dock>(
+        _dock = AppBarHelper.CreateAppBar<Dock>(
             _shellServices,
             AppBarScreen.FromPrimaryScreen(),
             AppBarEdge.Bottom,
             62);
 
-        _dockRegistration = AppBarHelper.Register(dock, AppBarEdge.Bottom);
-        dock.Initialize(_shellServices.Tasks, _dockPinningService);
+        _dockRegistration = AppBarHelper.Register(_dock, AppBarEdge.Bottom);
+        _dock.Initialize(_shellServices.Tasks, _dockPinningService);
 
         Trace.WriteLine("[Harbor] App: Startup complete.");
+    }
+
+    /// <summary>
+    /// Handles WM_DISPLAYCHANGE — rebuilds AppBar registrations for the new display configuration.
+    /// </summary>
+    private void OnDisplayChanged()
+    {
+        Trace.WriteLine("[Harbor] App: Display configuration changed, rebuilding AppBars.");
+
+        // Update AppBar positions on the primary screen.
+        // ManagedShell's AppBarWindow.UpdatePosition() handles re-querying the screen bounds.
+        _menuBar?.UpdatePosition();
+        _dock?.UpdatePosition();
     }
 
     protected override void OnExit(ExitEventArgs e)
@@ -96,6 +116,13 @@ public partial class App : Application
 
         _menuBarRegistration?.Dispose();
         _menuBarRegistration = null;
+
+        if (_displayChangeService is not null)
+        {
+            _displayChangeService.DisplayChanged -= OnDisplayChanged;
+            _displayChangeService.Dispose();
+            _displayChangeService = null;
+        }
 
         _foregroundService?.Dispose();
         _foregroundService = null;

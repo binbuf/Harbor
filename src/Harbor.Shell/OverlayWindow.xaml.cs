@@ -77,6 +77,7 @@ public partial class OverlayWindow : Window
 
     /// <summary>
     /// Queries DWM for the caption button bounds width for the target window.
+    /// DWM returns physical pixels; converts to WPF DIPs for layout.
     /// Returns null if the query fails.
     /// </summary>
     private int? GetCaptionButtonWidth()
@@ -89,8 +90,13 @@ public partial class OverlayWindow : Window
         if (hr.Failed)
             return null;
 
-        var width = captionBounds.right - captionBounds.left;
-        return width > 0 ? width : null;
+        var widthPhysical = captionBounds.right - captionBounds.left;
+        if (widthPhysical <= 0)
+            return null;
+
+        // Convert physical pixels to DIPs for WPF layout
+        var widthDip = (int)DisplayInterop.PhysicalToDip(widthPhysical, TargetHwnd);
+        return widthDip > 0 ? widthDip : null;
     }
 
     /// <summary>

@@ -40,6 +40,8 @@ public sealed class OverlayManager : IDisposable
         _syncService = syncService;
         _colorService = colorService;
 
+        _syncService.MonitorChanged += OnMonitorChanged;
+
         _foregroundSubscription = _eventManager.Subscribe(new WindowEventSubscription
         {
             EventTypes = new HashSet<WindowEventType> { WindowEventType.Foreground },
@@ -223,6 +225,37 @@ public sealed class OverlayManager : IDisposable
         overlay.SetMaximized(WindowCommandService.IsMaximized(hwnd));
     }
 
+    /// <summary>
+    /// Called when a tracked window crosses a monitor boundary.
+    /// WPF windows cannot change their DPI context after creation,
+    /// so the overlay must be destroyed and recreated on the new monitor.
+    /// </summary>
+    private void OnMonitorChanged(HWND hwnd)
+    {
+        if (_disposed) return;
+
+        // Marshal to UI thread since we need to create/destroy WPF windows
+        System.Windows.Application.Current?.Dispatcher.BeginInvoke(() =>
+        {
+            if (_disposed) return;
+
+            Trace.WriteLine($"[Harbor] OverlayManager: Monitor changed for HWND {hwnd}, recreating overlay.");
+
+            // Destroy old overlay (untrack handled inside)
+            DestroyOverlay(hwnd);
+
+            // Recreate on new monitor's DPI context
+            var overlay = EnsureOverlay(hwnd);
+
+            // Restore active state if this was the foreground window
+            if (overlay is not null && hwnd == _activeHwnd)
+            {
+                overlay.SetActive(true);
+                overlay.UpdateZOrder();
+            }
+        });
+    }
+
     private void OnForegroundChanged(WindowEventArgs args)
     {
         if (_disposed) return;
@@ -303,6 +336,7 @@ public sealed class OverlayManager : IDisposable
         if (_disposed) return;
         _disposed = true;
 
+        _syncService.MonitorChanged -= OnMonitorChanged;
         _eventManager.Unsubscribe(_foregroundSubscription);
         _eventManager.Unsubscribe(_locationSubscription);
         _eventManager.Unsubscribe(_destroySubscription);

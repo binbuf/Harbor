@@ -13,6 +13,7 @@ public partial class App : Application
     private ForegroundWindowService? _foregroundService;
     private TitleBarDiscoveryService? _titleBarService;
     private OverlayManager? _overlayManager;
+    private DockPinningService? _dockPinningService;
     private AppBarRegistration? _menuBarRegistration;
     private AppBarRegistration? _dockRegistration;
 
@@ -47,6 +48,9 @@ public partial class App : Application
         _menuBarRegistration = AppBarHelper.Register(menuBar, AppBarEdge.Top);
         menuBar.Initialize(_foregroundService, _shellServices.NotificationArea);
 
+        // Create dock pinning service for persistent app pinning
+        _dockPinningService = new DockPinningService();
+
         // Create and register the Dock as a bottom AppBar
         var dock = AppBarHelper.CreateAppBar<Dock>(
             _shellServices,
@@ -55,7 +59,7 @@ public partial class App : Application
             62);
 
         _dockRegistration = AppBarHelper.Register(dock, AppBarEdge.Bottom);
-        dock.Initialize(_shellServices.Tasks);
+        dock.Initialize(_shellServices.Tasks, _dockPinningService);
 
         Trace.WriteLine("[Harbor] App: Startup complete.");
     }
@@ -81,6 +85,9 @@ public partial class App : Application
 
         _windowEventManager?.Dispose();
         _windowEventManager = null;
+
+        _dockPinningService?.Dispose();
+        _dockPinningService = null;
 
         _shellServices?.Dispose();
         _shellServices = null;

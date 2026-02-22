@@ -2,7 +2,6 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:appbar="clr-namespace:ManagedShell.AppBar;assembly=ManagedShell.AppBar"
-        xmlns:converters="clr-namespace:Harbor.Shell.Converters"
         Title="Harbor Dock"
         AllowsTransparency="True"
         WindowStyle="None"
@@ -11,7 +10,7 @@
         Background="Transparent">
 
     <appbar:AppBarWindow.Resources>
-        <converters:AppIconConverter x:Key="AppIconConverter" />
+        <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter" />
     </appbar:AppBarWindow.Resources>
 
     <Grid x:Name="DockRoot" Height="62" VerticalAlignment="Bottom">
@@ -27,8 +26,8 @@
                 Padding="4,8">
 
             <StackPanel x:Name="DockPanel" Orientation="Horizontal">
-                <!-- Running application icons -->
-                <ItemsControl x:Name="TaskIconsControl"
+                <!-- Pinned application icons -->
+                <ItemsControl x:Name="PinnedIconsControl"
                               VerticalAlignment="Center">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
@@ -40,10 +39,52 @@
                             <Grid Width="48" Height="48"
                                   Margin="4,0"
                                   Cursor="Hand"
-                                  ToolTip="{Binding Title}"
-                                  MouseLeftButtonUp="DockIcon_MouseLeftButtonUp">
+                                  ToolTip="{Binding DisplayName}"
+                                  MouseLeftButtonUp="DockIcon_MouseLeftButtonUp"
+                                  MouseRightButtonUp="DockIcon_MouseRightButtonUp">
                                 <!-- Application icon -->
-                                <Image Source="{Binding Converter={StaticResource AppIconConverter}}"
+                                <Image Source="{Binding Icon}"
+                                       Width="48" Height="48"
+                                       RenderOptions.BitmapScalingMode="HighQuality" />
+                                <!-- Active indicator dot (visible only when running) -->
+                                <Ellipse Width="4" Height="4"
+                                         Fill="#FFFFFF"
+                                         HorizontalAlignment="Center"
+                                         VerticalAlignment="Bottom"
+                                         Margin="0,0,0,-2"
+                                         Visibility="{Binding IsRunning, Converter={StaticResource BoolToVisibilityConverter}}" />
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <!-- Separator: 1px vertical line between pinned and running sections -->
+                <Border x:Name="DockSeparator"
+                        Width="1"
+                        Height="24"
+                        VerticalAlignment="Center"
+                        Margin="2,0"
+                        Background="#33FFFFFF"
+                        Visibility="Collapsed" />
+
+                <!-- Running (unpinned) application icons -->
+                <ItemsControl x:Name="RunningIconsControl"
+                              VerticalAlignment="Center">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Width="48" Height="48"
+                                  Margin="4,0"
+                                  Cursor="Hand"
+                                  ToolTip="{Binding DisplayName}"
+                                  MouseLeftButtonUp="DockIcon_MouseLeftButtonUp"
+                                  MouseRightButtonUp="DockIcon_MouseRightButtonUp">
+                                <!-- Application icon -->
+                                <Image Source="{Binding Icon}"
                                        Width="48" Height="48"
                                        RenderOptions.BitmapScalingMode="HighQuality" />
                                 <!-- Active indicator dot -->

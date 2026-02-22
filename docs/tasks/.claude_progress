@@ -3,12 +3,9 @@
 003-managedshell-integration.md
 004-top-menu-bar.md
 005-system-tray-hosting.md
-005-system-tray-hosting.md
 006-dock-basic.md
 007-dock-icon-extraction.md
-007-dock-icon-extraction.md
 008-window-event-subscription.md
-009-titlebar-discovery.md
 009-titlebar-discovery.md
 010-overlay-window.md
 011-traffic-light-buttons.md
@@ -17,9 +14,9 @@
 013-click-routing.md
 014-titlebar-color-mask.md
 015-overlay-synchronization.md
-015-overlay-synchronization.md
-016-dpi-multimonitor.md
 016-dpi-multimonitor.md
 017-fullscreen-detection.md
 018-dark-light-theming.md
-018-dark-light-theming.md
+019-dock-animations.md
+020-watchdog-crash-recovery.md
+020-watchdog-crash-recovery.md

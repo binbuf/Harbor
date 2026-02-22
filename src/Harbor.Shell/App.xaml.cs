@@ -1,5 +1,7 @@
 using System.Diagnostics;
+using System.IO;
 using System.Windows;
+using System.Windows.Threading;
 using Harbor.Core.Interop;
 using Harbor.Core.Services;
 using ManagedShell.AppBar;
@@ -23,6 +25,9 @@ public partial class App : Application
     private DockPinningService? _dockPinningService;
     private DisplayChangeService? _displayChangeService;
     private ThemeService? _themeService;
+    private HiddenWindowRegistry? _hiddenWindowRegistry;
+    private HeartbeatService? _heartbeatService;
+    private Process? _watchdogProcess;
     private AppBarRegistration? _menuBarRegistration;
     private AppBarRegistration? _dockRegistration;
     private TopMenuBar? _menuBar;
@@ -33,6 +38,21 @@ public partial class App : Application
         base.OnStartup(e);
 
         Trace.WriteLine("[Harbor] App: Starting up...");
+
+        // Safe startup: register global exception handlers
+        AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
+        TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
+        DispatcherUnhandledException += OnDispatcherUnhandledException;
+
+        // Safe startup: clear stale hidden window entries from a previous session
+        CrashRecoveryService.ClearStaleRegistry();
+
+        // Initialize hidden window registry and heartbeat
+        _hiddenWindowRegistry = new HiddenWindowRegistry();
+        _heartbeatService = new HeartbeatService();
+
+        // Launch watchdog process
+        LaunchWatchdog();
 
         _shellServices = new ShellServices();
 
@@ -151,9 +171,82 @@ public partial class App : Application
         _dock?.UpdatePosition();
     }
 
+    private void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)
+    {
+        Trace.WriteLine($"[Harbor] App: Unhandled exception: {e.ExceptionObject}");
+        CrashRecoveryService.ExecuteRecovery(e.ExceptionObject as Exception);
+    }
+
+    private void OnUnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)
+    {
+        Trace.WriteLine($"[Harbor] App: Unobserved task exception: {e.Exception}");
+        CrashRecoveryService.ExecuteRecovery(e.Exception);
+        e.SetObserved();
+    }
+
+    private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
+    {
+        Trace.WriteLine($"[Harbor] App: Dispatcher unhandled exception: {e.Exception}");
+        CrashRecoveryService.ExecuteRecovery(e.Exception);
+    }
+
+    private void LaunchWatchdog()
+    {
+        try
+        {
+            var shellDir = AppContext.BaseDirectory;
+            // The watchdog is built alongside the shell — look for it relative to the shell output
+            var watchdogPath = Path.Combine(shellDir, "..", "harbor-watchdog", "harbor-watchdog.exe");
+            watchdogPath = Path.GetFullPath(watchdogPath);
+
+            // Also check same directory (single-folder publish scenario)
+            if (!File.Exists(watchdogPath))
+            {
+                watchdogPath = Path.Combine(shellDir, "harbor-watchdog.exe");
+            }
+
+            if (!File.Exists(watchdogPath))
+            {
+                Trace.WriteLine($"[Harbor] App: Watchdog not found at expected paths. Skipping launch.");
+                return;
+            }
+
+            _watchdogProcess = Process.Start(new ProcessStartInfo
+            {
+                FileName = watchdogPath,
+                Arguments = Environment.ProcessId.ToString(),
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            });
+
+            Trace.WriteLine($"[Harbor] App: Watchdog launched (PID {_watchdogProcess?.Id}).");
+        }
+        catch (Exception ex)
+        {
+            Trace.WriteLine($"[Harbor] App: Failed to launch watchdog: {ex.Message}");
+        }
+    }
+
     protected override void OnExit(ExitEventArgs e)
     {
         Trace.WriteLine("[Harbor] App: Shutting down...");
+
+        // Stop watchdog before disposing services
+        if (_watchdogProcess is { HasExited: false })
+        {
+            try
+            {
+                _watchdogProcess.Kill();
+                _watchdogProcess.WaitForExit(2000);
+                Trace.WriteLine("[Harbor] App: Watchdog process stopped.");
+            }
+            catch (Exception ex)
+            {
+                Trace.WriteLine($"[Harbor] App: Failed to stop watchdog: {ex.Message}");
+            }
+        }
+        _watchdogProcess?.Dispose();
+        _watchdogProcess = null;
 
         _fullscreenCoordinator?.Dispose();
         _fullscreenCoordinator = null;
@@ -202,6 +295,17 @@ public partial class App : Application
 
         _dockPinningService?.Dispose();
         _dockPinningService = null;
+
+        _heartbeatService?.Dispose();
+        _heartbeatService = null;
+
+        _hiddenWindowRegistry?.Dispose();
+        _hiddenWindowRegistry = null;
+
+        // Unregister exception handlers
+        AppDomain.CurrentDomain.UnhandledException -= OnUnhandledException;
+        TaskScheduler.UnobservedTaskException -= OnUnobservedTaskException;
+        DispatcherUnhandledException -= OnDispatcherUnhandledException;
 
         _shellServices?.Dispose();
         _shellServices = null;

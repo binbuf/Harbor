@@ -29,8 +29,9 @@ DwmGetColorizationColor
 DwmGetWindowAttribute
 DwmSetWindowAttribute
 
-// DPI
+// DPI & Monitor
 GetDpiForWindow
+GetMonitorInfo
 
 // Timing
 QueryPerformanceCounter

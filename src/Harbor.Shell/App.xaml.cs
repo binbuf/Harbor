@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Windows;
+using Harbor.Core.Interop;
 using Harbor.Core.Services;
 using ManagedShell.AppBar;
 using ManagedShell.Common.Helpers;
@@ -17,6 +18,8 @@ public partial class App : Application
     private TitleBarColorService? _titleBarColorService;
     private OverlaySyncService? _overlaySyncService;
     private OverlayManager? _overlayManager;
+    private FullscreenDetectionService? _fullscreenDetectionService;
+    private FullscreenRetreatCoordinator? _fullscreenCoordinator;
     private DockPinningService? _dockPinningService;
     private DisplayChangeService? _displayChangeService;
     private AppBarRegistration? _menuBarRegistration;
@@ -76,6 +79,17 @@ public partial class App : Application
         _dockRegistration = AppBarHelper.Register(_dock, AppBarEdge.Bottom);
         _dock.Initialize(_shellServices.Tasks, _dockPinningService);
 
+        // Create fullscreen detection and retreat coordination
+        _fullscreenDetectionService = new FullscreenDetectionService();
+        _fullscreenCoordinator = new FullscreenRetreatCoordinator(
+            _fullscreenDetectionService, _windowEventManager, _overlayManager);
+
+        // Register AppBars on the primary monitor for retreat management
+        var primaryMonitor = DisplayInterop.GetMonitorForWindow(
+            new Windows.Win32.Foundation.HWND(_menuBar.Handle));
+        _fullscreenCoordinator.RegisterAppBar(_menuBar, primaryMonitor);
+        _fullscreenCoordinator.RegisterAppBar(_dock, primaryMonitor);
+
         Trace.WriteLine("[Harbor] App: Startup complete.");
     }
 
@@ -95,6 +109,10 @@ public partial class App : Application
     protected override void OnExit(ExitEventArgs e)
     {
         Trace.WriteLine("[Harbor] App: Shutting down...");
+
+        _fullscreenCoordinator?.Dispose();
+        _fullscreenCoordinator = null;
+        _fullscreenDetectionService = null;
 
         _overlayManager?.Dispose();
         _overlayManager = null;

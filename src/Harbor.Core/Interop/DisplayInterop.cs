@@ -9,6 +9,21 @@ namespace Harbor.Core.Interop;
 /// </summary>
 public static class DisplayInterop
 {
+    /// <summary>
+    /// Returns the full display bounds (in physical pixels) for the monitor hosting the given window.
+    /// Returns null if the monitor info cannot be retrieved.
+    /// </summary>
+    public static RECT? GetMonitorBounds(HWND hwnd)
+    {
+        var hmonitor = WindowInterop.MonitorFromWindow(hwnd, MONITOR_FROM_FLAGS.MONITOR_DEFAULTTONEAREST);
+        var info = new MONITORINFO { cbSize = (uint)System.Runtime.InteropServices.Marshal.SizeOf<MONITORINFO>() };
+
+        if (!PInvoke.GetMonitorInfo(hmonitor, ref info))
+            return null;
+
+        return info.rcMonitor;
+    }
+
     public const uint BASE_DPI = 96;
 
     public static uint GetDpiForWindow(HWND hwnd)

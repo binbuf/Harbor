@@ -11,6 +11,7 @@ namespace Harbor.Shell;
 /// One overlay per tracked window, keyed by HWND.
 /// Routes traffic light button clicks to the target window via WindowCommandService.
 /// Integrates with OverlaySyncService for dual-layer synchronization (event-driven + polling).
+/// Supports fullscreen retreat: hides overlays on a specific monitor and suppresses new creation.
 /// </summary>
 public sealed class OverlayManager : IDisposable
 {
@@ -20,6 +21,11 @@ public sealed class OverlayManager : IDisposable
     private readonly TitleBarColorService? _colorService;
     private readonly OverlaySyncService _syncService;
     private readonly ConcurrentDictionary<HWND, OverlayWindow> _overlays = new();
+
+    // Set of monitor handles where fullscreen retreat is active — overlays are suppressed on these monitors
+    private readonly HashSet<IntPtr> _retreatedMonitors = new();
+    // Overlays hidden during retreat, keyed by monitor handle, for restore
+    private readonly ConcurrentDictionary<IntPtr, List<HWND>> _hiddenOverlays = new();
 
     private Guid _foregroundSubscription;
     private Guid _locationSubscription;
@@ -91,6 +97,81 @@ public sealed class OverlayManager : IDisposable
     public OverlaySyncService SyncService => _syncService;
 
     /// <summary>
+    /// Returns true if fullscreen retreat is active on the given monitor.
+    /// </summary>
+    public bool IsRetreated(IntPtr monitorHandle) => _retreatedMonitors.Contains(monitorHandle);
+
+    /// <summary>
+    /// Hides all overlays on the specified monitor and suppresses new overlay creation there.
+    /// Called when a fullscreen app is detected on that monitor.
+    /// </summary>
+    public void Retreat(IntPtr monitorHandle)
+    {
+        if (_disposed) return;
+        if (!_retreatedMonitors.Add(monitorHandle)) return; // already retreated
+
+        Trace.WriteLine($"[Harbor] OverlayManager: Retreating overlays on monitor {monitorHandle}.");
+
+        var hidden = new List<HWND>();
+
+        foreach (var kvp in _overlays)
+        {
+            var hwnd = kvp.Key;
+            var overlay = kvp.Value;
+            var overlayMonitor = DisplayInterop.GetMonitorForWindow(hwnd);
+            if (overlayMonitor == monitorHandle)
+            {
+                _syncService.Untrack(hwnd);
+                overlay.Hide();
+                hidden.Add(hwnd);
+            }
+        }
+
+        _hiddenOverlays[monitorHandle] = hidden;
+        Trace.WriteLine($"[Harbor] OverlayManager: Retreated {hidden.Count} overlays on monitor {monitorHandle}.");
+    }
+
+    /// <summary>
+    /// Restores overlays on the specified monitor after fullscreen exit.
+    /// Re-enables overlay creation and re-shows previously hidden overlays.
+    /// </summary>
+    public void Restore(IntPtr monitorHandle)
+    {
+        if (_disposed) return;
+        if (!_retreatedMonitors.Remove(monitorHandle)) return; // wasn't retreated
+
+        Trace.WriteLine($"[Harbor] OverlayManager: Restoring overlays on monitor {monitorHandle}.");
+
+        if (_hiddenOverlays.TryRemove(monitorHandle, out var hidden))
+        {
+            foreach (var hwnd in hidden)
+            {
+                if (!WindowInterop.IsWindow(hwnd) || !WindowInterop.IsWindowVisible(hwnd))
+                {
+                    // Window went away during retreat — remove the overlay
+                    DestroyOverlay(hwnd);
+                    continue;
+                }
+
+                if (_overlays.TryGetValue(hwnd, out var overlay))
+                {
+                    overlay.Show();
+
+                    // Re-discover title bar and re-register sync tracking
+                    var titleBarInfo = _titleBarService.Discover(hwnd);
+                    if (titleBarInfo is not null)
+                    {
+                        overlay.Reposition(titleBarInfo.Rect);
+                        UpdateSyncTracking(overlay, hwnd, titleBarInfo.Rect);
+                    }
+                }
+            }
+        }
+
+        Trace.WriteLine($"[Harbor] OverlayManager: Restored overlays on monitor {monitorHandle}.");
+    }
+
+    /// <summary>
     /// Ensures an overlay exists for the given window. Creates one if it doesn't exist.
     /// Repositions the overlay to match the current title bar.
     /// </summary>
@@ -98,6 +179,11 @@ public sealed class OverlayManager : IDisposable
     {
         if (_disposed) return null;
         if (hwnd == HWND.Null) return null;
+
+        // Suppress overlay creation on retreated monitors
+        var monitor = DisplayInterop.GetMonitorForWindow(hwnd);
+        if (_retreatedMonitors.Contains(monitor))
+            return null;
 
         // Check skip list — don't overlay frameless/custom-chrome windows
         if (_titleBarService.IsSkipped(hwnd))
@@ -282,6 +368,11 @@ public sealed class OverlayManager : IDisposable
     private void OnLocationChanged(WindowEventArgs args)
     {
         if (_disposed) return;
+
+        // Suppress location change processing for windows on retreated monitors
+        var monitor = DisplayInterop.GetMonitorForWindow(args.WindowHandle);
+        if (_retreatedMonitors.Contains(monitor))
+            return;
 
         // Only reposition if we have an overlay for this window
         if (!_overlays.TryGetValue(args.WindowHandle, out var overlay))

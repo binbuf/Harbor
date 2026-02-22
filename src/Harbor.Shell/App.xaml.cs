@@ -11,6 +11,8 @@ public partial class App : Application
     private ShellServices? _shellServices;
     private WindowEventManager? _windowEventManager;
     private ForegroundWindowService? _foregroundService;
+    private TitleBarDiscoveryService? _titleBarService;
+    private OverlayManager? _overlayManager;
     private AppBarRegistration? _menuBarRegistration;
     private AppBarRegistration? _dockRegistration;
 
@@ -30,6 +32,10 @@ public partial class App : Application
 
         // Create foreground window tracking service
         _foregroundService = new ForegroundWindowService();
+
+        // Create title bar discovery and overlay management
+        _titleBarService = new TitleBarDiscoveryService(_windowEventManager);
+        _overlayManager = new OverlayManager(_windowEventManager, _titleBarService);
 
         // Create and register the top menu bar as an AppBar
         var menuBar = AppBarHelper.CreateAppBar<TopMenuBar>(
@@ -57,6 +63,12 @@ public partial class App : Application
     protected override void OnExit(ExitEventArgs e)
     {
         Trace.WriteLine("[Harbor] App: Shutting down...");
+
+        _overlayManager?.Dispose();
+        _overlayManager = null;
+
+        _titleBarService?.Dispose();
+        _titleBarService = null;
 
         _dockRegistration?.Dispose();
         _dockRegistration = null;

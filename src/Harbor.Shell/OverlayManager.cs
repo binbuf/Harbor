@@ -21,6 +21,7 @@ public sealed class OverlayManager : IDisposable
     private Guid _locationSubscription;
     private Guid _destroySubscription;
     private bool _disposed;
+    private HWND _activeHwnd;
 
     public OverlayManager(
         WindowEventManager eventManager,
@@ -131,12 +132,21 @@ public sealed class OverlayManager : IDisposable
     {
         if (_disposed) return;
 
+        // Mark previous foreground overlay as inactive
+        if (_activeHwnd != HWND.Null && _overlays.TryGetValue(_activeHwnd, out var previousOverlay))
+        {
+            previousOverlay.SetActive(false);
+        }
+
+        _activeHwnd = args.WindowHandle;
+
         // Create or update overlay for the newly foreground window
         EnsureOverlay(args.WindowHandle);
 
-        // Update z-order for the active overlay
+        // Mark new foreground overlay as active and update z-order
         if (_overlays.TryGetValue(args.WindowHandle, out var overlay))
         {
+            overlay.SetActive(true);
             overlay.UpdateZOrder();
         }
     }

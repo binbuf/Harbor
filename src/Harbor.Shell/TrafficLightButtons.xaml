@@ -1,0 +1,61 @@
+<UserControl x:Class="Harbor.Shell.TrafficLightButtons"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Height="{Binding RelativeSource={RelativeSource AncestorType=Window}, Path=ActualHeight}"
+             HorizontalAlignment="Left"
+             Background="Transparent">
+    <Canvas x:Name="ButtonCanvas"
+            Width="68"
+            MouseEnter="OnGroupMouseEnter"
+            MouseLeave="OnGroupMouseLeave"
+            Background="Transparent">
+
+        <!-- Close button -->
+        <Grid x:Name="CloseButton"
+              Width="12" Height="12"
+              MouseLeftButtonDown="OnClosePressed"
+              MouseLeftButtonUp="OnCloseReleased"
+              Cursor="Arrow">
+            <Ellipse x:Name="CloseCircle" Fill="#FF5F57" />
+            <Path x:Name="CloseGlyph"
+                  Stroke="#4D0000"
+                  StrokeThickness="1.5"
+                  Opacity="0"
+                  Data="M 3,3 L 9,9 M 9,3 L 3,9"
+                  StrokeStartLineCap="Round"
+                  StrokeEndLineCap="Round" />
+        </Grid>
+
+        <!-- Minimize button -->
+        <Grid x:Name="MinimizeButton"
+              Width="12" Height="12"
+              MouseLeftButtonDown="OnMinimizePressed"
+              MouseLeftButtonUp="OnMinimizeReleased"
+              Cursor="Arrow">
+            <Ellipse x:Name="MinimizeCircle" Fill="#FEBC2E" />
+            <Path x:Name="MinimizeGlyph"
+                  Stroke="#6B4400"
+                  StrokeThickness="1.5"
+                  Opacity="0"
+                  Data="M 3,6 L 9,6"
+                  StrokeStartLineCap="Round"
+                  StrokeEndLineCap="Round" />
+        </Grid>
+
+        <!-- Maximize button -->
+        <Grid x:Name="MaximizeButton"
+              Width="12" Height="12"
+              MouseLeftButtonDown="OnMaximizePressed"
+              MouseLeftButtonUp="OnMaximizeReleased"
+              Cursor="Arrow">
+            <Ellipse x:Name="MaximizeCircle" Fill="#28C840" />
+            <Path x:Name="MaximizeGlyph"
+                  Stroke="#003D00"
+                  StrokeThickness="1.5"
+                  Opacity="0"
+                  Data="M 3,6 L 6,3 L 9,6 M 3,6 L 6,9 L 9,6"
+                  StrokeStartLineCap="Round"
+                  StrokeEndLineCap="Round" />
+        </Grid>
+    </Canvas>
+</UserControl>

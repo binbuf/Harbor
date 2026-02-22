@@ -28,7 +28,17 @@ public partial class OverlayWindow : Window
     {
         TargetHwnd = targetHwnd;
         InitializeComponent();
+        TrafficLights.TargetHwnd = targetHwnd;
         SourceInitialized += OnSourceInitialized;
+    }
+
+    /// <summary>
+    /// Sets whether the target window is active (foreground).
+    /// Controls traffic light button colors (active vs inactive gray).
+    /// </summary>
+    public void SetActive(bool isActive)
+    {
+        TrafficLights.SetActive(isActive);
     }
 
     private void OnSourceInitialized(object? sender, EventArgs e)

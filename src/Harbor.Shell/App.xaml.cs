@@ -24,6 +24,7 @@ public partial class App : Application
     private FullscreenRetreatCoordinator? _fullscreenCoordinator;
     private DockPinningService? _dockPinningService;
     private DockSettingsService? _dockSettingsService;
+    private ShellSettingsService? _shellSettingsService;
     private DisplayChangeService? _displayChangeService;
     private ThemeService? _themeService;
     private HiddenWindowRegistry? _hiddenWindowRegistry;
@@ -54,6 +55,13 @@ public partial class App : Application
 
         // Launch watchdog process
         LaunchWatchdog();
+
+        // Load shell settings and kill explorer.exe if configured
+        _shellSettingsService = new ShellSettingsService();
+        if (_shellSettingsService.ReplaceExplorer)
+        {
+            KillExplorer();
+        }
 
         _shellServices = new ShellServices();
 
@@ -229,6 +237,35 @@ public partial class App : Application
         }
     }
 
+    private static void KillExplorer()
+    {
+        try
+        {
+            var processes = Process.GetProcessesByName("explorer");
+            foreach (var proc in processes)
+            {
+                try
+                {
+                    proc.Kill();
+                    proc.WaitForExit(3000);
+                    Trace.WriteLine($"[Harbor] App: Killed explorer.exe (PID {proc.Id}).");
+                }
+                catch (Exception ex)
+                {
+                    Trace.WriteLine($"[Harbor] App: Failed to kill explorer.exe (PID {proc.Id}): {ex.Message}");
+                }
+                finally
+                {
+                    proc.Dispose();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Trace.WriteLine($"[Harbor] App: Failed to enumerate explorer processes: {ex.Message}");
+        }
+    }
+
     protected override void OnExit(ExitEventArgs e)
     {
         Trace.WriteLine("[Harbor] App: Shutting down...");
@@ -311,6 +348,15 @@ public partial class App : Application
         AppDomain.CurrentDomain.UnhandledException -= OnUnhandledException;
         TaskScheduler.UnobservedTaskException -= OnUnobservedTaskException;
         DispatcherUnhandledException -= OnDispatcherUnhandledException;
+
+        // Restart explorer.exe if we killed it on startup
+        if (_shellSettingsService?.ReplaceExplorer == true)
+        {
+            CrashRecoveryService.LaunchExplorer();
+        }
+
+        _shellSettingsService?.Dispose();
+        _shellSettingsService = null;
 
         _shellServices?.Dispose();
         _shellServices = null;

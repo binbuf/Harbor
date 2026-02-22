@@ -7,6 +7,7 @@ using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Threading;
 using Harbor.Core.Interop;
 using Harbor.Core.Services;
 using ManagedShell.AppBar;
@@ -23,6 +24,23 @@ public partial class Dock : AppBarWindow
     private DockAutoHideService? _autoHideService;
     private DockSettingsService? _settingsService;
     private bool _isAutoHideEnabled;
+
+    // Long-press detection for window picker
+    private DispatcherTimer? _longPressTimer;
+    private FrameworkElement? _longPressElement;
+    private bool _longPressTriggered;
+
+    // Recycle bin
+    private RecycleBinService? _recycleBinService;
+
+    // Drag reorder state
+    private Point _dragStartPoint;
+    private DockItem? _dragItem;
+    private FrameworkElement? _dragElement;
+    private bool _isDragging;
+    private System.Windows.Controls.Primitives.Popup? _dragGhost;
+    private int _dragFromIndex;
+    private int _dragTargetIndex;
 
     // Animation constants (match Design.md Section 5B / 5D)
     public const double IconDefaultSize = 48.0;
@@ -165,6 +183,13 @@ public partial class Dock : AppBarWindow
     {
         if (sender is not FrameworkElement element) return;
 
+        // Cancel long-press if mouse leaves without dragging
+        if (!_isDragging)
+        {
+            CancelLongPress();
+            element.MouseMove -= DockIcon_MouseMove;
+        }
+
         var scaleTransform = FindScaleTransform(element);
         if (scaleTransform is null) return;
 
@@ -183,6 +208,23 @@ public partial class Dock : AppBarWindow
         if (scaleTransform is null) return;
 
         AnimateScale(scaleTransform, PressedScaleFactor, PressScaleDownDuration, EaseIn);
+
+        // Record drag start point
+        _dragStartPoint = e.GetPosition(DockPanel);
+        _dragElement = element;
+        _dragItem = element.DataContext as DockItem;
+        _isDragging = false;
+
+        // Start long-press timer for window picker
+        _longPressTriggered = false;
+        _longPressElement = element;
+        _longPressTimer?.Stop();
+        _longPressTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
+        _longPressTimer.Tick += OnLongPressTick;
+        _longPressTimer.Start();
+
+        // Subscribe to MouseMove on the element for drag detection
+        element.MouseMove += DockIcon_MouseMove;
     }
 
     /// <summary>
@@ -191,6 +233,22 @@ public partial class Dock : AppBarWindow
     private void DockIcon_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
         if (sender is not FrameworkElement element) return;
+
+        // Unsubscribe mouse move
+        element.MouseMove -= DockIcon_MouseMove;
+
+        // Cancel long-press timer
+        CancelLongPress();
+
+        // Handle drag end
+        if (_isDragging)
+        {
+            EndDrag();
+            return;
+        }
+
+        // If long-press was triggered, don't do normal click
+        if (_longPressTriggered) return;
 
         // Animate scale back to default (or hover size if still hovering)
         var scaleTransform = FindScaleTransform(element);
@@ -324,11 +382,14 @@ public partial class Dock : AppBarWindow
             }
             else
             {
-                // Bring all windows to front, most recently active (first) ends up on top
+                // Sort by Z-order descending (bottom-of-stack first), so topmost gets activated last
                 Trace.WriteLine($"[Harbor] Dock: Activating all windows for: {dockItem.DisplayName}");
-                for (int i = dockItem.Windows.Count - 1; i >= 0; i--)
+                var sorted = dockItem.Windows
+                    .OrderByDescending(w => WindowInterop.GetZOrder(new HWND(w.Handle)))
+                    .ToList();
+                foreach (var window in sorted)
                 {
-                    dockItem.Windows[i].BringToFront();
+                    window.BringToFront();
                 }
             }
         }
@@ -448,10 +509,13 @@ public partial class Dock : AppBarWindow
             case DockMenuAction.Open:
                 if (dockItem.IsRunning && dockItem.Windows.Count > 0)
                 {
-                    // Bring all windows to front, most recent on top
-                    for (int i = dockItem.Windows.Count - 1; i >= 0; i--)
+                    // Sort by Z-order descending (bottom first), so topmost gets activated last
+                    var sortedWindows = dockItem.Windows
+                        .OrderByDescending(w => WindowInterop.GetZOrder(new HWND(w.Handle)))
+                        .ToList();
+                    foreach (var w in sortedWindows)
                     {
-                        dockItem.Windows[i].BringToFront();
+                        w.BringToFront();
                     }
                 }
                 else
@@ -601,6 +665,204 @@ public partial class Dock : AppBarWindow
 
     #endregion
 
+    #region Long-Press Window Picker
+
+    private void OnLongPressTick(object? sender, EventArgs e)
+    {
+        _longPressTimer?.Stop();
+        _longPressTriggered = true;
+
+        if (_longPressElement?.DataContext is DockItem dockItem && dockItem.Windows.Count > 1)
+        {
+            // Restore scale
+            var scaleTransform = FindScaleTransform(_longPressElement);
+            if (scaleTransform is not null)
+                AnimateScale(scaleTransform, 1.0, PressScaleUpDuration, EaseOut);
+
+            var picker = new DockWindowPickerPopup();
+            picker.Populate(dockItem.Windows);
+            picker.ShowCenteredAbove(_longPressElement);
+        }
+    }
+
+    private void CancelLongPress()
+    {
+        _longPressTimer?.Stop();
+        _longPressTimer = null;
+        _longPressElement = null;
+    }
+
+    #endregion
+
+    #region Trash / Recycle Bin
+
+    public void SetRecycleBinService(RecycleBinService service)
+    {
+        _recycleBinService = service;
+        _recycleBinService.PropertyChanged += OnRecycleBinChanged;
+        TrashIconImage.Source = _recycleBinService.CurrentIcon;
+    }
+
+    private void OnRecycleBinChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(RecycleBinService.CurrentIcon))
+        {
+            Dispatcher.Invoke(() => TrashIconImage.Source = _recycleBinService?.CurrentIcon);
+        }
+    }
+
+    private void TrashIcon_Click(object sender, MouseButtonEventArgs e)
+    {
+        _recycleBinService?.Open();
+    }
+
+    private void TrashIcon_RightClick(object sender, MouseButtonEventArgs e)
+    {
+        var menu = new ContextMenu();
+
+        var openItem = new MenuItem { Header = "Open" };
+        openItem.Click += (_, _) => _recycleBinService?.Open();
+        menu.Items.Add(openItem);
+
+        var emptyItem = new MenuItem { Header = "Empty Trash" };
+        emptyItem.Click += (_, _) => _recycleBinService?.Empty();
+        menu.Items.Add(emptyItem);
+
+        menu.PlacementTarget = (UIElement)sender;
+        menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Top;
+        menu.IsOpen = true;
+        e.Handled = true;
+    }
+
+    private void TrashIcon_MouseEnter(object sender, MouseEventArgs e)
+    {
+        // No scale animation for trash — it's a fixed dock element
+    }
+
+    private void TrashIcon_MouseLeave(object sender, MouseEventArgs e)
+    {
+    }
+
+    #endregion
+
+    #region Drag Reorder
+
+    private void DockIcon_MouseMove(object sender, MouseEventArgs e)
+    {
+        if (sender is not FrameworkElement element) return;
+        if (e.LeftButton != MouseButtonState.Pressed) return;
+
+        var currentPos = e.GetPosition(DockPanel);
+        var delta = currentPos - _dragStartPoint;
+
+        // Movement threshold — if moved more than 5px, start drag (cancel long-press)
+        if (!_isDragging && Math.Abs(delta.X) > 5)
+        {
+            // Only drag pinned items
+            if (_dragItem is not { IsPinned: true }) return;
+
+            CancelLongPress();
+            _isDragging = true;
+            _dragFromIndex = GetPinnedIndex(_dragItem);
+            _dragTargetIndex = _dragFromIndex;
+
+            Mouse.Capture(element);
+
+            // Create ghost popup
+            _dragGhost = new System.Windows.Controls.Primitives.Popup
+            {
+                AllowsTransparency = true,
+                IsHitTestVisible = false,
+                Placement = System.Windows.Controls.Primitives.PlacementMode.Absolute,
+                Child = new Border
+                {
+                    Opacity = 0.7,
+                    Child = new Image
+                    {
+                        Source = _dragItem.Icon,
+                        Width = 48,
+                        Height = 48,
+                    }
+                }
+            };
+
+            element.Opacity = 0.3;
+            UpdateGhostPosition(element, e);
+            _dragGhost.IsOpen = true;
+        }
+
+        if (_isDragging)
+        {
+            UpdateGhostPosition(element, e);
+            UpdateDragTarget(e);
+        }
+    }
+
+    private void UpdateGhostPosition(FrameworkElement element, MouseEventArgs e)
+    {
+        if (_dragGhost is null) return;
+        var screenPos = element.PointToScreen(e.GetPosition(element));
+        _dragGhost.HorizontalOffset = screenPos.X - 24;
+        _dragGhost.VerticalOffset = screenPos.Y - 24;
+    }
+
+    private void UpdateDragTarget(MouseEventArgs e)
+    {
+        if (_itemManager is null) return;
+
+        var pos = e.GetPosition(PinnedIconsControl);
+        var itemWidth = 56.0; // 48 icon + 4+4 margin
+        var newIndex = Math.Clamp((int)(pos.X / itemWidth), 0, _itemManager.PinnedItems.Count - 1);
+        _dragTargetIndex = newIndex;
+    }
+
+    private void EndDrag()
+    {
+        if (_dragElement is not null)
+        {
+            _dragElement.Opacity = 1.0;
+            _dragElement.MouseMove -= DockIcon_MouseMove;
+            Mouse.Capture(null);
+        }
+
+        if (_dragGhost is not null)
+        {
+            _dragGhost.IsOpen = false;
+            _dragGhost = null;
+        }
+
+        // Perform reorder if moved
+        if (_dragFromIndex != _dragTargetIndex && _itemManager is not null)
+        {
+            _itemManager.PinningService.Reorder(_dragFromIndex, _dragTargetIndex);
+        }
+
+        // Restore scale
+        if (_dragElement is not null)
+        {
+            var scaleTransform = FindScaleTransform(_dragElement);
+            if (scaleTransform is not null)
+                AnimateScale(scaleTransform, 1.0, PressScaleUpDuration, EaseOut);
+        }
+
+        _isDragging = false;
+        _dragItem = null;
+        _dragElement = null;
+    }
+
+    private int GetPinnedIndex(DockItem item)
+    {
+        if (_itemManager is null) return -1;
+        for (int i = 0; i < _itemManager.PinnedItems.Count; i++)
+        {
+            if (string.Equals(_itemManager.PinnedItems[i].ExecutablePath, item.ExecutablePath, StringComparison.OrdinalIgnoreCase))
+                return i;
+        }
+        return -1;
+    }
+
+    #endregion
+
     protected override void OnClosing(CancelEventArgs e)
     {
         PinnedIconsControl.ItemsSource = null;
@@ -620,6 +882,12 @@ public partial class Dock : AppBarWindow
             _autoHideService.HideRequested -= OnAutoHideHideRequested;
             _autoHideService.Dispose();
             _autoHideService = null;
+        }
+
+        if (_recycleBinService is not null)
+        {
+            _recycleBinService.PropertyChanged -= OnRecycleBinChanged;
+            _recycleBinService = null;
         }
 
         _iconService.ClearCache();

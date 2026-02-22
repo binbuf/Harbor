@@ -106,7 +106,7 @@ public static class CrashRecoveryService
             Process.Start(new ProcessStartInfo
             {
                 FileName = explorerPath,
-                UseShellExecute = false,
+                UseShellExecute = true,
             });
             Trace.WriteLine("[Harbor] CrashRecoveryService: Launched explorer.exe as fallback shell.");
         }

@@ -17,4 +17,9 @@
     <SolidColorBrush x:Key="DockTooltipBackground" Color="#1E1E1E" />
     <SolidColorBrush x:Key="DockTooltipForeground" Color="#FFFFFF" />
 
+    <!-- App Switcher -->
+    <SolidColorBrush x:Key="AppSwitcherBackground" Color="#D9F6F6F6" />
+    <SolidColorBrush x:Key="AppSwitcherForeground" Color="#000000" />
+    <SolidColorBrush x:Key="AppSwitcherAccentBrush" Color="#0078D4" />
+
 </ResourceDictionary>

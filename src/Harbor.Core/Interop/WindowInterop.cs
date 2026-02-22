@@ -156,4 +156,19 @@ public static class WindowInterop
     {
         return (GetWindowStyle(hwnd) & WS_MAXIMIZE) != 0;
     }
+
+    /// <summary>
+    /// Returns the Z-order position of a window (0 = topmost in Z, higher = further back).
+    /// Walks the GW_HWNDPREV chain from the given window.
+    /// </summary>
+    public static int GetZOrder(HWND hwnd)
+    {
+        int z = 0;
+        var current = hwnd;
+        while ((current = PInvoke.GetWindow(current, GET_WINDOW_CMD.GW_HWNDPREV)) != HWND.Null)
+        {
+            z++;
+        }
+        return z;
+    }
 }

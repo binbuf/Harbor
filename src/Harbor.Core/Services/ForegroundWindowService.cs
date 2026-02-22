@@ -66,6 +66,12 @@ public sealed class ForegroundWindowService : INotifyPropertyChanged, IDisposabl
     private void UpdateActiveAppName()
     {
         var hwnd = WindowInterop.GetForegroundWindow();
+        if (hwnd == HWND.Null) return;
+
+        // Skip updates when the foreground window belongs to Harbor itself
+        WindowInterop.GetWindowThreadProcessId(hwnd, out var processId);
+        if (processId == WindowInterop.GetCurrentProcessId()) return;
+
         ActiveAppName = GetAppNameFromWindow(hwnd);
     }
 

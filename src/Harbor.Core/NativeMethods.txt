@@ -40,6 +40,18 @@ QueryPerformanceFrequency
 // Window State
 IsIconic
 FindWindow
+GetWindow
+
+// Keyboard Hooks
+SetWindowsHookEx
+UnhookWindowsHookEx
+CallNextHookEx
+GetModuleHandle
+
+// Recycle Bin
+SHQueryRecycleBin
+SHEmptyRecycleBin
+SHGetStockIconInfo
 
 // System
 SystemParametersInfo

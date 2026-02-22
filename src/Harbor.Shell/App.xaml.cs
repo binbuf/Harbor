@@ -30,6 +30,13 @@ public partial class App : Application
     private HiddenWindowRegistry? _hiddenWindowRegistry;
     private HeartbeatService? _heartbeatService;
     private Process? _watchdogProcess;
+    private WorkAreaService? _workAreaService;
+    private LowLevelKeyboardHookService? _lowLevelKeyboardHook;
+    private WindowCycleService? _windowCycleService;
+    private AppSwitcherService? _appSwitcherService;
+    private AppSwitcherOverlay? _appSwitcherOverlay;
+    private HarborTrayIcon? _harborTrayIcon;
+    private RecycleBinService? _recycleBinService;
     private AppBarRegistration? _menuBarRegistration;
     private AppBarRegistration? _dockRegistration;
     private TopMenuBar? _menuBar;
@@ -115,6 +122,17 @@ public partial class App : Application
         _dockRegistration = AppBarHelper.Register(_dock, AppBarEdge.Bottom);
         _dock.Initialize(_shellServices.Tasks, _dockPinningService, _dockSettingsService);
 
+        // Reserve screen space for the menu bar and dock via work area adjustment.
+        // SHAppBarMessage can't work without explorer, so we do it manually.
+        if (_shellSettingsService.ReplaceExplorer)
+        {
+            _workAreaService = new WorkAreaService();
+            _workAreaService.Apply(topInset: 24, bottomInset: 82);
+        }
+
+        // Register ProcessExit to restore explorer even on forced termination (e.g. VS debugger stop)
+        AppDomain.CurrentDomain.ProcessExit += OnProcessExit;
+
         // Create fullscreen detection and retreat coordination
         _fullscreenDetectionService = new FullscreenDetectionService();
         _fullscreenCoordinator = new FullscreenRetreatCoordinator(
@@ -125,6 +143,32 @@ public partial class App : Application
             new Windows.Win32.Foundation.HWND(_menuBar.Handle));
         _fullscreenCoordinator.RegisterAppBar(_menuBar, primaryMonitor);
         _fullscreenCoordinator.RegisterAppBar(_dock, primaryMonitor);
+
+        // Auto-pin File Manager (explorer.exe) at front of dock
+        _dockPinningService.PinAt(0, @"C:\Windows\explorer.exe", "Finder");
+
+        // Create keyboard hook and hotkey services
+        _lowLevelKeyboardHook = new LowLevelKeyboardHookService();
+        _windowCycleService = new WindowCycleService(_lowLevelKeyboardHook, _shellServices.Tasks);
+
+        // Create app switcher with overlay
+        var iconService = new IconExtractionService();
+        _appSwitcherService = new AppSwitcherService(_lowLevelKeyboardHook, _shellServices.Tasks, iconService);
+        _appSwitcherOverlay = new AppSwitcherOverlay();
+
+        _appSwitcherService.ShowRequested += (apps, index) =>
+            Dispatcher.Invoke(() => _appSwitcherOverlay.ShowWithApps(apps, index));
+        _appSwitcherService.SelectionChanged += (index) =>
+            Dispatcher.Invoke(() => _appSwitcherOverlay.UpdateSelectedIndex(index));
+        _appSwitcherService.HideRequested += () =>
+            Dispatcher.Invoke(() => _appSwitcherOverlay.Hide());
+
+        // Create system tray icon
+        _harborTrayIcon = new HarborTrayIcon();
+
+        // Create recycle bin service and connect to dock
+        _recycleBinService = new RecycleBinService();
+        _dock.SetRecycleBinService(_recycleBinService);
 
         Trace.WriteLine("[Harbor] App: Startup complete.");
     }
@@ -179,6 +223,22 @@ public partial class App : Application
         // ManagedShell's AppBarWindow.UpdatePosition() handles re-querying the screen bounds.
         _menuBar?.UpdatePosition();
         _dock?.UpdatePosition();
+    }
+
+    /// <summary>
+    /// Fires when the process exits — including forced termination by the debugger.
+    /// Restores explorer and work area as a last-resort safety net.
+    /// </summary>
+    private void OnProcessExit(object? sender, EventArgs e)
+    {
+        Trace.WriteLine("[Harbor] App: ProcessExit fired.");
+
+        _workAreaService?.Restore();
+
+        if (_shellSettingsService?.ReplaceExplorer == true)
+        {
+            CrashRecoveryService.LaunchExplorer();
+        }
     }
 
     private void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)
@@ -295,6 +355,25 @@ public partial class App : Application
         _watchdogProcess?.Dispose();
         _watchdogProcess = null;
 
+        // Dispose new services in reverse order of creation
+        _recycleBinService?.Dispose();
+        _recycleBinService = null;
+
+        _harborTrayIcon?.Dispose();
+        _harborTrayIcon = null;
+
+        _appSwitcherService?.Dispose();
+        _appSwitcherService = null;
+
+        _appSwitcherOverlay?.Close();
+        _appSwitcherOverlay = null;
+
+        _windowCycleService?.Dispose();
+        _windowCycleService = null;
+
+        _lowLevelKeyboardHook?.Dispose();
+        _lowLevelKeyboardHook = null;
+
         _fullscreenCoordinator?.Dispose();
         _fullscreenCoordinator = null;
         _fullscreenDetectionService = null;
@@ -352,7 +431,12 @@ public partial class App : Application
         _hiddenWindowRegistry?.Dispose();
         _hiddenWindowRegistry = null;
 
-        // Unregister exception handlers
+        // Restore work area before restarting explorer
+        _workAreaService?.Dispose();
+        _workAreaService = null;
+
+        // Unregister exception and process-exit handlers
+        AppDomain.CurrentDomain.ProcessExit -= OnProcessExit;
         AppDomain.CurrentDomain.UnhandledException -= OnUnhandledException;
         TaskScheduler.UnobservedTaskException -= OnUnobservedTaskException;
         DispatcherUnhandledException -= OnDispatcherUnhandledException;

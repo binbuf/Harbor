@@ -7,8 +7,15 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\windows-logo.svg" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Harbor.Core\Harbor.Core.csproj" />

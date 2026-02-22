@@ -1,0 +1,39 @@
+<Window x:Class="Harbor.Shell.DockWindowPickerPopup"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        Topmost="True"
+        ShowInTaskbar="False"
+        SizeToContent="WidthAndHeight"
+        ResizeMode="NoResize">
+
+    <Border CornerRadius="10"
+            Background="{DynamicResource DockTooltipBackground}"
+            Padding="6,6"
+            MinWidth="180">
+        <ItemsControl x:Name="WindowList">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <Border x:Name="ItemBorder"
+                            CornerRadius="6"
+                            Background="Transparent"
+                            Padding="12,6"
+                            Margin="0,1"
+                            Cursor="Hand"
+                            MouseLeftButtonUp="WindowItem_Click"
+                            MouseEnter="WindowItem_MouseEnter"
+                            MouseLeave="WindowItem_MouseLeave">
+                        <TextBlock Text="{Binding Title}"
+                                   Foreground="{DynamicResource DockTooltipForeground}"
+                                   FontFamily="Segoe UI Variable"
+                                   FontSize="13"
+                                   TextTrimming="CharacterEllipsis"
+                                   MaxWidth="300" />
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+    </Border>
+</Window>

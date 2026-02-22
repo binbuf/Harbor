@@ -77,9 +77,8 @@
                 <Border Width="16" Height="16"
                         Margin="8,0,0,0"
                         VerticalAlignment="Center">
-                    <Ellipse Fill="#0078D4" Width="12" Height="12"
-                             HorizontalAlignment="Center"
-                             VerticalAlignment="Center" />
+                    <Image Source="Assets/windows-logo.svg" Width="14" Height="14"
+                           RenderOptions.BitmapScalingMode="HighQuality" />
                 </Border>
 
                 <!-- Active app name -->

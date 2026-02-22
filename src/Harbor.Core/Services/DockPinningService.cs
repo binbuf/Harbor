@@ -79,6 +79,53 @@ public class DockPinningService : IDisposable
     }
 
     /// <summary>
+    /// Pins an application at a specific index. No-op if already pinned.
+    /// </summary>
+    public void PinAt(int index, string executablePath, string? displayName = null)
+    {
+        if (string.IsNullOrEmpty(executablePath)) return;
+
+        lock (_lock)
+        {
+            if (_pins.Any(p => string.Equals(p.ExecutablePath, executablePath, StringComparison.OrdinalIgnoreCase)))
+                return;
+
+            var pin = new DockPin
+            {
+                ExecutablePath = executablePath,
+                DisplayName = displayName ?? Path.GetFileNameWithoutExtension(executablePath),
+            };
+            index = Math.Clamp(index, 0, _pins.Count);
+            _pins.Insert(index, pin);
+        }
+
+        Save();
+        PinsChanged?.Invoke(this, EventArgs.Empty);
+        Trace.WriteLine($"[Harbor] DockPinningService: Pinned {executablePath} at index {index}");
+    }
+
+    /// <summary>
+    /// Moves a pinned item from one position to another.
+    /// </summary>
+    public void Reorder(int fromIndex, int toIndex)
+    {
+        lock (_lock)
+        {
+            if (fromIndex < 0 || fromIndex >= _pins.Count) return;
+            toIndex = Math.Clamp(toIndex, 0, _pins.Count - 1);
+            if (fromIndex == toIndex) return;
+
+            var item = _pins[fromIndex];
+            _pins.RemoveAt(fromIndex);
+            _pins.Insert(toIndex, item);
+        }
+
+        Save();
+        PinsChanged?.Invoke(this, EventArgs.Empty);
+        Trace.WriteLine($"[Harbor] DockPinningService: Reordered from {fromIndex} to {toIndex}");
+    }
+
+    /// <summary>
     /// Unpins an application from the dock. No-op if not pinned.
     /// </summary>
     public void Unpin(string executablePath)

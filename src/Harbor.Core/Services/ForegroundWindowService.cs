@@ -18,6 +18,7 @@ public sealed class ForegroundWindowService : INotifyPropertyChanged, IDisposabl
     private UnhookWinEventSafeHandle? _hook;
     private WINEVENTPROC? _callback; // prevent GC of the delegate
     private string _activeAppName = string.Empty;
+    private nint _activeWindowHandle;
     private bool _disposed;
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -29,6 +30,17 @@ public sealed class ForegroundWindowService : INotifyPropertyChanged, IDisposabl
         {
             if (_activeAppName == value) return;
             _activeAppName = value;
+            OnPropertyChanged();
+        }
+    }
+
+    public nint ActiveWindowHandle
+    {
+        get => _activeWindowHandle;
+        private set
+        {
+            if (_activeWindowHandle == value) return;
+            _activeWindowHandle = value;
             OnPropertyChanged();
         }
     }
@@ -72,6 +84,7 @@ public sealed class ForegroundWindowService : INotifyPropertyChanged, IDisposabl
         WindowInterop.GetWindowThreadProcessId(hwnd, out var processId);
         if (processId == WindowInterop.GetCurrentProcessId()) return;
 
+        unsafe { ActiveWindowHandle = (nint)hwnd.Value; }
         ActiveAppName = GetAppNameFromWindow(hwnd);
     }
 
@@ -94,13 +107,29 @@ public sealed class ForegroundWindowService : INotifyPropertyChanged, IDisposabl
                 return description;
 
             // Fallback to process name
-            return process.ProcessName;
+            return CleanProcessName(process.ProcessName);
         }
         catch
         {
             // Process may have exited or access denied
             return string.Empty;
         }
+    }
+
+    /// <summary>
+    /// Cleans a raw process name for display: strips ".exe" suffix and capitalizes the first letter.
+    /// </summary>
+    internal static string CleanProcessName(string name)
+    {
+        if (string.IsNullOrEmpty(name)) return name;
+
+        if (name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+            name = name[..^4];
+
+        if (name.Length > 0 && char.IsLower(name[0]))
+            name = string.Concat(char.ToUpper(name[0]).ToString(), name.AsSpan(1));
+
+        return name;
     }
 
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null)

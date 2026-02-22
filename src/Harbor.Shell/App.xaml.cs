@@ -14,6 +14,7 @@ public partial class App : Application
     private ShellServices? _shellServices;
     private WindowEventManager? _windowEventManager;
     private ForegroundWindowService? _foregroundService;
+    private GlobalMenuBarService? _globalMenuService;
     private TitleBarDiscoveryService? _titleBarService;
     private WindowCommandService? _windowCommandService;
     private ColorOverrideService? _colorOverrideService;
@@ -80,6 +81,7 @@ public partial class App : Application
 
         // Create foreground window tracking service
         _foregroundService = new ForegroundWindowService();
+        _globalMenuService = new GlobalMenuBarService();
 
         // Create title bar discovery, command service, color detection, and overlay management
         _titleBarService = new TitleBarDiscoveryService(_windowEventManager);
@@ -106,7 +108,7 @@ public partial class App : Application
             24);
 
         _menuBarRegistration = AppBarHelper.Register(_menuBar, AppBarEdge.Top);
-        _menuBar.Initialize(_foregroundService, _shellServices.NotificationArea);
+        _menuBar.Initialize(_foregroundService, _shellServices.NotificationArea, _globalMenuService);
 
         // Create dock pinning and settings services
         _dockPinningService = new DockPinningService();
@@ -412,6 +414,9 @@ public partial class App : Application
             _displayChangeService.Dispose();
             _displayChangeService = null;
         }
+
+        _globalMenuService?.Dispose();
+        _globalMenuService = null;
 
         _foregroundService?.Dispose();
         _foregroundService = null;

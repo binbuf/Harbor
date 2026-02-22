@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
@@ -19,6 +20,7 @@ namespace Harbor.Shell;
 public partial class TopMenuBar : AppBarWindow
 {
     private ForegroundWindowService? _foregroundService;
+    private GlobalMenuBarService? _globalMenuService;
     private NotificationArea? _notificationArea;
     private DispatcherTimer? _clockTimer;
 
@@ -54,7 +56,7 @@ public partial class TopMenuBar : AppBarWindow
     /// Initializes services after the window source is available.
     /// Called after Show() so we have an HWND for acrylic.
     /// </summary>
-    public void Initialize(ForegroundWindowService foregroundService, NotificationArea notificationArea)
+    public void Initialize(ForegroundWindowService foregroundService, NotificationArea notificationArea, GlobalMenuBarService globalMenuService)
     {
         _foregroundService = foregroundService;
         _foregroundService.PropertyChanged += OnForegroundChanged;
@@ -67,6 +69,14 @@ public partial class TopMenuBar : AppBarWindow
         // Bind system tray icons
         _notificationArea = notificationArea;
         TrayIconsControl.ItemsSource = _notificationArea.TrayIcons;
+
+        // Wire up global menu bar
+        _globalMenuService = globalMenuService;
+        _globalMenuService.MenuItemsChanged += OnGlobalMenuItemsChanged;
+
+        // Query initial menu items
+        if (_foregroundService.ActiveWindowHandle != 0)
+            _globalMenuService.UpdateForWindow(_foregroundService.ActiveWindowHandle);
 
         StartClock();
     }
@@ -106,13 +116,24 @@ public partial class TopMenuBar : AppBarWindow
 
     private void OnForegroundChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName != nameof(ForegroundWindowService.ActiveAppName)) return;
-
-        Dispatcher.Invoke(() =>
+        if (e.PropertyName == nameof(ForegroundWindowService.ActiveAppName))
         {
-            var name = _foregroundService?.ActiveAppName;
-            AppNameText.Text = string.IsNullOrEmpty(name) ? "Harbor" : name;
-        });
+            Dispatcher.Invoke(() =>
+            {
+                var name = _foregroundService?.ActiveAppName;
+                AppNameText.Text = string.IsNullOrEmpty(name) ? "Harbor" : name;
+            });
+        }
+        else if (e.PropertyName == nameof(ForegroundWindowService.ActiveWindowHandle))
+        {
+            var hwnd = _foregroundService?.ActiveWindowHandle ?? 0;
+            _globalMenuService?.UpdateForWindow(hwnd);
+        }
+    }
+
+    private void OnGlobalMenuItemsChanged(IReadOnlyList<GlobalMenuItem> items)
+    {
+        Dispatcher.Invoke(() => MenuItemsControl.ItemsSource = items);
     }
 
     #region Clock
@@ -150,7 +171,7 @@ public partial class TopMenuBar : AppBarWindow
 
     private void SetupInteractionStates()
     {
-        var hoverTargets = new[] { AppNameItem, FileMenuItem, EditMenuItem, ViewMenuItem };
+        var hoverTargets = new[] { AppNameItem, WindowsLogoItem };
         foreach (var item in hoverTargets)
         {
             item.Background = TransparentBrush.Clone();
@@ -165,7 +186,14 @@ public partial class TopMenuBar : AppBarWindow
     {
         if (sender is not FrameworkElement element) return;
 
-        var brush = (SolidColorBrush)element.GetValue(System.Windows.Controls.Border.BackgroundProperty);
+        var brush = element.GetValue(Border.BackgroundProperty) as SolidColorBrush;
+        // Template items start with a shared Transparent brush — clone it so we can animate
+        if (brush is null || brush.IsFrozen)
+        {
+            brush = TransparentBrush.Clone();
+            element.SetValue(Border.BackgroundProperty, brush);
+        }
+
         var animation = new ColorAnimation
         {
             To = _hoverColor,
@@ -175,11 +203,13 @@ public partial class TopMenuBar : AppBarWindow
         brush.BeginAnimation(SolidColorBrush.ColorProperty, animation);
     }
 
-    private static void OnMenuItemMouseLeave(object sender, MouseEventArgs e)
+    private void OnMenuItemMouseLeave(object sender, MouseEventArgs e)
     {
         if (sender is not FrameworkElement element) return;
 
-        var brush = (SolidColorBrush)element.GetValue(System.Windows.Controls.Border.BackgroundProperty);
+        if (element.GetValue(Border.BackgroundProperty) is not SolidColorBrush brush || brush.IsFrozen)
+            return;
+
         var animation = new ColorAnimation
         {
             To = Colors.Transparent,
@@ -193,7 +223,9 @@ public partial class TopMenuBar : AppBarWindow
     {
         if (sender is not FrameworkElement element) return;
 
-        var brush = (SolidColorBrush)element.GetValue(System.Windows.Controls.Border.BackgroundProperty);
+        if (element.GetValue(Border.BackgroundProperty) is not SolidColorBrush brush || brush.IsFrozen)
+            return;
+
         brush.BeginAnimation(SolidColorBrush.ColorProperty, null);
         brush.Color = _pressedColor;
     }
@@ -202,7 +234,9 @@ public partial class TopMenuBar : AppBarWindow
     {
         if (sender is not FrameworkElement element) return;
 
-        var brush = (SolidColorBrush)element.GetValue(System.Windows.Controls.Border.BackgroundProperty);
+        if (element.GetValue(Border.BackgroundProperty) is not SolidColorBrush brush || brush.IsFrozen)
+            return;
+
         var animation = new ColorAnimation
         {
             To = _hoverColor,
@@ -210,6 +244,48 @@ public partial class TopMenuBar : AppBarWindow
             EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
         };
         brush.BeginAnimation(SolidColorBrush.ColorProperty, animation);
+    }
+
+    #endregion
+
+    #region Windows Logo System Menu
+
+    private void WindowsLogo_Click(object sender, MouseButtonEventArgs e)
+    {
+        var menu = new ContextMenu();
+
+        AddMenuItem(menu, $"About This PC", SystemActionService.OpenAboutThisPC);
+        menu.Items.Add(new Separator());
+        AddMenuItem(menu, "System Settings...", SystemActionService.OpenSystemSettings);
+        AddMenuItem(menu, "App Store...", SystemActionService.OpenAppStore);
+        menu.Items.Add(new Separator());
+        AddMenuItem(menu, "Lock Screen", SystemActionService.LockScreen);
+        AddMenuItem(menu, $"Log Out {SystemActionService.GetCurrentUserName()}...", SystemActionService.LogOut);
+        menu.Items.Add(new Separator());
+        AddMenuItem(menu, "Sleep", SystemActionService.Sleep);
+        AddMenuItem(menu, "Restart...", SystemActionService.Restart);
+        AddMenuItem(menu, "Shut Down...", SystemActionService.ShutDown);
+
+        menu.PlacementTarget = (UIElement)sender;
+        menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
+        menu.IsOpen = true;
+    }
+
+    private static void AddMenuItem(ContextMenu menu, string header, Action action)
+    {
+        var item = new MenuItem { Header = header };
+        item.Click += (_, _) => action();
+        menu.Items.Add(item);
+    }
+
+    #endregion
+
+    #region Global Menu Item Interaction
+
+    private void GlobalMenuItem_Click(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not FrameworkElement { DataContext: GlobalMenuItem item }) return;
+        _globalMenuService?.ActivateMenuItem(item);
     }
 
     #endregion
@@ -279,7 +355,12 @@ public partial class TopMenuBar : AppBarWindow
         _clockTimer = null;
 
         TrayIconsControl.ItemsSource = null;
+        MenuItemsControl.ItemsSource = null;
         _notificationArea = null;
+
+        if (_globalMenuService != null)
+            _globalMenuService.MenuItemsChanged -= OnGlobalMenuItemsChanged;
+        _globalMenuService = null;
 
         if (_foregroundService != null)
             _foregroundService.PropertyChanged -= OnForegroundChanged;

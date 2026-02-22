@@ -73,10 +73,13 @@
             <!-- Left side: Icon + App Name + Menu Items -->
             <StackPanel Orientation="Horizontal"
                         VerticalAlignment="Stretch">
-                <!-- Harbor icon placeholder (16x16, 8px left padding) -->
-                <Border Width="16" Height="16"
+                <!-- Windows logo — opens system menu on click -->
+                <Border x:Name="WindowsLogoItem"
+                        Width="16" Height="16"
                         Margin="8,0,0,0"
-                        VerticalAlignment="Center">
+                        VerticalAlignment="Center"
+                        Cursor="Hand"
+                        MouseLeftButtonUp="WindowsLogo_Click">
                     <Image Source="Assets/windows-logo.svg" Width="14" Height="14"
                            RenderOptions.BitmapScalingMode="HighQuality" />
                 </Border>
@@ -98,51 +101,36 @@
                                Text="Harbor" />
                 </Border>
 
-                <!-- Placeholder menu items -->
-                <Border x:Name="FileMenuItem"
-                        Margin="0,2,0,2"
-                        CornerRadius="4"
-                        Background="Transparent"
-                        VerticalAlignment="Stretch"
-                        Cursor="Hand">
-                    <TextBlock VerticalAlignment="Center"
-                               Padding="8,0"
-                               Foreground="{DynamicResource MenuBarInactiveTextBrush}"
-                               FontFamily="Segoe UI Variable"
-                               FontSize="13"
-                               FontWeight="Regular"
-                               Text="File" />
-                </Border>
-
-                <Border x:Name="EditMenuItem"
-                        Margin="0,2,0,2"
-                        CornerRadius="4"
-                        Background="Transparent"
-                        VerticalAlignment="Stretch"
-                        Cursor="Hand">
-                    <TextBlock VerticalAlignment="Center"
-                               Padding="8,0"
-                               Foreground="{DynamicResource MenuBarInactiveTextBrush}"
-                               FontFamily="Segoe UI Variable"
-                               FontSize="13"
-                               FontWeight="Regular"
-                               Text="Edit" />
-                </Border>
-
-                <Border x:Name="ViewMenuItem"
-                        Margin="0,2,0,2"
-                        CornerRadius="4"
-                        Background="Transparent"
-                        VerticalAlignment="Stretch"
-                        Cursor="Hand">
-                    <TextBlock VerticalAlignment="Center"
-                               Padding="8,0"
-                               Foreground="{DynamicResource MenuBarInactiveTextBrush}"
-                               FontFamily="Segoe UI Variable"
-                               FontSize="13"
-                               FontWeight="Regular"
-                               Text="View" />
-                </Border>
+                <!-- Dynamic global menu items -->
+                <ItemsControl x:Name="MenuItemsControl"
+                              VerticalAlignment="Stretch">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Margin="0,2,0,2"
+                                    CornerRadius="4"
+                                    Background="Transparent"
+                                    VerticalAlignment="Stretch"
+                                    Cursor="Hand"
+                                    MouseLeftButtonUp="GlobalMenuItem_Click"
+                                    MouseEnter="OnMenuItemMouseEnter"
+                                    MouseLeave="OnMenuItemMouseLeave"
+                                    MouseLeftButtonDown="OnMenuItemMouseDown">
+                                <TextBlock VerticalAlignment="Center"
+                                           Padding="8,0"
+                                           Foreground="{DynamicResource MenuBarInactiveTextBrush}"
+                                           FontFamily="Segoe UI Variable"
+                                           FontSize="13"
+                                           FontWeight="Regular"
+                                           Text="{Binding Name}" />
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
             </StackPanel>
         </DockPanel>
     </Grid>

@@ -29,6 +29,19 @@ public class ForegroundWindowServiceTests
         Assert.Equal(string.Empty, name);
     }
 
+    [Theory]
+    [InlineData("notepad.exe", "Notepad")]
+    [InlineData("notepad.EXE", "Notepad")]
+    [InlineData("Notepad", "Notepad")]
+    [InlineData("code", "Code")]
+    [InlineData("msedge", "Msedge")]
+    [InlineData("", "")]
+    public void CleanProcessName_CleansCorrectly(string input, string expected)
+    {
+        var result = ForegroundWindowService.CleanProcessName(input);
+        Assert.Equal(expected, result);
+    }
+
     [Fact]
     public void GetWindowText_ReturnsNonEmpty_ForForegroundWindow()
     {

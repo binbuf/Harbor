@@ -58,3 +58,5 @@ SystemParametersInfo
 SHGetFileInfo
 GetSystemMetrics
 GetDoubleClickTime
+ExitWindowsEx
+LockWorkStation

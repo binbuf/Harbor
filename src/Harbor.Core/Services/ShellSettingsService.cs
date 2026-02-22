@@ -12,7 +12,7 @@ public class ShellSettings
     /// <summary>
     /// When true, Harbor kills explorer.exe on startup and restarts it on exit.
     /// </summary>
-    public bool ReplaceExplorer { get; set; } = false;
+    public bool ReplaceExplorer { get; set; } = true;
 }
 
 /// <summary>

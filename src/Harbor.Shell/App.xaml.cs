@@ -237,32 +237,40 @@ public partial class App : Application
         }
     }
 
+    /// <summary>
+    /// Gracefully exits the explorer shell by posting WM_QUIT to its tray window.
+    /// This prevents Windows from auto-restarting explorer (unlike killing the process).
+    /// </summary>
     private static void KillExplorer()
     {
+        const uint WM_QUIT = 0x0012;
+
         try
         {
-            var processes = Process.GetProcessesByName("explorer");
-            foreach (var proc in processes)
+            var trayWnd = global::Windows.Win32.PInvoke.FindWindow("Shell_TrayWnd", null);
+            if (trayWnd != default)
             {
-                try
+                WindowInterop.PostMessage(trayWnd, WM_QUIT, 0, 0);
+                Trace.WriteLine("[Harbor] App: Posted WM_QUIT to Shell_TrayWnd.");
+
+                // Wait for explorer to exit
+                var processes = Process.GetProcessesByName("explorer");
+                foreach (var proc in processes)
                 {
-                    proc.Kill();
                     proc.WaitForExit(3000);
-                    Trace.WriteLine($"[Harbor] App: Killed explorer.exe (PID {proc.Id}).");
-                }
-                catch (Exception ex)
-                {
-                    Trace.WriteLine($"[Harbor] App: Failed to kill explorer.exe (PID {proc.Id}): {ex.Message}");
-                }
-                finally
-                {
                     proc.Dispose();
                 }
+
+                Trace.WriteLine("[Harbor] App: Explorer shell exited.");
+            }
+            else
+            {
+                Trace.WriteLine("[Harbor] App: Shell_TrayWnd not found — explorer may not be running.");
             }
         }
         catch (Exception ex)
         {
-            Trace.WriteLine($"[Harbor] App: Failed to enumerate explorer processes: {ex.Message}");
+            Trace.WriteLine($"[Harbor] App: Failed to exit explorer: {ex.Message}");
         }
     }
 

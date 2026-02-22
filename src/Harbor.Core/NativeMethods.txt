@@ -39,6 +39,7 @@ QueryPerformanceFrequency
 
 // Window State
 IsIconic
+FindWindow
 
 // System
 SystemParametersInfo

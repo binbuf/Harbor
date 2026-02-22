@@ -12,8 +12,8 @@
     <Grid x:Name="MenuBarRoot" Height="24">
         <!-- Background panel with bottom border -->
         <Border x:Name="BackgroundBorder"
-                Background="#CC1E1E1E"
-                BorderBrush="#3A3A3A"
+                Background="{DynamicResource MenuBarBackground}"
+                BorderBrush="{DynamicResource MenuBarBorderBrush}"
                 BorderThickness="0,0,0,1" />
 
         <!-- Content layout -->
@@ -25,7 +25,7 @@
                     VerticalAlignment="Stretch">
                 <TextBlock x:Name="ClockText"
                            VerticalAlignment="Center"
-                           Foreground="#FFFFFF"
+                           Foreground="{DynamicResource MenuBarTextBrush}"
                            FontFamily="Segoe UI Variable"
                            FontSize="13"
                            FontWeight="Regular" />
@@ -36,7 +36,7 @@
                        Text="›"
                        VerticalAlignment="Center"
                        Margin="0,0,10,0"
-                       Foreground="#FFFFFF"
+                       Foreground="{DynamicResource MenuBarTextBrush}"
                        FontFamily="Segoe UI Variable"
                        FontSize="13"
                        FontWeight="Regular" />
@@ -92,7 +92,7 @@
                     <TextBlock x:Name="AppNameText"
                                VerticalAlignment="Center"
                                Padding="6,0"
-                               Foreground="#FFFFFF"
+                               Foreground="{DynamicResource MenuBarTextBrush}"
                                FontFamily="Segoe UI Variable"
                                FontSize="13"
                                FontWeight="SemiBold"
@@ -108,7 +108,7 @@
                         Cursor="Hand">
                     <TextBlock VerticalAlignment="Center"
                                Padding="8,0"
-                               Foreground="#80FFFFFF"
+                               Foreground="{DynamicResource MenuBarInactiveTextBrush}"
                                FontFamily="Segoe UI Variable"
                                FontSize="13"
                                FontWeight="Regular"
@@ -123,7 +123,7 @@
                         Cursor="Hand">
                     <TextBlock VerticalAlignment="Center"
                                Padding="8,0"
-                               Foreground="#80FFFFFF"
+                               Foreground="{DynamicResource MenuBarInactiveTextBrush}"
                                FontFamily="Segoe UI Variable"
                                FontSize="13"
                                FontWeight="Regular"
@@ -138,7 +138,7 @@
                         Cursor="Hand">
                     <TextBlock VerticalAlignment="Center"
                                Padding="8,0"
-                               Foreground="#80FFFFFF"
+                               Foreground="{DynamicResource MenuBarInactiveTextBrush}"
                                FontFamily="Segoe UI Variable"
                                FontSize="13"
                                FontWeight="Regular"

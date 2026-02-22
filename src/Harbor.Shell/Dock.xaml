@@ -20,8 +20,8 @@
                 VerticalAlignment="Center"
                 Margin="0,0,0,4"
                 CornerRadius="16"
-                Background="#801E1E1E"
-                BorderBrush="#1FFFFFFF"
+                Background="{DynamicResource DockBackground}"
+                BorderBrush="{DynamicResource DockBorderBrush}"
                 BorderThickness="1"
                 Padding="4,8">
 
@@ -48,7 +48,7 @@
                                        RenderOptions.BitmapScalingMode="HighQuality" />
                                 <!-- Active indicator dot (visible only when running) -->
                                 <Ellipse Width="4" Height="4"
-                                         Fill="#FFFFFF"
+                                         Fill="{DynamicResource DockActiveDotBrush}"
                                          HorizontalAlignment="Center"
                                          VerticalAlignment="Bottom"
                                          Margin="0,0,0,-2"
@@ -64,7 +64,7 @@
                         Height="24"
                         VerticalAlignment="Center"
                         Margin="2,0"
-                        Background="#33FFFFFF"
+                        Background="{DynamicResource DockSeparatorBrush}"
                         Visibility="Collapsed" />
 
                 <!-- Running (unpinned) application icons -->
@@ -89,7 +89,7 @@
                                        RenderOptions.BitmapScalingMode="HighQuality" />
                                 <!-- Active indicator dot -->
                                 <Ellipse Width="4" Height="4"
-                                         Fill="#FFFFFF"
+                                         Fill="{DynamicResource DockActiveDotBrush}"
                                          HorizontalAlignment="Center"
                                          VerticalAlignment="Bottom"
                                          Margin="0,0,0,-2" />

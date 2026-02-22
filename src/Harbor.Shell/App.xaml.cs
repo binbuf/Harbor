@@ -22,6 +22,7 @@ public partial class App : Application
     private FullscreenRetreatCoordinator? _fullscreenCoordinator;
     private DockPinningService? _dockPinningService;
     private DisplayChangeService? _displayChangeService;
+    private ThemeService? _themeService;
     private AppBarRegistration? _menuBarRegistration;
     private AppBarRegistration? _dockRegistration;
     private TopMenuBar? _menuBar;
@@ -51,6 +52,11 @@ public partial class App : Application
         _titleBarColorService = new TitleBarColorService(_colorOverrideService);
         _overlaySyncService = new OverlaySyncService();
         _overlayManager = new OverlayManager(_windowEventManager, _titleBarService, _windowCommandService, _overlaySyncService, _titleBarColorService);
+
+        // Create theme detection service and apply initial theme
+        _themeService = new ThemeService();
+        ApplyTheme(_themeService.CurrentTheme);
+        _themeService.ThemeChanged += OnThemeChanged;
 
         // Create display change monitoring
         _displayChangeService = new DisplayChangeService();
@@ -94,6 +100,45 @@ public partial class App : Application
     }
 
     /// <summary>
+    /// Swaps the active theme resource dictionary and notifies shell chrome.
+    /// </summary>
+    private void ApplyTheme(AppTheme theme)
+    {
+        var uri = theme == AppTheme.Light
+            ? new Uri("LightTheme.xaml", UriKind.Relative)
+            : new Uri("DarkTheme.xaml", UriKind.Relative);
+
+        var newDict = new ResourceDictionary { Source = uri };
+
+        var merged = Resources.MergedDictionaries;
+        merged.Clear();
+        merged.Add(newDict);
+
+        Trace.WriteLine($"[Harbor] App: Applied {theme} theme.");
+    }
+
+    /// <summary>
+    /// Handles real-time theme changes from the system.
+    /// Swaps resource dictionary, reapplies acrylic, and invalidates title bar color cache.
+    /// </summary>
+    private void OnThemeChanged(AppTheme theme)
+    {
+        Dispatcher.Invoke(() =>
+        {
+            ApplyTheme(theme);
+
+            // Reapply acrylic with new theme colors
+            _menuBar?.ApplyThemedAcrylic(theme);
+            _dock?.ApplyThemedAcrylic(theme);
+
+            // Invalidate all cached title bar colors — apps may have changed appearance
+            _titleBarColorService?.InvalidateAll();
+
+            Trace.WriteLine($"[Harbor] App: Theme switch to {theme} complete.");
+        });
+    }
+
+    /// <summary>
     /// Handles WM_DISPLAYCHANGE — rebuilds AppBar registrations for the new display configuration.
     /// </summary>
     private void OnDisplayChanged()
@@ -134,6 +179,13 @@ public partial class App : Application
 
         _menuBarRegistration?.Dispose();
         _menuBarRegistration = null;
+
+        if (_themeService is not null)
+        {
+            _themeService.ThemeChanged -= OnThemeChanged;
+            _themeService.Dispose();
+            _themeService = null;
+        }
 
         if (_displayChangeService is not null)
         {

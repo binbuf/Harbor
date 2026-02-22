@@ -22,10 +22,19 @@ public partial class TopMenuBar : AppBarWindow
     private NotificationArea? _notificationArea;
     private DispatcherTimer? _clockTimer;
 
-    // Hover animation colors
+    // Hover animation colors — updated on theme change
     private static readonly SolidColorBrush TransparentBrush = new(Colors.Transparent);
-    private static readonly Color HoverColor = Color.FromArgb(26, 255, 255, 255);   // 10% white
-    private static readonly Color PressedColor = Color.FromArgb(51, 255, 255, 255);  // 20% white
+    private static readonly Color DarkHoverColor = Color.FromArgb(26, 255, 255, 255);   // #FFFFFF @ 10%
+    private static readonly Color DarkPressedColor = Color.FromArgb(51, 255, 255, 255);  // #FFFFFF @ 20%
+    private static readonly Color LightHoverColor = Color.FromArgb(20, 0, 0, 0);         // #000000 @ 8%
+    private static readonly Color LightPressedColor = Color.FromArgb(41, 0, 0, 0);       // #000000 @ 16%
+
+    // Acrylic color constants (AABBGGRR format for SetWindowCompositionAttribute)
+    public const uint DarkAcrylicColor = 0xCC1E1E1E;  // #1E1E1E @ 80%
+    public const uint LightAcrylicColor = 0xCCF6F6F6; // #F6F6F6 @ 80%
+
+    private Color _hoverColor = DarkHoverColor;
+    private Color _pressedColor = DarkPressedColor;
 
     public TopMenuBar(
         AppBarManager appBarManager,
@@ -70,15 +79,27 @@ public partial class TopMenuBar : AppBarWindow
 
     private void ApplyAcrylic()
     {
+        ApplyThemedAcrylic(ThemeService.ReadThemeFromRegistry());
+    }
+
+    /// <summary>
+    /// Applies acrylic blur with the correct background tint for the given theme.
+    /// Called on startup and when the system theme changes.
+    /// </summary>
+    public void ApplyThemedAcrylic(AppTheme theme)
+    {
         var hwnd = new WindowInteropHelper(this).Handle;
         if (hwnd == IntPtr.Zero) return;
 
-        // AABBGGRR format: 80% opacity (#CC), color #1E1E1E → BB=1E, GG=1E, RR=1E
-        const uint acrylicColor = 0xCC1E1E1E;
+        var acrylicColor = theme == AppTheme.Light ? LightAcrylicColor : DarkAcrylicColor;
         var result = CompositionInterop.EnableAcrylic(new HWND(hwnd), acrylicColor);
 
+        // Update hover/pressed colors for the new theme
+        _hoverColor = theme == AppTheme.Light ? LightHoverColor : DarkHoverColor;
+        _pressedColor = theme == AppTheme.Light ? LightPressedColor : DarkPressedColor;
+
         if (result)
-            Trace.WriteLine("[Harbor] TopMenuBar: Acrylic background applied.");
+            Trace.WriteLine($"[Harbor] TopMenuBar: Acrylic applied for {theme} theme.");
         else
             Trace.WriteLine("[Harbor] TopMenuBar: Acrylic failed, using solid fallback.");
     }
@@ -140,14 +161,14 @@ public partial class TopMenuBar : AppBarWindow
         }
     }
 
-    private static void OnMenuItemMouseEnter(object sender, MouseEventArgs e)
+    private void OnMenuItemMouseEnter(object sender, MouseEventArgs e)
     {
         if (sender is not FrameworkElement element) return;
 
         var brush = (SolidColorBrush)element.GetValue(System.Windows.Controls.Border.BackgroundProperty);
         var animation = new ColorAnimation
         {
-            To = HoverColor,
+            To = _hoverColor,
             Duration = TimeSpan.FromMilliseconds(120),
             EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
         };
@@ -168,23 +189,23 @@ public partial class TopMenuBar : AppBarWindow
         brush.BeginAnimation(SolidColorBrush.ColorProperty, animation);
     }
 
-    private static void OnMenuItemMouseDown(object sender, MouseButtonEventArgs e)
+    private void OnMenuItemMouseDown(object sender, MouseButtonEventArgs e)
     {
         if (sender is not FrameworkElement element) return;
 
         var brush = (SolidColorBrush)element.GetValue(System.Windows.Controls.Border.BackgroundProperty);
         brush.BeginAnimation(SolidColorBrush.ColorProperty, null);
-        brush.Color = PressedColor;
+        brush.Color = _pressedColor;
     }
 
-    private static void OnMenuItemMouseUp(object sender, MouseButtonEventArgs e)
+    private void OnMenuItemMouseUp(object sender, MouseButtonEventArgs e)
     {
         if (sender is not FrameworkElement element) return;
 
         var brush = (SolidColorBrush)element.GetValue(System.Windows.Controls.Border.BackgroundProperty);
         var animation = new ColorAnimation
         {
-            To = HoverColor,
+            To = _hoverColor,
             Duration = TimeSpan.FromMilliseconds(120),
             EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
         };

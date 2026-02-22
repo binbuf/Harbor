@@ -1,0 +1,16 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- Top Menu Bar -->
+    <SolidColorBrush x:Key="MenuBarBackground" Color="#CCF6F6F6" />
+    <SolidColorBrush x:Key="MenuBarBorderBrush" Color="#D1D1D1" />
+    <SolidColorBrush x:Key="MenuBarTextBrush" Color="#000000" />
+    <SolidColorBrush x:Key="MenuBarInactiveTextBrush" Color="#80000000" />
+
+    <!-- Dock -->
+    <SolidColorBrush x:Key="DockBackground" Color="#80F6F6F6" />
+    <SolidColorBrush x:Key="DockBorderBrush" Color="#14000000" />
+    <SolidColorBrush x:Key="DockSeparatorBrush" Color="#1F000000" />
+    <SolidColorBrush x:Key="DockActiveDotBrush" Color="#000000" />
+
+</ResourceDictionary>

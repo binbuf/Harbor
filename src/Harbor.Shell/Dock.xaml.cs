@@ -66,16 +66,29 @@ public partial class Dock : AppBarWindow
         ApplyAcrylic();
     }
 
+    // Acrylic color constants (AABBGGRR format for SetWindowCompositionAttribute)
+    public const uint DarkAcrylicColor = 0x801E1E1E;  // #1E1E1E @ 50%
+    public const uint LightAcrylicColor = 0x80F6F6F6; // #F6F6F6 @ 50%
+
     private void ApplyAcrylic()
+    {
+        ApplyThemedAcrylic(ThemeService.ReadThemeFromRegistry());
+    }
+
+    /// <summary>
+    /// Applies acrylic blur with the correct background tint for the given theme.
+    /// Called on startup and when the system theme changes.
+    /// </summary>
+    public void ApplyThemedAcrylic(AppTheme theme)
     {
         var hwnd = new WindowInteropHelper(this).Handle;
         if (hwnd == IntPtr.Zero) return;
 
-        const uint acrylicColor = 0x801E1E1E;
+        var acrylicColor = theme == AppTheme.Light ? LightAcrylicColor : DarkAcrylicColor;
         var result = CompositionInterop.EnableAcrylic(new HWND(hwnd), acrylicColor);
 
         if (result)
-            Trace.WriteLine("[Harbor] Dock: Acrylic background applied.");
+            Trace.WriteLine($"[Harbor] Dock: Acrylic applied for {theme} theme.");
         else
             Trace.WriteLine("[Harbor] Dock: Acrylic failed, using solid fallback.");
     }

@@ -9,6 +9,7 @@ namespace Harbor.Shell;
 public partial class App : Application
 {
     private ShellServices? _shellServices;
+    private WindowEventManager? _windowEventManager;
     private ForegroundWindowService? _foregroundService;
     private AppBarRegistration? _menuBarRegistration;
     private AppBarRegistration? _dockRegistration;
@@ -23,6 +24,9 @@ public partial class App : Application
 
         Trace.WriteLine($"[Harbor] App: NotificationArea initialized = {!_shellServices.NotificationArea.IsFailed}");
         Trace.WriteLine($"[Harbor] App: TrayIcons count = {_shellServices.NotificationArea.TrayIcons.Count}");
+
+        // Create centralized window event subscription system
+        _windowEventManager = new WindowEventManager(Dispatcher);
 
         // Create foreground window tracking service
         _foregroundService = new ForegroundWindowService();
@@ -62,6 +66,9 @@ public partial class App : Application
 
         _foregroundService?.Dispose();
         _foregroundService = null;
+
+        _windowEventManager?.Dispose();
+        _windowEventManager = null;
 
         _shellServices?.Dispose();
         _shellServices = null;

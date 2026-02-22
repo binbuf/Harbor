@@ -10,9 +10,11 @@ GetWindowLong
 SetWindowLong
 MonitorFromWindow
 IsWindow
+IsWindowVisible
 GetWindowText
 GetWindowTextLength
 GetWindowThreadProcessId
+GetCurrentProcessId
 
 // Event Hooks
 SetWinEventHook

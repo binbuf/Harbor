@@ -98,6 +98,16 @@ public static class WindowInterop
         return PInvoke.IsWindow(hwnd);
     }
 
+    public static bool IsWindowVisible(HWND hwnd)
+    {
+        return PInvoke.IsWindowVisible(hwnd);
+    }
+
+    public static uint GetCurrentProcessId()
+    {
+        return PInvoke.GetCurrentProcessId();
+    }
+
     public static string GetWindowText(HWND hwnd)
     {
         var length = PInvoke.GetWindowTextLength(hwnd);

@@ -11,17 +11,17 @@ public static class SystemActionService
 {
     public static void OpenAboutThisPC()
     {
-        Process.Start(new ProcessStartInfo("ms-settings:about") { UseShellExecute = true });
+        LaunchUri("ms-settings:about");
     }
 
     public static void OpenSystemSettings()
     {
-        Process.Start(new ProcessStartInfo("ms-settings:") { UseShellExecute = true });
+        LaunchUri("ms-settings:");
     }
 
     public static void OpenAppStore()
     {
-        Process.Start(new ProcessStartInfo("ms-windows-store:") { UseShellExecute = true });
+        LaunchUri("ms-windows-store:");
     }
 
     public static void Sleep()
@@ -51,6 +51,28 @@ public static class SystemActionService
     }
 
     public static string GetCurrentUserName() => Environment.UserName;
+
+    /// <summary>
+    /// Launches a protocol URI. Uses explorer.exe as the launcher so it works
+    /// even when Explorer's shell (Shell_TrayWnd) has been killed by Harbor.
+    /// UseShellExecute fails with 0x80040900 when no shell is running.
+    /// </summary>
+    private static void LaunchUri(string uri)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = "explorer.exe",
+                Arguments = uri,
+                UseShellExecute = false,
+            });
+        }
+        catch (Exception ex)
+        {
+            Trace.WriteLine($"[Harbor] SystemActionService: Failed to launch '{uri}': {ex.Message}");
+        }
+    }
 
     // SetSuspendState lives in powrprof.dll which CsWin32 can't generate
     [DllImport("powrprof.dll", SetLastError = true)]

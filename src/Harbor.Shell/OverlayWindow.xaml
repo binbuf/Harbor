@@ -11,5 +11,7 @@
         ResizeMode="NoResize">
     <Grid>
         <local:TrafficLightButtons x:Name="TrafficLights" HorizontalAlignment="Left" />
+        <Border x:Name="ColorMask" HorizontalAlignment="Right" VerticalAlignment="Stretch"
+                Background="Transparent" />
     </Grid>
 </Window>

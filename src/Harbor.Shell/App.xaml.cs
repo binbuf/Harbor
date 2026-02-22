@@ -13,6 +13,8 @@ public partial class App : Application
     private ForegroundWindowService? _foregroundService;
     private TitleBarDiscoveryService? _titleBarService;
     private WindowCommandService? _windowCommandService;
+    private ColorOverrideService? _colorOverrideService;
+    private TitleBarColorService? _titleBarColorService;
     private OverlayManager? _overlayManager;
     private DockPinningService? _dockPinningService;
     private AppBarRegistration? _menuBarRegistration;
@@ -35,10 +37,12 @@ public partial class App : Application
         // Create foreground window tracking service
         _foregroundService = new ForegroundWindowService();
 
-        // Create title bar discovery, command service, and overlay management
+        // Create title bar discovery, command service, color detection, and overlay management
         _titleBarService = new TitleBarDiscoveryService(_windowEventManager);
         _windowCommandService = new WindowCommandService();
-        _overlayManager = new OverlayManager(_windowEventManager, _titleBarService, _windowCommandService);
+        _colorOverrideService = new ColorOverrideService();
+        _titleBarColorService = new TitleBarColorService(_colorOverrideService);
+        _overlayManager = new OverlayManager(_windowEventManager, _titleBarService, _windowCommandService, _titleBarColorService);
 
         // Create and register the top menu bar as an AppBar
         var menuBar = AppBarHelper.CreateAppBar<TopMenuBar>(
@@ -72,6 +76,12 @@ public partial class App : Application
 
         _overlayManager?.Dispose();
         _overlayManager = null;
+
+        _titleBarColorService?.Dispose();
+        _titleBarColorService = null;
+
+        _colorOverrideService?.Dispose();
+        _colorOverrideService = null;
 
         _titleBarService?.Dispose();
         _titleBarService = null;

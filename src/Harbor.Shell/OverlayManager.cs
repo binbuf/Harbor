@@ -16,6 +16,7 @@ public sealed class OverlayManager : IDisposable
     private readonly WindowEventManager _eventManager;
     private readonly TitleBarDiscoveryService _titleBarService;
     private readonly WindowCommandService _commandService;
+    private readonly TitleBarColorService? _colorService;
     private readonly ConcurrentDictionary<HWND, OverlayWindow> _overlays = new();
 
     private Guid _foregroundSubscription;
@@ -27,11 +28,13 @@ public sealed class OverlayManager : IDisposable
     public OverlayManager(
         WindowEventManager eventManager,
         TitleBarDiscoveryService titleBarService,
-        WindowCommandService commandService)
+        WindowCommandService commandService,
+        TitleBarColorService? colorService = null)
     {
         _eventManager = eventManager;
         _titleBarService = titleBarService;
         _commandService = commandService;
+        _colorService = colorService;
 
         _foregroundSubscription = _eventManager.Subscribe(new WindowEventSubscription
         {
@@ -98,6 +101,7 @@ public sealed class OverlayManager : IDisposable
         {
             // Reposition existing overlay
             existing.Reposition(titleBarInfo.Rect);
+            ApplyMaskColor(existing, hwnd, titleBarInfo.Rect);
             return existing;
         }
 
@@ -108,6 +112,7 @@ public sealed class OverlayManager : IDisposable
         overlay.Reposition(titleBarInfo.Rect);
         overlay.UpdateZOrder();
         UpdateOverlayState(overlay, hwnd);
+        ApplyMaskColor(overlay, hwnd, titleBarInfo.Rect);
 
         if (_overlays.TryAdd(hwnd, overlay))
         {
@@ -156,6 +161,21 @@ public sealed class OverlayManager : IDisposable
                         UpdateOverlayState(overlay, hwnd);
                     }
                 });
+        }
+    }
+
+    private void ApplyMaskColor(OverlayWindow overlay, HWND hwnd, RECT titleBarRect)
+    {
+        if (_colorService is null) return;
+
+        try
+        {
+            var colorInfo = _colorService.Detect(hwnd, titleBarRect);
+            overlay.SetMaskColor(colorInfo.Color);
+        }
+        catch (Exception ex)
+        {
+            Trace.WriteLine($"[Harbor] OverlayManager: Failed to apply mask color: {ex.Message}");
         }
     }
 

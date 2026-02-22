@@ -1,9 +1,11 @@
 using System.Diagnostics;
 using System.Windows;
 using System.Windows.Interop;
+using System.Windows.Media;
 using Harbor.Core.Interop;
 using Harbor.Core.Services;
 using Windows.Win32.Foundation;
+using Windows.Win32.Graphics.Dwm;
 using Windows.Win32.UI.WindowsAndMessaging;
 
 namespace Harbor.Shell;
@@ -40,6 +42,41 @@ public partial class OverlayWindow : Window
     {
         add => TrafficLights.ButtonClicked += value;
         remove => TrafficLights.ButtonClicked -= value;
+    }
+
+    /// <summary>
+    /// Default mask width in DIPs, covering the native minimize/maximize/close buttons.
+    /// </summary>
+    internal const int DefaultMaskWidth = 135;
+
+    /// <summary>
+    /// Sets the color mask that hides the native window control buttons.
+    /// </summary>
+    public void SetMaskColor(Color color, int maskWidth = -1)
+    {
+        if (maskWidth < 0)
+            maskWidth = GetCaptionButtonWidth() ?? DefaultMaskWidth;
+
+        ColorMask.Width = maskWidth;
+        ColorMask.Background = new SolidColorBrush(color);
+    }
+
+    /// <summary>
+    /// Queries DWM for the caption button bounds width for the target window.
+    /// Returns null if the query fails.
+    /// </summary>
+    private int? GetCaptionButtonWidth()
+    {
+        var hr = DwmInterop.GetWindowAttribute(
+            TargetHwnd,
+            (DWMWINDOWATTRIBUTE)DwmInterop.DWMWA_CAPTION_BUTTON_BOUNDS,
+            out RECT captionBounds);
+
+        if (hr.Failed)
+            return null;
+
+        var width = captionBounds.right - captionBounds.left;
+        return width > 0 ? width : null;
     }
 
     /// <summary>

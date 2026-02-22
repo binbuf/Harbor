@@ -10,6 +10,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Harbor.Core.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="ManagedShell" Version="0.0.337" />
     <PackageReference Include="Microsoft.Windows.CsWin32" Version="0.3.183">
       <PrivateAssets>all</PrivateAssets>

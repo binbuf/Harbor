@@ -10,6 +10,7 @@ namespace Harbor.Shell;
 /// Manages the lifecycle of overlay windows that sit on top of application title bars.
 /// One overlay per tracked window, keyed by HWND.
 /// Routes traffic light button clicks to the target window via WindowCommandService.
+/// Integrates with OverlaySyncService for dual-layer synchronization (event-driven + polling).
 /// </summary>
 public sealed class OverlayManager : IDisposable
 {
@@ -17,6 +18,7 @@ public sealed class OverlayManager : IDisposable
     private readonly TitleBarDiscoveryService _titleBarService;
     private readonly WindowCommandService _commandService;
     private readonly TitleBarColorService? _colorService;
+    private readonly OverlaySyncService _syncService;
     private readonly ConcurrentDictionary<HWND, OverlayWindow> _overlays = new();
 
     private Guid _foregroundSubscription;
@@ -29,11 +31,13 @@ public sealed class OverlayManager : IDisposable
         WindowEventManager eventManager,
         TitleBarDiscoveryService titleBarService,
         WindowCommandService commandService,
+        OverlaySyncService syncService,
         TitleBarColorService? colorService = null)
     {
         _eventManager = eventManager;
         _titleBarService = titleBarService;
         _commandService = commandService;
+        _syncService = syncService;
         _colorService = colorService;
 
         _foregroundSubscription = _eventManager.Subscribe(new WindowEventSubscription
@@ -57,7 +61,7 @@ public sealed class OverlayManager : IDisposable
             Handler = OnWindowDestroyed,
         });
 
-        Trace.WriteLine("[Harbor] OverlayManager: Initialized.");
+        Trace.WriteLine("[Harbor] OverlayManager: Initialized with dual-layer sync.");
     }
 
     /// <summary>
@@ -80,6 +84,11 @@ public sealed class OverlayManager : IDisposable
     }
 
     /// <summary>
+    /// Returns the sync service for instrumentation access.
+    /// </summary>
+    public OverlaySyncService SyncService => _syncService;
+
+    /// <summary>
     /// Ensures an overlay exists for the given window. Creates one if it doesn't exist.
     /// Repositions the overlay to match the current title bar.
     /// </summary>
@@ -99,8 +108,9 @@ public sealed class OverlayManager : IDisposable
 
         if (_overlays.TryGetValue(hwnd, out var existing))
         {
-            // Reposition existing overlay
+            // Reposition existing overlay and update sync tracking
             existing.Reposition(titleBarInfo.Rect);
+            UpdateSyncTracking(existing, hwnd, titleBarInfo.Rect);
             ApplyMaskColor(existing, hwnd, titleBarInfo.Rect);
             return existing;
         }
@@ -112,6 +122,7 @@ public sealed class OverlayManager : IDisposable
         overlay.Reposition(titleBarInfo.Rect);
         overlay.UpdateZOrder();
         UpdateOverlayState(overlay, hwnd);
+        UpdateSyncTracking(overlay, hwnd, titleBarInfo.Rect);
         ApplyMaskColor(overlay, hwnd, titleBarInfo.Rect);
 
         if (_overlays.TryAdd(hwnd, overlay))
@@ -121,6 +132,7 @@ public sealed class OverlayManager : IDisposable
         }
 
         // Race condition — another thread created the overlay first
+        _syncService.Untrack(hwnd);
         overlay.Close();
         _overlays.TryGetValue(hwnd, out var winner);
         return winner;
@@ -133,9 +145,33 @@ public sealed class OverlayManager : IDisposable
     {
         if (_overlays.TryRemove(hwnd, out var overlay))
         {
+            _syncService.Untrack(hwnd);
             overlay.ButtonClicked -= OnButtonClicked;
             overlay.Close();
             Trace.WriteLine($"[Harbor] OverlayManager: Destroyed overlay for HWND {hwnd}");
+        }
+    }
+
+    /// <summary>
+    /// Registers or updates sync tracking for an overlay based on current window/title bar geometry.
+    /// </summary>
+    private void UpdateSyncTracking(OverlayWindow overlay, HWND hwnd, RECT titleBarRect)
+    {
+        if (overlay.OverlayHwnd == HWND.Null) return;
+
+        if (!WindowInterop.GetWindowRect(hwnd, out var windowRect))
+            return;
+
+        var offset = TitleBarOffset.Compute(windowRect, titleBarRect);
+        overlay.SetTitleBarOffset(windowRect, titleBarRect);
+
+        if (_syncService.IsTracking(hwnd))
+        {
+            _syncService.UpdateOffset(hwnd, windowRect, offset);
+        }
+        else
+        {
+            _syncService.Track(hwnd, overlay.OverlayHwnd, windowRect, offset);
         }
     }
 
@@ -218,16 +254,40 @@ public sealed class OverlayManager : IDisposable
         if (!_overlays.TryGetValue(args.WindowHandle, out var overlay))
             return;
 
-        // Re-discover title bar (cache was invalidated by TitleBarDiscoveryService)
-        var titleBarInfo = _titleBarService.Discover(args.WindowHandle);
-        if (titleBarInfo is null)
+        // Layer 1 fast path: use OverlaySyncService to reposition from cached offset
+        // This avoids full UIA title bar re-discovery for every location change
+        var fastResult = _syncService.RepositionFromEvent(args.WindowHandle);
+        if (fastResult.HasValue)
+        {
+            // Update maximized state on location change (fires when window is maximized/restored)
+            var isMaximized = WindowCommandService.IsMaximized(args.WindowHandle);
+            overlay.SetMaximized(isMaximized);
+
+            // If maximized state changed, the title bar geometry may have changed —
+            // do a full re-discovery to update the offset
+            if (isMaximized != overlay.TitleBarOffset.Height > 0)
+            {
+                var titleBarInfo = _titleBarService.Discover(args.WindowHandle);
+                if (titleBarInfo is not null)
+                {
+                    UpdateSyncTracking(overlay, args.WindowHandle, titleBarInfo.Rect);
+                }
+            }
+
+            return;
+        }
+
+        // Fallback: full re-discovery (sync service didn't have this window tracked)
+        var info = _titleBarService.Discover(args.WindowHandle);
+        if (info is null)
         {
             // Window may have gone frameless or been minimized — destroy overlay
             DestroyOverlay(args.WindowHandle);
             return;
         }
 
-        overlay.Reposition(titleBarInfo.Rect);
+        overlay.Reposition(info.Rect);
+        UpdateSyncTracking(overlay, args.WindowHandle, info.Rect);
 
         // Update maximized state on location change (fires when window is maximized/restored)
         overlay.SetMaximized(WindowCommandService.IsMaximized(args.WindowHandle));
@@ -252,6 +312,7 @@ public sealed class OverlayManager : IDisposable
         {
             try
             {
+                _syncService.Untrack(kvp.Key);
                 kvp.Value.ButtonClicked -= OnButtonClicked;
                 kvp.Value.Close();
             }

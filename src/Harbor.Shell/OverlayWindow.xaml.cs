@@ -27,6 +27,20 @@ public partial class OverlayWindow : Window
     /// </summary>
     public HWND OverlayHwnd { get; private set; }
 
+    /// <summary>
+    /// Cached title bar offset relative to the target window rect.
+    /// Used for fast repositioning without full UIA re-discovery.
+    /// </summary>
+    public TitleBarOffset TitleBarOffset { get; private set; }
+
+    /// <summary>
+    /// Stores the title bar offset computed from the initial discovery.
+    /// </summary>
+    public void SetTitleBarOffset(RECT windowRect, RECT titleBarRect)
+    {
+        TitleBarOffset = TitleBarOffset.Compute(windowRect, titleBarRect);
+    }
+
     public OverlayWindow(HWND targetHwnd)
     {
         TargetHwnd = targetHwnd;

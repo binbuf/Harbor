@@ -9,17 +9,19 @@ public class OverlayManagerTests : IDisposable
     private readonly WindowEventManager _eventManager = new();
     private readonly TitleBarDiscoveryService _titleBarService;
     private readonly WindowCommandService _commandService = new();
+    private readonly OverlaySyncService _syncService = new();
     private readonly OverlayManager _manager;
 
     public OverlayManagerTests()
     {
         _titleBarService = new TitleBarDiscoveryService(_eventManager);
-        _manager = new OverlayManager(_eventManager, _titleBarService, _commandService);
+        _manager = new OverlayManager(_eventManager, _titleBarService, _commandService, _syncService);
     }
 
     public void Dispose()
     {
         _manager.Dispose();
+        _syncService.Dispose();
         _titleBarService.Dispose();
         _eventManager.Dispose();
     }
@@ -73,11 +75,13 @@ public class OverlayManagerTests : IDisposable
     {
         var eventManager = new WindowEventManager();
         var titleBarService = new TitleBarDiscoveryService(eventManager);
-        var manager = new OverlayManager(eventManager, titleBarService, new WindowCommandService());
+        var syncService = new OverlaySyncService();
+        var manager = new OverlayManager(eventManager, titleBarService, new WindowCommandService(), syncService);
 
         manager.Dispose();
         manager.Dispose(); // should not throw
 
+        syncService.Dispose();
         titleBarService.Dispose();
         eventManager.Dispose();
     }
@@ -88,11 +92,13 @@ public class OverlayManagerTests : IDisposable
         // After dispose, overlay count should be zero
         var eventManager = new WindowEventManager();
         var titleBarService = new TitleBarDiscoveryService(eventManager);
-        var manager = new OverlayManager(eventManager, titleBarService, new WindowCommandService());
+        var syncService = new OverlaySyncService();
+        var manager = new OverlayManager(eventManager, titleBarService, new WindowCommandService(), syncService);
 
         manager.Dispose();
         Assert.Equal(0, manager.OverlayCount);
 
+        syncService.Dispose();
         titleBarService.Dispose();
         eventManager.Dispose();
     }

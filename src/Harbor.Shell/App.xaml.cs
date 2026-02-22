@@ -15,6 +15,7 @@ public partial class App : Application
     private WindowCommandService? _windowCommandService;
     private ColorOverrideService? _colorOverrideService;
     private TitleBarColorService? _titleBarColorService;
+    private OverlaySyncService? _overlaySyncService;
     private OverlayManager? _overlayManager;
     private DockPinningService? _dockPinningService;
     private AppBarRegistration? _menuBarRegistration;
@@ -42,7 +43,8 @@ public partial class App : Application
         _windowCommandService = new WindowCommandService();
         _colorOverrideService = new ColorOverrideService();
         _titleBarColorService = new TitleBarColorService(_colorOverrideService);
-        _overlayManager = new OverlayManager(_windowEventManager, _titleBarService, _windowCommandService, _titleBarColorService);
+        _overlaySyncService = new OverlaySyncService();
+        _overlayManager = new OverlayManager(_windowEventManager, _titleBarService, _windowCommandService, _overlaySyncService, _titleBarColorService);
 
         // Create and register the top menu bar as an AppBar
         var menuBar = AppBarHelper.CreateAppBar<TopMenuBar>(
@@ -76,6 +78,9 @@ public partial class App : Application
 
         _overlayManager?.Dispose();
         _overlayManager = null;
+
+        _overlaySyncService?.Dispose();
+        _overlaySyncService = null;
 
         _titleBarColorService?.Dispose();
         _titleBarColorService = null;

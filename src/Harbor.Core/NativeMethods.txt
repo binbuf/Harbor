@@ -32,6 +32,13 @@ DwmSetWindowAttribute
 // DPI
 GetDpiForWindow
 
+// Timing
+QueryPerformanceCounter
+QueryPerformanceFrequency
+
+// Window State
+IsIconic
+
 // System
 SystemParametersInfo
 SHGetFileInfo

@@ -156,7 +156,24 @@ public class DockItem : INotifyPropertyChanged
     public required string ExecutablePath { get; set; }
     public required string DisplayName { get; set; }
     public bool IsPinned { get; set; }
-    public bool IsRunning { get; set; }
+
+    private bool _isRunning;
+    public bool IsRunning
+    {
+        get => _isRunning;
+        set { if (_isRunning != value) { _isRunning = value; OnPropertyChanged(); } }
+    }
+
+    private bool _isLaunching;
+    /// <summary>
+    /// True while a launch bounce animation is playing.
+    /// </summary>
+    public bool IsLaunching
+    {
+        get => _isLaunching;
+        set { if (_isLaunching != value) { _isLaunching = value; OnPropertyChanged(); } }
+    }
+
     public ApplicationWindow? Window { get; set; }
     public System.Windows.Media.ImageSource? Icon { get; set; }
 

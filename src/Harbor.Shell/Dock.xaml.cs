@@ -5,6 +5,8 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
+using System.Windows.Media;
+using System.Windows.Media.Animation;
 using Harbor.Core.Interop;
 using Harbor.Core.Services;
 using ManagedShell.AppBar;
@@ -18,6 +20,33 @@ public partial class Dock : AppBarWindow
 {
     private DockItemManager? _itemManager;
     private readonly IconExtractionService _iconService = new();
+    private DockAutoHideService? _autoHideService;
+    private bool _isAutoHideEnabled;
+
+    // Animation constants (match Design.md Section 5B / 5D)
+    public const double IconDefaultSize = 48.0;
+    public const double IconHoverSize = 56.0;
+    public const double IconPressedSize = 44.0;
+    public const double HoverScaleFactor = IconHoverSize / IconDefaultSize;   // 1.167
+    public const double PressedScaleFactor = IconPressedSize / IconDefaultSize; // 0.917
+
+    public static readonly Duration HoverScaleDuration = new(TimeSpan.FromMilliseconds(150));
+    public static readonly Duration PressScaleDownDuration = new(TimeSpan.FromMilliseconds(80));
+    public static readonly Duration PressScaleUpDuration = new(TimeSpan.FromMilliseconds(100));
+
+    public const double BounceTranslation = -12.0; // 12 DIP upward (negative Y)
+    public const int BounceCount = 3;
+    public static readonly Duration SingleBounceDuration = new(TimeSpan.FromMilliseconds(300));
+    public static readonly Duration TotalBounceDuration = new(TimeSpan.FromMilliseconds(900));
+
+    public static readonly Duration ShowAnimationDuration = new(TimeSpan.FromMilliseconds(250));
+    public static readonly Duration HideAnimationDuration = new(TimeSpan.FromMilliseconds(200));
+
+    // Easing functions matching the spec cubic-bezier curves
+    private static readonly IEasingFunction EaseOut = new QuadraticEase { EasingMode = EasingMode.EaseOut };
+    private static readonly IEasingFunction EaseIn = new QuadraticEase { EasingMode = EasingMode.EaseIn };
+    private static readonly IEasingFunction ShowEasing = new SplineEase(0.16, 1, 0.3, 1);
+    private static readonly IEasingFunction HideEasing = new SplineEase(0.7, 0, 0.84, 0);
 
     public Dock(
         AppBarManager appBarManager,
@@ -49,7 +78,12 @@ public partial class Dock : AppBarWindow
 
         UpdateSeparatorVisibility();
 
-        Trace.WriteLine("[Harbor] Dock: Initialized with pinning support and icon extraction.");
+        // Initialize auto-hide service
+        _autoHideService = new DockAutoHideService();
+        _autoHideService.ShowRequested += OnAutoHideShowRequested;
+        _autoHideService.HideRequested += OnAutoHideHideRequested;
+
+        Trace.WriteLine("[Harbor] Dock: Initialized with pinning support, animations, and auto-hide.");
     }
 
     /// <summary>
@@ -58,6 +92,22 @@ public partial class Dock : AppBarWindow
     public void Initialize(Tasks tasks)
     {
         Initialize(tasks, new DockPinningService());
+    }
+
+    /// <summary>
+    /// Enables or disables auto-hide behavior.
+    /// </summary>
+    public void SetAutoHide(bool enabled)
+    {
+        _isAutoHideEnabled = enabled;
+        AutoHideTriggerZone.Visibility = enabled ? Visibility.Visible : Visibility.Collapsed;
+
+        if (!enabled && _autoHideService?.State == DockAutoHideService.AutoHideState.Hidden)
+        {
+            // Restore dock if it was hidden
+            DockSlideTransform.Y = 0;
+            DockContainer.Visibility = Visibility.Visible;
+        }
     }
 
     protected override void OnSourceInitialized(EventArgs e)
@@ -106,16 +156,158 @@ public partial class Dock : AppBarWindow
             : Visibility.Collapsed;
     }
 
+    #region Icon Hover Animation
+
+    private void DockIcon_MouseEnter(object sender, MouseEventArgs e)
+    {
+        if (sender is not FrameworkElement element) return;
+
+        var scaleTransform = FindScaleTransform(element);
+        if (scaleTransform is null) return;
+
+        AnimateScale(scaleTransform, HoverScaleFactor, HoverScaleDuration, EaseOut);
+    }
+
+    private void DockIcon_MouseLeave(object sender, MouseEventArgs e)
+    {
+        if (sender is not FrameworkElement element) return;
+
+        var scaleTransform = FindScaleTransform(element);
+        if (scaleTransform is null) return;
+
+        AnimateScale(scaleTransform, 1.0, HoverScaleDuration, EaseOut);
+    }
+
+    #endregion
+
+    #region Icon Press Animation
+
+    private void DockIcon_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not FrameworkElement element) return;
+
+        var scaleTransform = FindScaleTransform(element);
+        if (scaleTransform is null) return;
+
+        AnimateScale(scaleTransform, PressedScaleFactor, PressScaleDownDuration, EaseIn);
+    }
+
     /// <summary>
-    /// Handles left-click on a dock icon.
+    /// Handles left-click release on a dock icon: restore scale and perform action.
     /// </summary>
     private void DockIcon_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
-        if (sender is not FrameworkElement { DataContext: DockItem dockItem })
+        if (sender is not FrameworkElement element) return;
+
+        // Animate scale back to default (or hover size if still hovering)
+        var scaleTransform = FindScaleTransform(element);
+        if (scaleTransform is not null)
+        {
+            var targetScale = element.IsMouseOver ? HoverScaleFactor : 1.0;
+            AnimateScale(scaleTransform, targetScale, PressScaleUpDuration, EaseOut);
+        }
+
+        if (element.DataContext is not DockItem dockItem)
             return;
+
+        // If launching a pinned non-running app, trigger bounce
+        if (dockItem.IsPinned && !dockItem.IsRunning)
+        {
+            StartBounceAnimation(element, dockItem);
+        }
 
         HandleDockIconClick(dockItem);
     }
+
+    #endregion
+
+    #region Launch Bounce Animation
+
+    private void StartBounceAnimation(FrameworkElement element, DockItem dockItem)
+    {
+        var translateTransform = FindTranslateTransform(element);
+        if (translateTransform is null) return;
+
+        dockItem.IsLaunching = true;
+
+        var animation = new DoubleAnimationUsingKeyFrames
+        {
+            Duration = TotalBounceDuration,
+        };
+
+        // 3 bounces: each 300ms (150ms up ease-out, 150ms down ease-in)
+        for (int i = 0; i < BounceCount; i++)
+        {
+            var baseTime = TimeSpan.FromMilliseconds(i * 300);
+            animation.KeyFrames.Add(new EasingDoubleKeyFrame(
+                BounceTranslation,
+                KeyTime.FromTimeSpan(baseTime + TimeSpan.FromMilliseconds(150)),
+                EaseOut));
+            animation.KeyFrames.Add(new EasingDoubleKeyFrame(
+                0,
+                KeyTime.FromTimeSpan(baseTime + TimeSpan.FromMilliseconds(300)),
+                EaseIn));
+        }
+
+        animation.Completed += (_, _) => dockItem.IsLaunching = false;
+        translateTransform.BeginAnimation(TranslateTransform.YProperty, animation);
+    }
+
+    #endregion
+
+    #region Auto-Hide
+
+    private void TriggerZone_MouseEnter(object sender, MouseEventArgs e)
+    {
+        if (_isAutoHideEnabled)
+            _autoHideService?.OnTriggerZoneEnter();
+    }
+
+    private void DockContainer_MouseEnter(object sender, MouseEventArgs e)
+    {
+        _autoHideService?.OnDockAreaEnter();
+    }
+
+    private void DockContainer_MouseLeave(object sender, MouseEventArgs e)
+    {
+        if (_isAutoHideEnabled)
+            _autoHideService?.OnDockAreaLeave();
+    }
+
+    private void OnAutoHideShowRequested()
+    {
+        Dispatcher.Invoke(() =>
+        {
+            DockContainer.Visibility = Visibility.Visible;
+            var slideUp = new DoubleAnimation(62, 0, ShowAnimationDuration)
+            {
+                EasingFunction = ShowEasing,
+            };
+            slideUp.Completed += (_, _) => _autoHideService?.OnShowAnimationCompleted();
+            DockSlideTransform.BeginAnimation(TranslateTransform.YProperty, slideUp);
+        });
+    }
+
+    private void OnAutoHideHideRequested()
+    {
+        Dispatcher.Invoke(() =>
+        {
+            var slideDown = new DoubleAnimation(0, 62, HideAnimationDuration)
+            {
+                EasingFunction = HideEasing,
+            };
+            slideDown.Completed += (_, _) =>
+            {
+                DockContainer.Visibility = Visibility.Collapsed;
+                _autoHideService?.OnHideAnimationCompleted();
+            };
+            DockSlideTransform.BeginAnimation(TranslateTransform.YProperty, slideDown);
+        });
+    }
+
+    #endregion
+
+    #region Click Handling
 
     /// <summary>
     /// Click-to-activate / click-to-minimize / launch logic.
@@ -161,6 +353,10 @@ public partial class Dock : AppBarWindow
             Trace.WriteLine($"[Harbor] Dock: Failed to launch {executablePath}: {ex.Message}");
         }
     }
+
+    #endregion
+
+    #region Context Menu
 
     /// <summary>
     /// Handles right-click on a dock icon — shows context menu.
@@ -316,6 +512,46 @@ public partial class Dock : AppBarWindow
         }
     }
 
+    #endregion
+
+    #region Helpers
+
+    private static ScaleTransform? FindScaleTransform(FrameworkElement element)
+    {
+        if (element.RenderTransform is TransformGroup group)
+        {
+            foreach (var transform in group.Children)
+            {
+                if (transform is ScaleTransform scale)
+                    return scale;
+            }
+        }
+        return element.RenderTransform as ScaleTransform;
+    }
+
+    private static TranslateTransform? FindTranslateTransform(FrameworkElement element)
+    {
+        if (element.RenderTransform is TransformGroup group)
+        {
+            foreach (var transform in group.Children)
+            {
+                if (transform is TranslateTransform translate)
+                    return translate;
+            }
+        }
+        return element.RenderTransform as TranslateTransform;
+    }
+
+    private static void AnimateScale(ScaleTransform transform, double targetScale, Duration duration, IEasingFunction easing)
+    {
+        var animX = new DoubleAnimation(targetScale, duration) { EasingFunction = easing };
+        var animY = new DoubleAnimation(targetScale, duration) { EasingFunction = easing };
+        transform.BeginAnimation(ScaleTransform.ScaleXProperty, animX);
+        transform.BeginAnimation(ScaleTransform.ScaleYProperty, animY);
+    }
+
+    #endregion
+
     protected override void OnClosing(CancelEventArgs e)
     {
         PinnedIconsControl.ItemsSource = null;
@@ -329,8 +565,35 @@ public partial class Dock : AppBarWindow
             _itemManager = null;
         }
 
+        if (_autoHideService is not null)
+        {
+            _autoHideService.ShowRequested -= OnAutoHideShowRequested;
+            _autoHideService.HideRequested -= OnAutoHideHideRequested;
+            _autoHideService.Dispose();
+            _autoHideService = null;
+        }
+
         _iconService.ClearCache();
 
         base.OnClosing(e);
+    }
+}
+
+/// <summary>
+/// A spline-based easing function that maps to CSS cubic-bezier(x1, y1, x2, y2).
+/// WPF doesn't have a built-in cubic-bezier easing, so we approximate using a KeySpline.
+/// </summary>
+internal sealed class SplineEase : IEasingFunction
+{
+    private readonly KeySpline _spline;
+
+    public SplineEase(double x1, double y1, double x2, double y2)
+    {
+        _spline = new KeySpline(x1, y1, x2, y2);
+    }
+
+    public double Ease(double normalizedTime)
+    {
+        return _spline.GetSplineProgress(normalizedTime);
     }
 }

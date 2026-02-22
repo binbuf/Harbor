@@ -11,9 +11,76 @@
 
     <appbar:AppBarWindow.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+
+        <!-- Custom tooltip style: rounded pill, 8px above icon -->
+        <Style x:Key="DockTooltipStyle" TargetType="ToolTip">
+            <Setter Property="Background" Value="{DynamicResource DockTooltipBackground}" />
+            <Setter Property="Foreground" Value="{DynamicResource DockTooltipForeground}" />
+            <Setter Property="FontFamily" Value="Segoe UI Variable" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Padding" Value="12,6" />
+            <Setter Property="Placement" Value="Top" />
+            <Setter Property="VerticalOffset" Value="-8" />
+            <Setter Property="HasDropShadow" Value="False" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToolTip">
+                        <Border Background="{TemplateBinding Background}"
+                                CornerRadius="8"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Shared icon DataTemplate used by both pinned and running ItemsControls -->
+        <DataTemplate x:Key="DockIconTemplate">
+            <Grid Width="48" Height="48"
+                  Margin="4,0"
+                  Cursor="Hand"
+                  RenderTransformOrigin="0.5,0.5"
+                  MouseLeftButtonDown="DockIcon_MouseLeftButtonDown"
+                  MouseLeftButtonUp="DockIcon_MouseLeftButtonUp"
+                  MouseRightButtonUp="DockIcon_MouseRightButtonUp"
+                  MouseEnter="DockIcon_MouseEnter"
+                  MouseLeave="DockIcon_MouseLeave">
+                <Grid.ToolTip>
+                    <ToolTip Content="{Binding DisplayName}"
+                             Style="{StaticResource DockTooltipStyle}" />
+                </Grid.ToolTip>
+                <ToolTipService.InitialShowDelay>500</ToolTipService.InitialShowDelay>
+                <Grid.RenderTransform>
+                    <TransformGroup>
+                        <ScaleTransform x:Name="IconScale" ScaleX="1" ScaleY="1" />
+                        <TranslateTransform x:Name="IconTranslate" Y="0" />
+                    </TransformGroup>
+                </Grid.RenderTransform>
+                <!-- Application icon -->
+                <Image Source="{Binding Icon}"
+                       Width="48" Height="48"
+                       RenderOptions.BitmapScalingMode="HighQuality" />
+                <!-- Active indicator dot (visible only when running) -->
+                <Ellipse Width="4" Height="4"
+                         Fill="{DynamicResource DockActiveDotBrush}"
+                         HorizontalAlignment="Center"
+                         VerticalAlignment="Bottom"
+                         Margin="0,0,0,-2"
+                         Visibility="{Binding IsRunning, Converter={StaticResource BoolToVisibilityConverter}}" />
+            </Grid>
+        </DataTemplate>
     </appbar:AppBarWindow.Resources>
 
     <Grid x:Name="DockRoot" Height="62" VerticalAlignment="Bottom">
+        <!-- Auto-hide trigger zone: 2px tall, invisible, at bottom edge -->
+        <Border x:Name="AutoHideTriggerZone"
+                Height="2"
+                VerticalAlignment="Bottom"
+                Background="Transparent"
+                IsHitTestVisible="True"
+                MouseEnter="TriggerZone_MouseEnter" />
+
         <!-- Dock container: centered, auto-width, rounded corners, acrylic background -->
         <Border x:Name="DockContainer"
                 HorizontalAlignment="Center"
@@ -23,39 +90,24 @@
                 Background="{DynamicResource DockBackground}"
                 BorderBrush="{DynamicResource DockBorderBrush}"
                 BorderThickness="1"
-                Padding="4,8">
+                Padding="4,8"
+                RenderTransformOrigin="0.5,1"
+                MouseEnter="DockContainer_MouseEnter"
+                MouseLeave="DockContainer_MouseLeave">
+            <Border.RenderTransform>
+                <TranslateTransform x:Name="DockSlideTransform" Y="0" />
+            </Border.RenderTransform>
 
             <StackPanel x:Name="DockPanel" Orientation="Horizontal">
                 <!-- Pinned application icons -->
                 <ItemsControl x:Name="PinnedIconsControl"
-                              VerticalAlignment="Center">
+                              VerticalAlignment="Center"
+                              ItemTemplate="{StaticResource DockIconTemplate}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
                             <StackPanel Orientation="Horizontal" />
                         </ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <Grid Width="48" Height="48"
-                                  Margin="4,0"
-                                  Cursor="Hand"
-                                  ToolTip="{Binding DisplayName}"
-                                  MouseLeftButtonUp="DockIcon_MouseLeftButtonUp"
-                                  MouseRightButtonUp="DockIcon_MouseRightButtonUp">
-                                <!-- Application icon -->
-                                <Image Source="{Binding Icon}"
-                                       Width="48" Height="48"
-                                       RenderOptions.BitmapScalingMode="HighQuality" />
-                                <!-- Active indicator dot (visible only when running) -->
-                                <Ellipse Width="4" Height="4"
-                                         Fill="{DynamicResource DockActiveDotBrush}"
-                                         HorizontalAlignment="Center"
-                                         VerticalAlignment="Bottom"
-                                         Margin="0,0,0,-2"
-                                         Visibility="{Binding IsRunning, Converter={StaticResource BoolToVisibilityConverter}}" />
-                            </Grid>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
                 </ItemsControl>
 
                 <!-- Separator: 1px vertical line between pinned and running sections -->
@@ -69,33 +121,13 @@
 
                 <!-- Running (unpinned) application icons -->
                 <ItemsControl x:Name="RunningIconsControl"
-                              VerticalAlignment="Center">
+                              VerticalAlignment="Center"
+                              ItemTemplate="{StaticResource DockIconTemplate}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
                             <StackPanel Orientation="Horizontal" />
                         </ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <Grid Width="48" Height="48"
-                                  Margin="4,0"
-                                  Cursor="Hand"
-                                  ToolTip="{Binding DisplayName}"
-                                  MouseLeftButtonUp="DockIcon_MouseLeftButtonUp"
-                                  MouseRightButtonUp="DockIcon_MouseRightButtonUp">
-                                <!-- Application icon -->
-                                <Image Source="{Binding Icon}"
-                                       Width="48" Height="48"
-                                       RenderOptions.BitmapScalingMode="HighQuality" />
-                                <!-- Active indicator dot -->
-                                <Ellipse Width="4" Height="4"
-                                         Fill="{DynamicResource DockActiveDotBrush}"
-                                         HorizontalAlignment="Center"
-                                         VerticalAlignment="Bottom"
-                                         Margin="0,0,0,-2" />
-                            </Grid>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
                 </ItemsControl>
             </StackPanel>
         </Border>

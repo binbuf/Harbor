@@ -39,6 +39,7 @@ public partial class App : Application
     private HarborTrayIcon? _harborTrayIcon;
     private RecycleBinService? _recycleBinService;
     private WallpaperService? _wallpaperService;
+    private WallpaperBrightnessService? _wallpaperBrightnessService;
     private DesktopBackgroundWindow? _desktopBackground;
     private DockOverlapMonitorService? _overlapMonitor;
     private ExplorerSuppressionService? _explorerSuppression;
@@ -70,13 +71,15 @@ public partial class App : Application
 
         // Load shell settings and suppress explorer's UI if configured
         _shellSettingsService = new ShellSettingsService();
+        // Create wallpaper service (needed for dynamic menu bar color and desktop background)
+        _wallpaperService = new WallpaperService();
+
         if (_shellSettingsService.ReplaceExplorer)
         {
             _explorerSuppression = new ExplorerSuppressionService();
             _explorerSuppression.Suppress();
 
             // Render the desktop wallpaper to cover explorer's desktop
-            _wallpaperService = new WallpaperService();
             _desktopBackground = new DesktopBackgroundWindow();
             _desktopBackground.Show();
             _desktopBackground.Initialize(_wallpaperService);
@@ -116,11 +119,15 @@ public partial class App : Application
             _shellServices,
             AppBarScreen.FromPrimaryScreen(),
             AppBarEdge.Top,
-            24);
+            30);
 
         _menuBarRegistration = AppBarHelper.Register(_menuBar, AppBarEdge.Top);
         _menuBar.Initialize(_foregroundService, _shellServices.NotificationArea, _globalMenuService);
         _menuBar.ConnectSettings(_shellSettingsService);
+
+        // Connect wallpaper brightness service for dynamic menu bar color
+        _wallpaperBrightnessService = new WallpaperBrightnessService(_wallpaperService);
+        _menuBar.ConnectBrightnessService(_wallpaperBrightnessService);
 
         // Create dock pinning and settings services
         _dockPinningService = new DockPinningService();
@@ -480,9 +487,12 @@ public partial class App : Application
         _hiddenWindowRegistry?.Dispose();
         _hiddenWindowRegistry = null;
 
-        // Close desktop background and wallpaper service
+        // Close desktop background and wallpaper services
         _desktopBackground?.Close();
         _desktopBackground = null;
+
+        _wallpaperBrightnessService?.Dispose();
+        _wallpaperBrightnessService = null;
 
         _wallpaperService?.Dispose();
         _wallpaperService = null;

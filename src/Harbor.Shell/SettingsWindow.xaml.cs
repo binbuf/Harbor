@@ -69,7 +69,10 @@ public partial class SettingsWindow : Window
 
         // Menu Bar
         ShowAppMenuItemsToggle.IsChecked = _shellSettings.ShowAppMenuItems;
+        AutoHideMenuBarToggle.IsChecked = _shellSettings.AutoHideMenuBar;
         MenuBarTranslucencyToggle.IsChecked = _shellSettings.MenuBarTranslucency;
+        DynamicMenuBarColorToggle.IsChecked = _shellSettings.DynamicMenuBarColor;
+        MonochromeTrayIconsToggle.IsChecked = _shellSettings.MonochromeTrayIcons;
         ShowDayOfWeekToggle.IsChecked = _shellSettings.ShowDayOfWeek;
         Use24HourClockToggle.IsChecked = _shellSettings.Use24HourClock;
         ShowSecondsToggle.IsChecked = _shellSettings.ShowSeconds;
@@ -171,10 +174,28 @@ public partial class SettingsWindow : Window
         _shellSettings.ShowAppMenuItems = ShowAppMenuItemsToggle.IsChecked == true;
     }
 
+    private void AutoHideMenuBarToggle_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_loading) return;
+        _shellSettings.AutoHideMenuBar = AutoHideMenuBarToggle.IsChecked == true;
+    }
+
     private void MenuBarTranslucencyToggle_Changed(object sender, RoutedEventArgs e)
     {
         if (_loading) return;
         _shellSettings.MenuBarTranslucency = MenuBarTranslucencyToggle.IsChecked == true;
+    }
+
+    private void DynamicMenuBarColorToggle_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_loading) return;
+        _shellSettings.DynamicMenuBarColor = DynamicMenuBarColorToggle.IsChecked == true;
+    }
+
+    private void MonochromeTrayIconsToggle_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_loading) return;
+        _shellSettings.MonochromeTrayIcons = MonochromeTrayIconsToggle.IsChecked == true;
     }
 
     private void ShowDayOfWeekToggle_Changed(object sender, RoutedEventArgs e)

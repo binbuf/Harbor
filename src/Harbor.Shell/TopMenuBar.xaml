@@ -9,103 +9,63 @@
         Topmost="True"
         Background="Transparent">
 
-    <Grid x:Name="MenuBarRoot" Height="24">
-        <!-- Background panel with bottom border -->
-        <Border x:Name="BackgroundBorder"
-                Background="{DynamicResource MenuBarBackground}"
-                BorderBrush="{DynamicResource MenuBarBorderBrush}"
-                BorderThickness="0,0,0,1" />
+    <Grid x:Name="MenuBarRoot" Height="30">
+        <!-- Auto-hide trigger zone: 2px tall, invisible, at top edge -->
+        <Border x:Name="AutoHideTriggerZone"
+                Height="2"
+                VerticalAlignment="Top"
+                Background="Transparent"
+                IsHitTestVisible="True"
+                Visibility="Collapsed"
+                MouseEnter="TriggerZone_MouseEnter" />
 
-        <!-- Content layout -->
-        <DockPanel Margin="0,0,0,1">
-            <!-- Right side: Clock -->
-            <Border DockPanel.Dock="Right"
-                    x:Name="ClockContainer"
-                    Margin="0,0,12,0"
-                    VerticalAlignment="Stretch"
-                    Cursor="Hand"
-                    MouseLeftButtonUp="Clock_Click">
-                <TextBlock x:Name="ClockText"
+        <!-- Main menu bar container (slides up/down for auto-hide) -->
+        <Grid x:Name="MenuBarContainer"
+              RenderTransformOrigin="0.5,0"
+              MouseEnter="MenuBarContainer_MouseEnter"
+              MouseLeave="MenuBarContainer_MouseLeave">
+            <Grid.RenderTransform>
+                <TranslateTransform x:Name="MenuBarSlideTransform" Y="0" />
+            </Grid.RenderTransform>
+
+            <!-- Background panel with bottom border -->
+            <Border x:Name="BackgroundBorder"
+                    Background="{DynamicResource MenuBarBackground}"
+                    BorderBrush="{DynamicResource MenuBarBorderBrush}"
+                    BorderThickness="0,0,0,1" />
+
+            <!-- Content layout -->
+            <DockPanel Margin="4,0,4,0" VerticalAlignment="Stretch">
+                <!-- Right side: Clock -->
+                <Border DockPanel.Dock="Right"
+                        x:Name="ClockContainer"
+                        Margin="0,0,12,0"
+                        VerticalAlignment="Center"
+                        Cursor="Hand"
+                        MouseLeftButtonUp="Clock_Click">
+                    <TextBlock x:Name="ClockText"
+                               VerticalAlignment="Center"
+                               Foreground="{DynamicResource MenuBarTextBrush}"
+                               FontFamily="Segoe UI Variable"
+                               FontSize="13"
+                               FontWeight="Regular" />
+                </Border>
+
+                <!-- Control Center chevron (visual placeholder) -->
+                <TextBlock DockPanel.Dock="Right"
+                           Text="›"
                            VerticalAlignment="Center"
+                           Margin="0,0,10,0"
                            Foreground="{DynamicResource MenuBarTextBrush}"
                            FontFamily="Segoe UI Variable"
                            FontSize="13"
                            FontWeight="Regular" />
-            </Border>
 
-            <!-- Control Center chevron (visual placeholder) -->
-            <TextBlock DockPanel.Dock="Right"
-                       Text="›"
-                       VerticalAlignment="Center"
-                       Margin="0,0,10,0"
-                       Foreground="{DynamicResource MenuBarTextBrush}"
-                       FontFamily="Segoe UI Variable"
-                       FontSize="13"
-                       FontWeight="Regular" />
-
-            <!-- System tray icons -->
-            <ItemsControl DockPanel.Dock="Right"
-                          x:Name="TrayIconsControl"
-                          VerticalAlignment="Center"
-                          Margin="0,0,8,0">
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <StackPanel Orientation="Horizontal" />
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                        <Border Width="18" Height="18"
-                                Margin="4,0"
-                                VerticalAlignment="Center"
-                                Cursor="Hand"
-                                ToolTip="{Binding Title}"
-                                MouseLeftButtonUp="TrayIcon_MouseLeftButtonUp"
-                                MouseRightButtonUp="TrayIcon_MouseRightButtonUp"
-                                MouseEnter="TrayIcon_MouseEnter"
-                                MouseLeave="TrayIcon_MouseLeave">
-                            <Image Source="{Binding Icon}"
-                                   Width="18" Height="18"
-                                   RenderOptions.BitmapScalingMode="HighQuality" />
-                        </Border>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-
-            <!-- Left side: Icon + App Name + Menu Items -->
-            <StackPanel Orientation="Horizontal"
-                        VerticalAlignment="Stretch">
-                <!-- Windows logo — opens system menu on click -->
-                <Border x:Name="WindowsLogoItem"
-                        Width="16" Height="16"
-                        Margin="8,0,0,0"
-                        VerticalAlignment="Center"
-                        Cursor="Hand"
-                        MouseLeftButtonUp="WindowsLogo_Click">
-                    <Image Source="Assets/windows-logo.svg" Width="14" Height="14"
-                           RenderOptions.BitmapScalingMode="HighQuality" />
-                </Border>
-
-                <!-- Active app name -->
-                <Border x:Name="AppNameItem"
-                        Margin="4,2,0,2"
-                        CornerRadius="4"
-                        Background="Transparent"
-                        VerticalAlignment="Stretch"
-                        Cursor="Hand">
-                    <TextBlock x:Name="AppNameText"
-                               VerticalAlignment="Center"
-                               Padding="6,0"
-                               Foreground="{DynamicResource MenuBarTextBrush}"
-                               FontFamily="Segoe UI Variable"
-                               FontSize="13"
-                               FontWeight="SemiBold"
-                               Text="Harbor" />
-                </Border>
-
-                <!-- Dynamic global menu items -->
-                <ItemsControl x:Name="MenuItemsControl"
-                              VerticalAlignment="Stretch">
+                <!-- System tray icons -->
+                <ItemsControl DockPanel.Dock="Right"
+                              x:Name="TrayIconsControl"
+                              VerticalAlignment="Center"
+                              Margin="0,0,8,0">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
                             <StackPanel Orientation="Horizontal" />
@@ -113,27 +73,92 @@
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <Border Margin="0,2,0,2"
-                                    CornerRadius="4"
-                                    Background="Transparent"
-                                    VerticalAlignment="Stretch"
+                            <Border Width="18" Height="18"
+                                    Margin="4,0"
+                                    VerticalAlignment="Center"
                                     Cursor="Hand"
-                                    MouseLeftButtonUp="GlobalMenuItem_Click"
-                                    MouseEnter="OnMenuItemMouseEnter"
-                                    MouseLeave="OnMenuItemMouseLeave"
-                                    MouseLeftButtonDown="OnMenuItemMouseDown">
-                                <TextBlock VerticalAlignment="Center"
-                                           Padding="8,0"
-                                           Foreground="{DynamicResource MenuBarInactiveTextBrush}"
-                                           FontFamily="Segoe UI Variable"
-                                           FontSize="13"
-                                           FontWeight="Regular"
-                                           Text="{Binding Name}" />
+                                    ToolTip="{Binding Title}"
+                                    MouseLeftButtonUp="TrayIcon_MouseLeftButtonUp"
+                                    MouseRightButtonUp="TrayIcon_MouseRightButtonUp"
+                                    MouseEnter="TrayIcon_MouseEnter"
+                                    MouseLeave="TrayIcon_MouseLeave">
+                                <Image Source="{Binding Icon}"
+                                       Width="18" Height="18"
+                                       RenderOptions.BitmapScalingMode="HighQuality">
+                                    <Image.Style>
+                                        <Style TargetType="Image">
+                                            <!-- Monochrome conversion applied dynamically in code-behind -->
+                                        </Style>
+                                    </Image.Style>
+                                </Image>
                             </Border>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
-            </StackPanel>
-        </DockPanel>
+
+                <!-- Left side: Icon + App Name + Menu Items -->
+                <StackPanel Orientation="Horizontal"
+                            VerticalAlignment="Center">
+                    <!-- Windows logo — opens system menu on click -->
+                    <Border x:Name="WindowsLogoItem"
+                            Width="16" Height="16"
+                            Margin="8,0,0,0"
+                            VerticalAlignment="Center"
+                            Cursor="Hand"
+                            MouseLeftButtonUp="WindowsLogo_Click">
+                        <Image Source="Assets/windows-logo.svg" Width="14" Height="14"
+                               RenderOptions.BitmapScalingMode="HighQuality" />
+                    </Border>
+
+                    <!-- Active app name -->
+                    <Border x:Name="AppNameItem"
+                            Margin="4,0,0,0"
+                            CornerRadius="4"
+                            Background="Transparent"
+                            VerticalAlignment="Center"
+                            Cursor="Hand">
+                        <TextBlock x:Name="AppNameText"
+                                   VerticalAlignment="Center"
+                                   Padding="6,2"
+                                   Foreground="{DynamicResource MenuBarTextBrush}"
+                                   FontFamily="Segoe UI Variable"
+                                   FontSize="13"
+                                   FontWeight="SemiBold"
+                                   Text="Harbor" />
+                    </Border>
+
+                    <!-- Dynamic global menu items -->
+                    <ItemsControl x:Name="MenuItemsControl"
+                                  VerticalAlignment="Center">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Margin="0,0,0,0"
+                                        CornerRadius="4"
+                                        Background="Transparent"
+                                        VerticalAlignment="Center"
+                                        Cursor="Hand"
+                                        MouseLeftButtonUp="GlobalMenuItem_Click"
+                                        MouseEnter="OnMenuItemMouseEnter"
+                                        MouseLeave="OnMenuItemMouseLeave"
+                                        MouseLeftButtonDown="OnMenuItemMouseDown">
+                                    <TextBlock VerticalAlignment="Center"
+                                               Padding="8,2"
+                                               Foreground="{DynamicResource MenuBarInactiveTextBrush}"
+                                               FontFamily="Segoe UI Variable"
+                                               FontSize="13"
+                                               FontWeight="Regular"
+                                               Text="{Binding Name}" />
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </DockPanel>
+        </Grid>
     </Grid>
 </appbar:AppBarWindow>

@@ -35,4 +35,8 @@
       - Network
 - Apps icon/action in Dock
   - Similar to the older MacOS Mission Control, the new Apps section shows all the apps in a rounded rect translucent frosted glass window as icons that can be scrolled of all the apps that are installed. If we need to pre-cache or something to optimize (and scan on update) then let's do it; but if there's a way to do this without costly scans let's not.
--Enable Microsoft PowerToys as part of the install to replace MacOS Spotlight Search that comes up when you use CMD+SPACE on a Mac?
+- Enable Microsoft PowerToys as part of the install to replace MacOS Spotlight Search that comes up when you use CMD+SPACE on a Mac?
+- Desktop
+  - Allow icons (configurable toggle to show these or not)
+  - Allow selection of icons (if shown)
+  

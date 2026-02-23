@@ -329,6 +329,31 @@
                             </Grid>
                         </Border>
 
+                        <!-- Auto-hide menu bar -->
+                        <Border Background="{DynamicResource SettingsCardBackground}" CornerRadius="8" Padding="16,12" Margin="0,0,0,8">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                    <TextBlock Text="Automatically hide and show the menu bar"
+                                               Foreground="{DynamicResource SettingsTextBrush}"
+                                               FontFamily="Segoe UI Variable" FontSize="13" />
+                                    <TextBlock Text="Menu bar slides out of view until cursor hits the top edge"
+                                               Foreground="{DynamicResource SettingsSecondaryTextBrush}"
+                                               FontFamily="Segoe UI Variable" FontSize="11"
+                                               Margin="0,2,0,0" />
+                                </StackPanel>
+                                <CheckBox x:Name="AutoHideMenuBarToggle"
+                                          Grid.Column="1"
+                                          Style="{StaticResource ToggleSwitchStyle}"
+                                          VerticalAlignment="Center"
+                                          Checked="AutoHideMenuBarToggle_Changed"
+                                          Unchecked="AutoHideMenuBarToggle_Changed" />
+                            </Grid>
+                        </Border>
+
                         <!-- Menu bar translucency -->
                         <Border Background="{DynamicResource SettingsCardBackground}" CornerRadius="8" Padding="16,12" Margin="0,0,0,8">
                             <Grid>
@@ -346,6 +371,56 @@
                                           VerticalAlignment="Center"
                                           Checked="MenuBarTranslucencyToggle_Changed"
                                           Unchecked="MenuBarTranslucencyToggle_Changed" />
+                            </Grid>
+                        </Border>
+
+                        <!-- Dynamic color -->
+                        <Border Background="{DynamicResource SettingsCardBackground}" CornerRadius="8" Padding="16,12" Margin="0,0,0,8">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                    <TextBlock Text="Dynamic color"
+                                               Foreground="{DynamicResource SettingsTextBrush}"
+                                               FontFamily="Segoe UI Variable" FontSize="13" />
+                                    <TextBlock Text="Adapt text color based on wallpaper brightness"
+                                               Foreground="{DynamicResource SettingsSecondaryTextBrush}"
+                                               FontFamily="Segoe UI Variable" FontSize="11"
+                                               Margin="0,2,0,0" />
+                                </StackPanel>
+                                <CheckBox x:Name="DynamicMenuBarColorToggle"
+                                          Grid.Column="1"
+                                          Style="{StaticResource ToggleSwitchStyle}"
+                                          VerticalAlignment="Center"
+                                          Checked="DynamicMenuBarColorToggle_Changed"
+                                          Unchecked="DynamicMenuBarColorToggle_Changed" />
+                            </Grid>
+                        </Border>
+
+                        <!-- Monochrome tray icons -->
+                        <Border Background="{DynamicResource SettingsCardBackground}" CornerRadius="8" Padding="16,12" Margin="0,0,0,8">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                    <TextBlock Text="Monochrome tray icons"
+                                               Foreground="{DynamicResource SettingsTextBrush}"
+                                               FontFamily="Segoe UI Variable" FontSize="13" />
+                                    <TextBlock Text="Force all status icons to black and white"
+                                               Foreground="{DynamicResource SettingsSecondaryTextBrush}"
+                                               FontFamily="Segoe UI Variable" FontSize="11"
+                                               Margin="0,2,0,0" />
+                                </StackPanel>
+                                <CheckBox x:Name="MonochromeTrayIconsToggle"
+                                          Grid.Column="1"
+                                          Style="{StaticResource ToggleSwitchStyle}"
+                                          VerticalAlignment="Center"
+                                          Checked="MonochromeTrayIconsToggle_Changed"
+                                          Unchecked="MonochromeTrayIconsToggle_Changed" />
                             </Grid>
                         </Border>
 

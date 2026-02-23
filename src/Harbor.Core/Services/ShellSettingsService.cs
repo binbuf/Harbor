@@ -58,6 +58,22 @@ public class ShellSettings
     /// Show desktop icons.
     /// </summary>
     public bool ShowDesktopIcons { get; set; } = true;
+
+    /// <summary>
+    /// Auto-hide the menu bar until the cursor hits the top screen edge.
+    /// </summary>
+    public bool AutoHideMenuBar { get; set; }
+
+    /// <summary>
+    /// Force all tray icons to monochrome (grayscale) for visual consistency.
+    /// </summary>
+    public bool MonochromeTrayIcons { get; set; } = true;
+
+    /// <summary>
+    /// Dynamically adapt menu bar text color based on wallpaper brightness.
+    /// When disabled, text follows the current theme (white for dark, black for light).
+    /// </summary>
+    public bool DynamicMenuBarColor { get; set; } = true;
 }
 
 /// <summary>
@@ -241,6 +257,51 @@ public class ShellSettingsService : IDisposable
         }
     }
 
+    public bool AutoHideMenuBar
+    {
+        get { lock (_lock) return _settings.AutoHideMenuBar; }
+        set
+        {
+            lock (_lock)
+            {
+                if (_settings.AutoHideMenuBar == value) return;
+                _settings.AutoHideMenuBar = value;
+            }
+            Save();
+            SettingsChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    public bool MonochromeTrayIcons
+    {
+        get { lock (_lock) return _settings.MonochromeTrayIcons; }
+        set
+        {
+            lock (_lock)
+            {
+                if (_settings.MonochromeTrayIcons == value) return;
+                _settings.MonochromeTrayIcons = value;
+            }
+            Save();
+            SettingsChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    public bool DynamicMenuBarColor
+    {
+        get { lock (_lock) return _settings.DynamicMenuBarColor; }
+        set
+        {
+            lock (_lock)
+            {
+                if (_settings.DynamicMenuBarColor == value) return;
+                _settings.DynamicMenuBarColor = value;
+            }
+            Save();
+            SettingsChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
     /// <summary>
     /// Raised when any setting changes.
     /// </summary>
@@ -295,6 +356,9 @@ public class ShellSettingsService : IDisposable
                     ShowRecentApps = _settings.ShowRecentApps,
                     AnimateOpeningApps = _settings.AnimateOpeningApps,
                     ShowDesktopIcons = _settings.ShowDesktopIcons,
+                    AutoHideMenuBar = _settings.AutoHideMenuBar,
+                    MonochromeTrayIcons = _settings.MonochromeTrayIcons,
+                    DynamicMenuBarColor = _settings.DynamicMenuBarColor,
                 };
             }
 

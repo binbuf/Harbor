@@ -7,6 +7,7 @@ using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Harbor.Core.Interop;
 using Harbor.Core.Services;
@@ -26,6 +27,14 @@ public partial class TopMenuBar : AppBarWindow
     private DispatcherTimer? _clockTimer;
     private CalendarFlyout? _calendarFlyout;
 
+    // Auto-hide
+    private MenuBarAutoHideService? _autoHideService;
+    private bool _isAutoHideEnabled;
+
+    // Dynamic color
+    private WallpaperBrightnessService? _brightnessService;
+    private bool _dynamicColorOverrideIsLight;
+
     // Hover animation colors — updated on theme change
     private static readonly SolidColorBrush TransparentBrush = new(Colors.Transparent);
     private static readonly Color DarkHoverColor = Color.FromArgb(26, 255, 255, 255);   // #FFFFFF @ 10%
@@ -40,6 +49,15 @@ public partial class TopMenuBar : AppBarWindow
     // Solid fallback colors (fully opaque, no acrylic)
     public const uint DarkSolidColor = 0xFF1E1E1E;
     public const uint LightSolidColor = 0xFFF6F6F6;
+
+    // Auto-hide animation durations
+    private static readonly Duration ShowAnimationDuration = new(TimeSpan.FromMilliseconds(200));
+    private static readonly Duration HideAnimationDuration = new(TimeSpan.FromMilliseconds(150));
+    private static readonly IEasingFunction ShowEasing = new QuadraticEase { EasingMode = EasingMode.EaseOut };
+    private static readonly IEasingFunction HideEasing = new QuadraticEase { EasingMode = EasingMode.EaseIn };
+
+    // Tracks original tray icon sources so we can restore them when monochrome is toggled off
+    private readonly Dictionary<System.Windows.Controls.Image, ImageSource> _originalTrayIconSources = new();
 
     private Color _hoverColor = DarkHoverColor;
     private Color _pressedColor = DarkPressedColor;
@@ -87,6 +105,11 @@ public partial class TopMenuBar : AppBarWindow
         if (_foregroundService.ActiveWindowHandle != 0)
             _globalMenuService.UpdateForWindow(_foregroundService.ActiveWindowHandle);
 
+        // Initialize auto-hide service
+        _autoHideService = new MenuBarAutoHideService();
+        _autoHideService.ShowRequested += OnAutoHideShowRequested;
+        _autoHideService.HideRequested += OnAutoHideHideRequested;
+
         StartClock();
     }
 
@@ -99,6 +122,26 @@ public partial class TopMenuBar : AppBarWindow
         _shellSettings = shellSettings;
         _shellSettings.SettingsChanged += OnShellSettingsChanged;
         ApplySettingsToUI();
+    }
+
+    /// <summary>
+    /// Connects the wallpaper brightness service for dynamic menu bar color.
+    /// </summary>
+    public void ConnectBrightnessService(WallpaperBrightnessService brightnessService)
+    {
+        _brightnessService = brightnessService;
+        _brightnessService.BrightnessChanged += OnBrightnessChanged;
+        _dynamicColorOverrideIsLight = _brightnessService.IsLightBackground;
+        ApplyDynamicColor();
+    }
+
+    private void OnBrightnessChanged(bool isLight)
+    {
+        Dispatcher.Invoke(() =>
+        {
+            _dynamicColorOverrideIsLight = isLight;
+            ApplyDynamicColor();
+        });
     }
 
     private void OnShellSettingsChanged(object? sender, EventArgs e)
@@ -121,7 +164,201 @@ public partial class TopMenuBar : AppBarWindow
 
         // Toggle translucency
         ApplyTranslucency(ThemeService.ReadThemeFromRegistry());
+
+        // Apply auto-hide mode
+        ApplyAutoHideMode(_shellSettings.AutoHideMenuBar);
+
+        // Apply monochrome tray icons
+        ApplyMonochromeTrayIcons();
+
+        // Apply dynamic color
+        ApplyDynamicColor();
     }
+
+    #region Auto-Hide
+
+    private void ApplyAutoHideMode(bool enabled)
+    {
+        _isAutoHideEnabled = enabled;
+        AutoHideTriggerZone.Visibility = enabled ? Visibility.Visible : Visibility.Collapsed;
+
+        if (!enabled && _autoHideService?.State == MenuBarAutoHideService.AutoHideState.Hidden)
+        {
+            // Restore menu bar if it was hidden
+            MenuBarSlideTransform.Y = 0;
+            MenuBarContainer.Visibility = Visibility.Visible;
+        }
+
+        if (enabled)
+        {
+            _autoHideService?.ForceHidden();
+            MenuBarSlideTransform.Y = -24; // slide up (negative Y = off-screen top)
+            MenuBarContainer.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    private void TriggerZone_MouseEnter(object sender, MouseEventArgs e)
+    {
+        if (_isAutoHideEnabled)
+            _autoHideService?.OnTriggerZoneEnter();
+    }
+
+    private void MenuBarContainer_MouseEnter(object sender, MouseEventArgs e)
+    {
+        _autoHideService?.OnMenuBarEnter();
+    }
+
+    private void MenuBarContainer_MouseLeave(object sender, MouseEventArgs e)
+    {
+        if (_isAutoHideEnabled)
+            _autoHideService?.OnMenuBarLeave();
+    }
+
+    private void OnAutoHideShowRequested()
+    {
+        Dispatcher.Invoke(() =>
+        {
+            MenuBarContainer.Visibility = Visibility.Visible;
+            var slideDown = new DoubleAnimation(-24, 0, ShowAnimationDuration)
+            {
+                EasingFunction = ShowEasing,
+            };
+            slideDown.Completed += (_, _) => _autoHideService?.OnShowAnimationCompleted();
+            MenuBarSlideTransform.BeginAnimation(TranslateTransform.YProperty, slideDown);
+        });
+    }
+
+    private void OnAutoHideHideRequested()
+    {
+        Dispatcher.Invoke(() =>
+        {
+            var slideUp = new DoubleAnimation(0, -24, HideAnimationDuration)
+            {
+                EasingFunction = HideEasing,
+            };
+            slideUp.Completed += (_, _) =>
+            {
+                MenuBarContainer.Visibility = Visibility.Collapsed;
+                _autoHideService?.OnHideAnimationCompleted();
+            };
+            MenuBarSlideTransform.BeginAnimation(TranslateTransform.YProperty, slideUp);
+        });
+    }
+
+    #endregion
+
+    #region Monochrome Tray Icons
+
+    private void ApplyMonochromeTrayIcons()
+    {
+        if (_shellSettings is null) return;
+
+        for (int i = 0; i < TrayIconsControl.Items.Count; i++)
+        {
+            var container = TrayIconsControl.ItemContainerGenerator.ContainerFromIndex(i) as FrameworkElement;
+            if (container is null) continue;
+
+            var image = FindVisualChild<System.Windows.Controls.Image>(container);
+            if (image is null) continue;
+
+            if (_shellSettings.MonochromeTrayIcons)
+            {
+                // Save original source if not already tracked
+                if (!_originalTrayIconSources.ContainsKey(image) && image.Source is not null)
+                    _originalTrayIconSources[image] = image.Source;
+
+                // Convert to grayscale via FormatConvertedBitmap
+                var original = _originalTrayIconSources.GetValueOrDefault(image) ?? image.Source;
+                if (original is BitmapSource bitmapSource)
+                {
+                    try
+                    {
+                        var grayscale = new FormatConvertedBitmap(bitmapSource, PixelFormats.Gray8, null, 0);
+                        // Convert back to Pbgra32 so WPF can render it with proper alpha
+                        var colorGrayscale = new FormatConvertedBitmap(grayscale, PixelFormats.Pbgra32, null, 0);
+                        colorGrayscale.Freeze();
+                        image.Source = colorGrayscale;
+                    }
+                    catch
+                    {
+                        // If conversion fails, leave the original image
+                    }
+                }
+            }
+            else
+            {
+                // Restore original source
+                if (_originalTrayIconSources.TryGetValue(image, out var original))
+                {
+                    image.Source = original;
+                    _originalTrayIconSources.Remove(image);
+                }
+            }
+        }
+    }
+
+    #endregion
+
+    #region Dynamic Color
+
+    /// <summary>
+    /// Applies dynamic menu bar text color based on wallpaper brightness.
+    /// When the setting is enabled, overrides theme text color with white or black
+    /// for optimal contrast against the actual wallpaper showing through the translucent bar.
+    /// </summary>
+    private void ApplyDynamicColor()
+    {
+        if (_shellSettings is null) return;
+
+        if (_shellSettings.DynamicMenuBarColor && _brightnessService is not null)
+        {
+            // Override text color based on wallpaper brightness
+            var textColor = _dynamicColorOverrideIsLight ? Colors.Black : Colors.White;
+            var inactiveAlpha = _dynamicColorOverrideIsLight ? (byte)128 : (byte)128;
+            var inactiveColor = Color.FromArgb(inactiveAlpha, textColor.R, textColor.G, textColor.B);
+
+            var textBrush = new SolidColorBrush(textColor);
+            var inactiveBrush = new SolidColorBrush(inactiveColor);
+            textBrush.Freeze();
+            inactiveBrush.Freeze();
+
+            AppNameText.Foreground = textBrush;
+            ClockText.Foreground = textBrush;
+
+            // Update hover/pressed colors to match
+            _hoverColor = _dynamicColorOverrideIsLight ? LightHoverColor : DarkHoverColor;
+            _pressedColor = _dynamicColorOverrideIsLight ? LightPressedColor : DarkPressedColor;
+
+            // Tint the acrylic with the wallpaper's dominant color when translucency is also enabled
+            if (_shellSettings.MenuBarTranslucency)
+            {
+                var wallColor = _brightnessService.DominantColor;
+                // Build AABBGGRR tint at ~60% opacity for the acrylic composition
+                uint acrylicTint = ((uint)0x99 << 24)
+                    | ((uint)wallColor.B << 16)
+                    | ((uint)wallColor.G << 8)
+                    | wallColor.R;
+
+                var hwnd = new WindowInteropHelper(this).Handle;
+                if (hwnd != IntPtr.Zero)
+                    CompositionInterop.EnableAcrylic(new HWND(hwnd), acrylicTint);
+            }
+
+            Trace.WriteLine($"[Harbor] TopMenuBar: Dynamic color applied (isLight={_dynamicColorOverrideIsLight})");
+        }
+        else
+        {
+            // Use theme-based colors (DynamicResource handles this automatically)
+            AppNameText.SetResourceReference(System.Windows.Controls.TextBlock.ForegroundProperty, "MenuBarTextBrush");
+            ClockText.SetResourceReference(System.Windows.Controls.TextBlock.ForegroundProperty, "MenuBarTextBrush");
+
+            // Restore standard acrylic tint if translucency is on
+            if (_shellSettings.MenuBarTranslucency)
+                ApplyThemedAcrylic(ThemeService.ReadThemeFromRegistry());
+        }
+    }
+
+    #endregion
 
     private void RebuildClockFormat()
     {
@@ -160,6 +397,9 @@ public partial class TopMenuBar : AppBarWindow
         if (_shellSettings?.MenuBarTranslucency == true)
         {
             ApplyThemedAcrylic(theme);
+            // Let the DWM acrylic show through — don't paint over it
+            BackgroundBorder.Background = Brushes.Transparent;
+            BackgroundBorder.BorderBrush = Brushes.Transparent;
         }
         else
         {
@@ -169,6 +409,10 @@ public partial class TopMenuBar : AppBarWindow
 
             var solidColor = theme == AppTheme.Light ? LightSolidColor : DarkSolidColor;
             CompositionInterop.EnableAcrylic(new HWND(hwnd), solidColor);
+
+            // Restore theme brushes on the BackgroundBorder for solid mode
+            BackgroundBorder.SetResourceReference(Border.BackgroundProperty, "MenuBarBackground");
+            BackgroundBorder.SetResourceReference(Border.BorderBrushProperty, "MenuBarBorderBrush");
         }
     }
 
@@ -200,9 +444,16 @@ public partial class TopMenuBar : AppBarWindow
         _pressedColor = theme == AppTheme.Light ? LightPressedColor : DarkPressedColor;
 
         if (result)
+        {
+            // Let the DWM acrylic show through
+            BackgroundBorder.Background = Brushes.Transparent;
+            BackgroundBorder.BorderBrush = Brushes.Transparent;
             Trace.WriteLine($"[Harbor] TopMenuBar: Acrylic applied for {theme} theme.");
+        }
         else
+        {
             Trace.WriteLine("[Harbor] TopMenuBar: Acrylic failed, using solid fallback.");
+        }
     }
 
     private void OnForegroundChanged(object? sender, PropertyChangedEventArgs e)
@@ -224,7 +475,17 @@ public partial class TopMenuBar : AppBarWindow
 
     private void OnGlobalMenuItemsChanged(IReadOnlyList<GlobalMenuItem> items)
     {
-        Dispatcher.Invoke(() => MenuItemsControl.ItemsSource = items);
+        Dispatcher.Invoke(() =>
+        {
+            MenuItemsControl.ItemsSource = items;
+
+            // Re-apply monochrome effect when tray icons change
+            if (_shellSettings?.MonochromeTrayIcons == true)
+            {
+                // Defer to allow ItemContainerGenerator to create containers
+                Dispatcher.BeginInvoke(DispatcherPriority.Loaded, ApplyMonochromeTrayIcons);
+            }
+        });
     }
 
     #region Clock
@@ -306,7 +567,6 @@ public partial class TopMenuBar : AppBarWindow
         if (sender is not FrameworkElement element) return;
 
         var brush = element.GetValue(Border.BackgroundProperty) as SolidColorBrush;
-        // Template items start with a shared Transparent brush — clone it so we can animate
         if (brush is null || brush.IsFrozen)
         {
             brush = TransparentBrush.Clone();
@@ -468,6 +728,24 @@ public partial class TopMenuBar : AppBarWindow
 
     #endregion
 
+    #region Helpers
+
+    private static T? FindVisualChild<T>(DependencyObject parent) where T : DependencyObject
+    {
+        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
+        {
+            var child = VisualTreeHelper.GetChild(parent, i);
+            if (child is T typedChild)
+                return typedChild;
+            var result = FindVisualChild<T>(child);
+            if (result is not null)
+                return result;
+        }
+        return null;
+    }
+
+    #endregion
+
     protected override void OnClosing(CancelEventArgs e)
     {
         _clockTimer?.Stop();
@@ -490,6 +768,20 @@ public partial class TopMenuBar : AppBarWindow
         if (_shellSettings != null)
             _shellSettings.SettingsChanged -= OnShellSettingsChanged;
         _shellSettings = null;
+
+        if (_autoHideService != null)
+        {
+            _autoHideService.ShowRequested -= OnAutoHideShowRequested;
+            _autoHideService.HideRequested -= OnAutoHideHideRequested;
+            _autoHideService.Dispose();
+            _autoHideService = null;
+        }
+
+        if (_brightnessService != null)
+        {
+            _brightnessService.BrightnessChanged -= OnBrightnessChanged;
+            _brightnessService = null;
+        }
 
         base.OnClosing(e);
     }

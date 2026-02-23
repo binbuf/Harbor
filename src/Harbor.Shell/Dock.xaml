@@ -40,7 +40,7 @@
             <Grid Width="48" Height="56"
                   Margin="4,0"
                   Cursor="Hand"
-                  RenderTransformOrigin="0.5,0.5"
+                  RenderTransformOrigin="0.5,1.0"
                   MouseLeftButtonDown="DockIcon_MouseLeftButtonDown"
                   MouseLeftButtonUp="DockIcon_MouseLeftButtonUp"
                   MouseRightButtonUp="DockIcon_MouseRightButtonUp"
@@ -73,10 +73,10 @@
         </DataTemplate>
     </appbar:AppBarWindow.Resources>
 
-    <Grid x:Name="DockRoot" Height="68" VerticalAlignment="Bottom">
-        <!-- Auto-hide trigger zone: 2px tall, invisible, at bottom edge -->
+    <Grid x:Name="DockRoot" Height="62" VerticalAlignment="Bottom">
+        <!-- Auto-hide trigger zone: 6px tall, invisible, at bottom edge -->
         <Border x:Name="AutoHideTriggerZone"
-                Height="2"
+                Height="6"
                 VerticalAlignment="Bottom"
                 Background="Transparent"
                 IsHitTestVisible="True"
@@ -86,12 +86,13 @@
         <Border x:Name="DockContainer"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Center"
-                Margin="0,0,0,4"
+                Margin="0,0,0,1"
                 CornerRadius="16"
                 Background="{DynamicResource DockBackground}"
                 BorderBrush="{DynamicResource DockBorderBrush}"
                 BorderThickness="1"
                 Padding="4,4"
+                ClipToBounds="False"
                 RenderTransformOrigin="0.5,1"
                 MouseEnter="DockContainer_MouseEnter"
                 MouseLeave="DockContainer_MouseLeave"
@@ -100,10 +101,11 @@
                 <TranslateTransform x:Name="DockSlideTransform" Y="0" />
             </Border.RenderTransform>
 
-            <StackPanel x:Name="DockPanel" Orientation="Horizontal">
+            <StackPanel x:Name="DockPanel" Orientation="Horizontal" ClipToBounds="False">
                 <!-- Pinned application icons -->
                 <ItemsControl x:Name="PinnedIconsControl"
                               VerticalAlignment="Center"
+                              ClipToBounds="False"
                               ItemTemplate="{StaticResource DockIconTemplate}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
@@ -124,6 +126,7 @@
                 <!-- Running (unpinned) application icons -->
                 <ItemsControl x:Name="RunningIconsControl"
                               VerticalAlignment="Center"
+                              ClipToBounds="False"
                               ItemTemplate="{StaticResource DockIconTemplate}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
@@ -145,7 +148,7 @@
                       Width="48" Height="56"
                       Margin="4,0"
                       Cursor="Hand"
-                      RenderTransformOrigin="0.5,0.5"
+                      RenderTransformOrigin="0.5,1.0"
                       MouseLeftButtonUp="TrashIcon_Click"
                       MouseRightButtonUp="TrashIcon_RightClick"
                       MouseEnter="TrashIcon_MouseEnter"

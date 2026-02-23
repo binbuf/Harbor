@@ -12,21 +12,23 @@ public class DockContextMenuServiceTests
     {
         var items = DockContextMenuService.GetPinnedAppMenuItems(TestExe, TestName);
 
-        Assert.Equal("Open", items[0].Label);
-        Assert.Equal(DockMenuAction.Open, items[0].Action);
+        Assert.Equal("New Window", items[0].Label);
+        Assert.Equal(DockMenuAction.NewWindow, items[0].Action);
 
-        Assert.Equal("Remove from Dock", items[1].Label);
-        Assert.Equal(DockMenuAction.RemoveFromDock, items[1].Action);
+        Assert.True(items[1].IsSeparator);
 
-        Assert.True(items[2].IsSeparator);
+        Assert.Equal("Options", items[2].Label);
+        Assert.True(items[2].IsSubmenuHeader);
+        Assert.NotNull(items[2].Children);
+        Assert.Equal(2, items[2].Children!.Count);
+        Assert.Equal("Keep in Dock", items[2].Children![0].Label);
+        Assert.True(items[2].Children![0].IsChecked); // already pinned
+        Assert.Equal("Open at Login", items[2].Children![1].Label);
 
-        Assert.Equal("Options", items[3].Label);
-        Assert.True(items[3].IsSubmenuHeader);
-        Assert.NotNull(items[3].Children);
-        Assert.Equal(2, items[3].Children!.Count);
-        Assert.Equal("Keep in Dock", items[3].Children![0].Label);
-        Assert.True(items[3].Children![0].IsChecked); // already pinned
-        Assert.Equal("Open at Login", items[3].Children![1].Label);
+        Assert.True(items[3].IsSeparator);
+
+        Assert.Equal("Remove from Dock", items[4].Label);
+        Assert.Equal(DockMenuAction.RemoveFromDock, items[4].Action);
     }
 
     [Fact]
@@ -34,13 +36,15 @@ public class DockContextMenuServiceTests
     {
         var items = DockContextMenuService.GetRunningAppMenuItems(TestExe, TestName);
 
-        Assert.Equal("Open", items[0].Label);
-        Assert.True(items[1].IsSeparator);
-        Assert.Equal("Options", items[2].Label);
-        Assert.True(items[2].IsSubmenuHeader);
+        Assert.Equal("New Window", items[0].Label);
+        Assert.Equal("Show All Windows", items[1].Label);
+        Assert.Equal("Hide", items[2].Label);
         Assert.True(items[3].IsSeparator);
-        Assert.Equal("Quit", items[4].Label);
-        Assert.Equal(DockMenuAction.Quit, items[4].Action);
+        Assert.Equal("Options", items[4].Label);
+        Assert.True(items[4].IsSubmenuHeader);
+        Assert.True(items[5].IsSeparator);
+        Assert.Equal("Quit", items[6].Label);
+        Assert.Equal(DockMenuAction.Quit, items[6].Action);
     }
 
     [Fact]
@@ -77,8 +81,8 @@ public class DockContextMenuServiceTests
     {
         var items = DockContextMenuService.GetMenuItems(TestExe, TestName, isPinned: true, isRunning: false);
 
-        Assert.Equal("Open", items[0].Label);
-        Assert.Equal("Remove from Dock", items[1].Label);
+        Assert.Equal("New Window", items[0].Label);
+        Assert.Contains(items, i => i.Action == DockMenuAction.RemoveFromDock);
         Assert.DoesNotContain(items, i => i.Action == DockMenuAction.Quit);
     }
 
@@ -130,17 +134,17 @@ public class DockContextMenuServiceTests
     }
 
     [Fact]
-    public void PinnedApp_HasFourTopLevelItems()
+    public void PinnedApp_HasFiveTopLevelItems()
     {
         var items = DockContextMenuService.GetPinnedAppMenuItems(TestExe, TestName);
-        Assert.Equal(4, items.Count); // Open, Remove, Separator, Options
+        Assert.Equal(5, items.Count); // NewWindow, Sep, Options, Sep, Remove
     }
 
     [Fact]
-    public void RunningApp_HasFiveTopLevelItems()
+    public void RunningApp_HasSevenTopLevelItems()
     {
         var items = DockContextMenuService.GetRunningAppMenuItems(TestExe, TestName);
-        Assert.Equal(5, items.Count); // Open, Sep, Options, Sep, Quit
+        Assert.Equal(7, items.Count); // NewWindow, ShowAll, Hide, Sep, Options, Sep, Quit
     }
 
     #region Window Grouping Tests
@@ -167,7 +171,7 @@ public class DockContextMenuServiceTests
         Assert.True(items[2].IsSeparator);
 
         // Regular menu items follow after the separator
-        Assert.Equal("Open", items[3].Label);
+        Assert.Equal("New Window", items[3].Label);
     }
 
     [Fact]
@@ -198,7 +202,7 @@ public class DockContextMenuServiceTests
             TestExe, TestName, isPinned: false, isRunning: true, windows: windows);
 
         // Should be the same as without windows — no window list prepended
-        Assert.Equal("Open", items[0].Label);
+        Assert.Equal("New Window", items[0].Label);
         Assert.DoesNotContain(items, i => i.Action == DockMenuAction.SwitchToWindow);
     }
 
@@ -209,7 +213,7 @@ public class DockContextMenuServiceTests
         var items = DockContextMenuService.GetMenuItems(
             TestExe, TestName, isPinned: false, isRunning: true);
 
-        Assert.Equal("Open", items[0].Label);
+        Assert.Equal("New Window", items[0].Label);
         Assert.DoesNotContain(items, i => i.Action == DockMenuAction.SwitchToWindow);
     }
 
@@ -276,7 +280,7 @@ public class DockContextMenuServiceTests
         Assert.True(items[2].IsSeparator);
 
         // Regular pinned+running items follow
-        Assert.Equal("Open", items[3].Label);
+        Assert.Equal("New Window", items[3].Label);
         Assert.Contains(items, i => i.Action == DockMenuAction.Quit);
         Assert.Contains(items, i => i.Action == DockMenuAction.RemoveFromDock);
     }

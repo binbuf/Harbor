@@ -59,12 +59,12 @@ public class DockMagnificationCalculatorTests
     }
 
     [Fact]
-    public void VerticalOffset_ScaleGreaterThanOne_ReturnsNegative()
+    public void VerticalOffset_ScaleGreaterThanOne_ReturnsZero()
     {
         var offset = DockMagnificationCalculator.ComputeVerticalOffset(1.5, 48.0);
 
-        // Should be -(1.5 - 1.0) * 48 / 2 = -12.0
-        Assert.Equal(-12.0, offset, precision: 6);
+        // With bottom-origin RenderTransformOrigin, no Y translation needed
+        Assert.Equal(0.0, offset, precision: 6);
     }
 
     [Fact]

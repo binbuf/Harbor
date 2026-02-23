@@ -154,7 +154,8 @@ public partial class Dock : AppBarWindow
 
         if (!enabled && _autoHideService?.State == DockAutoHideService.AutoHideState.Hidden)
         {
-            // Restore dock if it was hidden
+            // Clear animation hold before setting local value (WPF animation precedence fix)
+            DockSlideTransform.BeginAnimation(TranslateTransform.YProperty, null);
             DockSlideTransform.Y = 0;
             DockContainer.Visibility = Visibility.Visible;
         }
@@ -162,7 +163,9 @@ public partial class Dock : AppBarWindow
         if (enabled && startHidden && _autoHideService is not null)
         {
             _autoHideService.ForceHidden();
-            DockSlideTransform.Y = 68;
+            // Clear animation hold before setting local value (WPF animation precedence fix)
+            DockSlideTransform.BeginAnimation(TranslateTransform.YProperty, null);
+            DockSlideTransform.Y = 62;
             DockContainer.Visibility = Visibility.Collapsed;
         }
     }
@@ -364,7 +367,7 @@ public partial class Dock : AppBarWindow
         Dispatcher.Invoke(() =>
         {
             DockContainer.Visibility = Visibility.Visible;
-            var slideUp = new DoubleAnimation(68, 0, ShowAnimationDuration)
+            var slideUp = new DoubleAnimation(62, 0, ShowAnimationDuration)
             {
                 EasingFunction = ShowEasing,
             };
@@ -377,7 +380,7 @@ public partial class Dock : AppBarWindow
     {
         Dispatcher.Invoke(() =>
         {
-            var slideDown = new DoubleAnimation(0, 68, HideAnimationDuration)
+            var slideDown = new DoubleAnimation(0, 62, HideAnimationDuration)
             {
                 EasingFunction = HideEasing,
             };
@@ -411,8 +414,8 @@ public partial class Dock : AppBarWindow
         var centers = new List<double>();
         var elements = new List<FrameworkElement>();
 
-        CollectIconElements(PinnedIconsControl, centers, elements);
-        CollectIconElements(RunningIconsControl, centers, elements);
+        CollectIconElements(PinnedIconsControl, centers, elements, DockPanel);
+        CollectIconElements(RunningIconsControl, centers, elements, DockPanel);
 
         // Add trash icon
         var trashPoint = TrashIcon.TranslatePoint(new Point(TrashIcon.ActualWidth / 2, 0), DockPanel);
@@ -449,7 +452,7 @@ public partial class Dock : AppBarWindow
         }
 
         // Adjust DockRoot height to accommodate magnified icons
-        DockRoot.Height = 68 + (MagnificationMaxScale - 1) * IconDefaultSize;
+        DockRoot.Height = 62 + (MagnificationMaxScale - 1) * IconDefaultSize;
     }
 
     private void ResetMagnification()
@@ -458,7 +461,7 @@ public partial class Dock : AppBarWindow
         ResetItemsControlScales(RunningIconsControl);
 
         // Reset trash icon (no TransformGroup)
-        DockRoot.Height = 68;
+        DockRoot.Height = 62;
     }
 
     /// <summary>
@@ -489,11 +492,11 @@ public partial class Dock : AppBarWindow
         AnimateItemsControlElements(RunningIconsControl, AnimateElement);
 
         // Animate DockRoot height back
-        var heightAnim = new DoubleAnimation(68, duration) { EasingFunction = EaseOut };
+        var heightAnim = new DoubleAnimation(62, duration) { EasingFunction = EaseOut };
         DockRoot.BeginAnimation(HeightProperty, heightAnim);
     }
 
-    private static void CollectIconElements(ItemsControl itemsControl, List<double> centers, List<FrameworkElement> elements)
+    private static void CollectIconElements(ItemsControl itemsControl, List<double> centers, List<FrameworkElement> elements, UIElement referencePanel)
     {
         for (int i = 0; i < itemsControl.Items.Count; i++)
         {
@@ -504,15 +507,7 @@ public partial class Dock : AppBarWindow
             var grid = FindVisualChild<Grid>(container);
             if (grid is null) continue;
 
-            var panel = VisualTreeHelper.GetParent(grid) as FrameworkElement ?? grid;
-            var point = grid.TranslatePoint(new Point(grid.ActualWidth / 2, 0),
-                (FrameworkElement)VisualTreeHelper.GetParent(VisualTreeHelper.GetParent(VisualTreeHelper.GetParent(grid)!)!)!);
-
-            // Get position relative to the DockPanel (which is the StackPanel containing all)
-            var dockPanel = FindVisualParent<StackPanel>(grid);
-            if (dockPanel is null) continue;
-
-            var centerPoint = grid.TranslatePoint(new Point(grid.ActualWidth / 2, 0), dockPanel);
+            var centerPoint = grid.TranslatePoint(new Point(grid.ActualWidth / 2, 0), referencePanel);
             centers.Add(centerPoint.X);
             elements.Add(grid);
         }
@@ -657,9 +652,18 @@ public partial class Dock : AppBarWindow
     /// </summary>
     private void DockIcon_MouseRightButtonUp(object sender, MouseButtonEventArgs e)
     {
-        if (sender is not FrameworkElement { DataContext: DockItem dockItem })
-            return;
+        if (sender is not FrameworkElement element) return;
+        if (element.DataContext is not DockItem dockItem) return;
 
+        ShowContextMenuForIcon(element, dockItem);
+        e.Handled = true;
+    }
+
+    /// <summary>
+    /// Shows the context menu for a dock icon. Shared by right-click and long-press.
+    /// </summary>
+    private void ShowContextMenuForIcon(FrameworkElement element, DockItem dockItem)
+    {
         if (_itemManager is null) return;
 
         var isOpenAtLogin = StartupShortcutService.IsOpenAtLogin(dockItem.ExecutablePath);
@@ -682,11 +686,9 @@ public partial class Dock : AppBarWindow
             windowList);
 
         var contextMenu = BuildContextMenu(menuItems, dockItem);
-        contextMenu.PlacementTarget = (UIElement)sender;
+        contextMenu.PlacementTarget = element;
         contextMenu.Placement = System.Windows.Controls.Primitives.PlacementMode.Top;
         contextMenu.IsOpen = true;
-
-        e.Handled = true;
     }
 
     private ContextMenu BuildContextMenu(List<DockMenuItem> items, DockItem dockItem)
@@ -778,6 +780,35 @@ public partial class Dock : AppBarWindow
 
             case DockMenuAction.OpenAtLogin:
                 StartupShortcutService.Toggle(dockItem.ExecutablePath);
+                break;
+
+            case DockMenuAction.NewWindow:
+                LaunchApplication(dockItem.ExecutablePath);
+                break;
+
+            case DockMenuAction.ShowAllWindows:
+                if (dockItem.Windows.Count > 0)
+                {
+                    Trace.WriteLine($"[Harbor] Dock: Showing all windows for: {dockItem.DisplayName}");
+                    var sorted = dockItem.Windows
+                        .OrderByDescending(w => WindowInterop.GetZOrder(new HWND(w.Handle)))
+                        .ToList();
+                    foreach (var w in sorted)
+                    {
+                        w.BringToFront();
+                    }
+                }
+                break;
+
+            case DockMenuAction.Hide:
+                if (dockItem.Windows.Count > 0)
+                {
+                    Trace.WriteLine($"[Harbor] Dock: Hiding all windows for: {dockItem.DisplayName}");
+                    foreach (var w in dockItem.Windows)
+                    {
+                        w.Minimize();
+                    }
+                }
                 break;
 
             case DockMenuAction.Quit:
@@ -900,16 +931,14 @@ public partial class Dock : AppBarWindow
         _longPressTimer?.Stop();
         _longPressTriggered = true;
 
-        if (_longPressElement?.DataContext is DockItem dockItem && dockItem.Windows.Count > 1)
+        if (_longPressElement?.DataContext is DockItem dockItem)
         {
             // Restore scale
             var scaleTransform = FindScaleTransform(_longPressElement);
             if (scaleTransform is not null)
                 AnimateScale(scaleTransform, 1.0, PressScaleUpDuration, EaseOut);
 
-            var picker = new DockWindowPickerPopup();
-            picker.Populate(dockItem.Windows);
-            picker.ShowCenteredAbove(_longPressElement);
+            ShowContextMenuForIcon(_longPressElement, dockItem);
         }
     }
 

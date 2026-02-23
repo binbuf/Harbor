@@ -138,7 +138,7 @@ public partial class App : Application
             _shellServices,
             AppBarScreen.FromPrimaryScreen(),
             AppBarEdge.Bottom,
-            68);
+            62);
 
         _dockRegistration = AppBarHelper.Register(_dock, AppBarEdge.Bottom);
         _dock.Initialize(_shellServices.Tasks, _dockPinningService, _dockSettingsService);
@@ -148,7 +148,7 @@ public partial class App : Application
         if (_shellSettingsService.ReplaceExplorer)
         {
             _workAreaService = new WorkAreaService();
-            _workAreaService.Apply(topInset: 24, bottomInset: 82);
+            _workAreaService.Apply(topInset: 24, bottomInset: 66);
         }
 
         // Apply initial auto-hide mode
@@ -271,7 +271,7 @@ public partial class App : Application
         {
             case DockAutoHideMode.Never:
                 _dock?.SetAutoHide(false);
-                _workAreaService?.Reapply(topInset: 24, bottomInset: 82);
+                _workAreaService?.Reapply(topInset: 24, bottomInset: 66);
                 break;
 
             case DockAutoHideMode.Always:
@@ -281,7 +281,7 @@ public partial class App : Application
 
             case DockAutoHideMode.WhenOverlapped:
                 _dock?.SetAutoHide(false);
-                _workAreaService?.Reapply(topInset: 24, bottomInset: 82);
+                _workAreaService?.Reapply(topInset: 24, bottomInset: 66);
                 if (_windowEventManager is not null)
                 {
                     _overlapMonitor = new DockOverlapMonitorService(_windowEventManager);
@@ -293,17 +293,31 @@ public partial class App : Application
         Trace.WriteLine($"[Harbor] App: Applied auto-hide mode: {mode}");
     }
 
+    private DispatcherTimer? _overlapCooldownTimer;
+
     private void OnOverlapChanged(bool isOverlapped)
     {
         Dispatcher.Invoke(() =>
         {
+            // Cancel any pending cooldown
+            _overlapCooldownTimer?.Stop();
+            _overlapCooldownTimer = null;
+
             if (isOverlapped)
             {
                 _dock?.SetAutoHide(true, startHidden: true);
             }
             else
             {
-                _dock?.SetAutoHide(false);
+                // Brief cooldown before restoring dock to prevent immediate re-hide feedback loop
+                _overlapCooldownTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
+                _overlapCooldownTimer.Tick += (_, _) =>
+                {
+                    _overlapCooldownTimer?.Stop();
+                    _overlapCooldownTimer = null;
+                    _dock?.SetAutoHide(false);
+                };
+                _overlapCooldownTimer.Start();
             }
         });
     }

@@ -13,14 +13,15 @@ public static class DockContextMenuService
     {
         return
         [
-            new DockMenuItem("Open", DockMenuAction.Open),
-            new DockMenuItem("Remove from Dock", DockMenuAction.RemoveFromDock),
+            new DockMenuItem("New Window", DockMenuAction.NewWindow),
             DockMenuItem.Separator,
             new DockMenuItem("Options", DockMenuAction.None, IsSubmenuHeader: true, Children:
             [
                 new DockMenuItem("Keep in Dock", DockMenuAction.KeepInDock, IsChecked: true),
                 new DockMenuItem("Open at Login", DockMenuAction.OpenAtLogin),
             ]),
+            DockMenuItem.Separator,
+            new DockMenuItem("Remove from Dock", DockMenuAction.RemoveFromDock),
         ];
     }
 
@@ -31,7 +32,9 @@ public static class DockContextMenuService
     {
         return
         [
-            new DockMenuItem("Open", DockMenuAction.Open),
+            new DockMenuItem("New Window", DockMenuAction.NewWindow),
+            new DockMenuItem("Show All Windows", DockMenuAction.ShowAllWindows),
+            new DockMenuItem("Hide", DockMenuAction.Hide),
             DockMenuItem.Separator,
             new DockMenuItem("Options", DockMenuAction.None, IsSubmenuHeader: true, Children:
             [
@@ -50,8 +53,9 @@ public static class DockContextMenuService
     {
         return
         [
-            new DockMenuItem("Open", DockMenuAction.Open),
-            new DockMenuItem("Remove from Dock", DockMenuAction.RemoveFromDock),
+            new DockMenuItem("New Window", DockMenuAction.NewWindow),
+            new DockMenuItem("Show All Windows", DockMenuAction.ShowAllWindows),
+            new DockMenuItem("Hide", DockMenuAction.Hide),
             DockMenuItem.Separator,
             new DockMenuItem("Options", DockMenuAction.None, IsSubmenuHeader: true, Children:
             [
@@ -59,6 +63,7 @@ public static class DockContextMenuService
                 new DockMenuItem("Open at Login", DockMenuAction.OpenAtLogin),
             ]),
             DockMenuItem.Separator,
+            new DockMenuItem("Remove from Dock", DockMenuAction.RemoveFromDock),
             new DockMenuItem("Quit", DockMenuAction.Quit),
         ];
     }
@@ -165,4 +170,7 @@ public enum DockMenuAction
     OpenAtLogin,
     Quit,
     SwitchToWindow,
+    NewWindow,
+    ShowAllWindows,
+    Hide,
 }

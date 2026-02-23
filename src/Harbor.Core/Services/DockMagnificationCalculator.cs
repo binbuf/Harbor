@@ -55,6 +55,8 @@ public static class DockMagnificationCalculator
     /// <returns>Negative Y translation to apply (moves icon upward).</returns>
     public static double ComputeVerticalOffset(double scale, double iconHeight)
     {
-        return -(scale - 1.0) * iconHeight / 2.0;
+        // With RenderTransformOrigin at (0.5, 1.0), scaling grows upward from bottom.
+        // No additional Y translation needed for bottom-aligned growth.
+        return 0;
     }
 }

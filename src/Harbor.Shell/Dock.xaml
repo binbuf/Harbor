@@ -73,7 +73,7 @@
         </DataTemplate>
     </appbar:AppBarWindow.Resources>
 
-    <Grid x:Name="DockRoot" Height="62" VerticalAlignment="Bottom">
+    <Grid x:Name="DockRoot" Height="86" VerticalAlignment="Bottom">
         <!-- Auto-hide trigger zone: 6px tall, invisible, at bottom edge -->
         <Border x:Name="AutoHideTriggerZone"
                 Height="6"
@@ -85,13 +85,13 @@
         <!-- Dock container: centered, auto-width, rounded corners, acrylic background -->
         <Border x:Name="DockContainer"
                 HorizontalAlignment="Center"
-                VerticalAlignment="Center"
-                Margin="0,0,0,1"
+                VerticalAlignment="Bottom"
+                Margin="0,0,0,4"
                 CornerRadius="16"
                 Background="{DynamicResource DockBackground}"
                 BorderBrush="{DynamicResource DockBorderBrush}"
                 BorderThickness="1"
-                Padding="4,4"
+                Padding="8,4"
                 ClipToBounds="False"
                 RenderTransformOrigin="0.5,1"
                 MouseEnter="DockContainer_MouseEnter"

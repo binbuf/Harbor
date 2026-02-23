@@ -62,6 +62,10 @@ public partial class Dock : AppBarWindow
     public static readonly Duration ShowAnimationDuration = new(TimeSpan.FromMilliseconds(250));
     public static readonly Duration HideAnimationDuration = new(TimeSpan.FromMilliseconds(200));
 
+    // Dock layout constants
+    public const double DockWindowHeight = 86.0;   // AppBar window height (includes magnification headroom)
+    public const double DockVisibleHeight = 62.0;   // Visible pill height for slide animations
+
     // Magnification constants
     public const double MagnificationMaxScale = 1.5;
     public const double MagnificationEffectRadius = 3.0;
@@ -163,10 +167,19 @@ public partial class Dock : AppBarWindow
         if (enabled && startHidden && _autoHideService is not null)
         {
             _autoHideService.ForceHidden();
-            // Clear animation hold before setting local value (WPF animation precedence fix)
+            DockContainer.Visibility = Visibility.Visible;
+            // Animate slide-down instead of instantly hiding
             DockSlideTransform.BeginAnimation(TranslateTransform.YProperty, null);
-            DockSlideTransform.Y = 62;
-            DockContainer.Visibility = Visibility.Collapsed;
+            DockSlideTransform.Y = 0;
+            var slideDown = new DoubleAnimation(0, DockVisibleHeight, HideAnimationDuration)
+            {
+                EasingFunction = HideEasing,
+            };
+            slideDown.Completed += (_, _) =>
+            {
+                DockContainer.Visibility = Visibility.Collapsed;
+            };
+            DockSlideTransform.BeginAnimation(TranslateTransform.YProperty, slideDown);
         }
     }
 
@@ -367,7 +380,7 @@ public partial class Dock : AppBarWindow
         Dispatcher.Invoke(() =>
         {
             DockContainer.Visibility = Visibility.Visible;
-            var slideUp = new DoubleAnimation(62, 0, ShowAnimationDuration)
+            var slideUp = new DoubleAnimation(DockVisibleHeight, 0, ShowAnimationDuration)
             {
                 EasingFunction = ShowEasing,
             };
@@ -380,7 +393,7 @@ public partial class Dock : AppBarWindow
     {
         Dispatcher.Invoke(() =>
         {
-            var slideDown = new DoubleAnimation(0, 62, HideAnimationDuration)
+            var slideDown = new DoubleAnimation(0, DockVisibleHeight, HideAnimationDuration)
             {
                 EasingFunction = HideEasing,
             };
@@ -441,27 +454,26 @@ public partial class Dock : AppBarWindow
 
             if (scaleTransform is not null)
             {
+                // Clear animation clocks before setting local values (WPF animation precedence fix)
+                scaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+                scaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, null);
                 scaleTransform.ScaleX = scale;
                 scaleTransform.ScaleY = scale;
             }
 
             if (translateTransform is not null)
             {
-                translateTransform.Y = DockMagnificationCalculator.ComputeVerticalOffset(scale, IconDefaultSize);
+                translateTransform.BeginAnimation(TranslateTransform.YProperty, null);
+                var offset = DockMagnificationCalculator.ComputeVerticalOffset(scale, IconDefaultSize);
+                translateTransform.Y = offset;
             }
         }
-
-        // Adjust DockRoot height to accommodate magnified icons
-        DockRoot.Height = 62 + (MagnificationMaxScale - 1) * IconDefaultSize;
     }
 
     private void ResetMagnification()
     {
         ResetItemsControlScales(PinnedIconsControl);
         ResetItemsControlScales(RunningIconsControl);
-
-        // Reset trash icon (no TransformGroup)
-        DockRoot.Height = 62;
     }
 
     /// <summary>
@@ -490,10 +502,6 @@ public partial class Dock : AppBarWindow
 
         AnimateItemsControlElements(PinnedIconsControl, AnimateElement);
         AnimateItemsControlElements(RunningIconsControl, AnimateElement);
-
-        // Animate DockRoot height back
-        var heightAnim = new DoubleAnimation(62, duration) { EasingFunction = EaseOut };
-        DockRoot.BeginAnimation(HeightProperty, heightAnim);
     }
 
     private static void CollectIconElements(ItemsControl itemsControl, List<double> centers, List<FrameworkElement> elements, UIElement referencePanel)

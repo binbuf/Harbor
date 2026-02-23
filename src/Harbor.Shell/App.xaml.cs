@@ -138,7 +138,7 @@ public partial class App : Application
             _shellServices,
             AppBarScreen.FromPrimaryScreen(),
             AppBarEdge.Bottom,
-            62);
+            86);
 
         _dockRegistration = AppBarHelper.Register(_dock, AppBarEdge.Bottom);
         _dock.Initialize(_shellServices.Tasks, _dockPinningService, _dockSettingsService);
@@ -148,7 +148,7 @@ public partial class App : Application
         if (_shellSettingsService.ReplaceExplorer)
         {
             _workAreaService = new WorkAreaService();
-            _workAreaService.Apply(topInset: 24, bottomInset: 66);
+            _workAreaService.Apply(topInset: 24, bottomInset: 58);
         }
 
         // Apply initial auto-hide mode
@@ -271,7 +271,7 @@ public partial class App : Application
         {
             case DockAutoHideMode.Never:
                 _dock?.SetAutoHide(false);
-                _workAreaService?.Reapply(topInset: 24, bottomInset: 66);
+                _workAreaService?.Reapply(topInset: 24, bottomInset: 58);
                 break;
 
             case DockAutoHideMode.Always:
@@ -281,10 +281,12 @@ public partial class App : Application
 
             case DockAutoHideMode.WhenOverlapped:
                 _dock?.SetAutoHide(false);
-                _workAreaService?.Reapply(topInset: 24, bottomInset: 66);
+                _workAreaService?.Reapply(topInset: 24, bottomInset: 58);
                 if (_windowEventManager is not null)
                 {
                     _overlapMonitor = new DockOverlapMonitorService(_windowEventManager);
+                    if (_dock is not null)
+                        _overlapMonitor.ExcludedWindow = new Windows.Win32.Foundation.HWND(_dock.Handle);
                     _overlapMonitor.OverlapChanged += OnOverlapChanged;
                 }
                 break;
@@ -306,6 +308,7 @@ public partial class App : Application
             if (isOverlapped)
             {
                 _dock?.SetAutoHide(true, startHidden: true);
+                _workAreaService?.Reapply(topInset: 24, bottomInset: 0);
             }
             else
             {
@@ -316,6 +319,7 @@ public partial class App : Application
                     _overlapCooldownTimer?.Stop();
                     _overlapCooldownTimer = null;
                     _dock?.SetAutoHide(false);
+                    _workAreaService?.Reapply(topInset: 24, bottomInset: 58);
                 };
                 _overlapCooldownTimer.Start();
             }

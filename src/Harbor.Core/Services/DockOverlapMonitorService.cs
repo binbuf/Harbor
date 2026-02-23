@@ -20,6 +20,11 @@ public sealed class DockOverlapMonitorService : IDisposable
     private System.Threading.Timer? _debounceTimer;
 
     /// <summary>
+    /// Window handle to exclude from overlap detection (e.g. the dock's own window).
+    /// </summary>
+    public HWND ExcludedWindow { get; set; }
+
+    /// <summary>
     /// Raised when the overlap state changes. True = at least one window overlaps the dock zone.
     /// </summary>
     public event Action<bool>? OverlapChanged;
@@ -52,6 +57,9 @@ public sealed class DockOverlapMonitorService : IDisposable
     private void OnWindowEvent(WindowEventArgs args)
     {
         if (_disposed) return;
+
+        // Skip events from the dock's own window to prevent self-triggering
+        if (args.WindowHandle == ExcludedWindow) return;
 
         if (args.EventType == WindowEventType.ObjectDestroy)
         {

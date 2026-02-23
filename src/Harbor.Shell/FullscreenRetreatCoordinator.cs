@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Windows;
 using Harbor.Core.Interop;
 using Harbor.Core.Services;
 using ManagedShell.AppBar;
@@ -38,8 +39,8 @@ public sealed class FullscreenRetreatCoordinator : IDisposable
     private readonly OverlayManager _overlayManager;
     private readonly ConcurrentDictionary<IntPtr, MonitorRetreatInfo> _monitors = new();
 
-    // AppBars keyed by monitor handle — only primary monitor for now
-    private readonly ConcurrentDictionary<IntPtr, List<AppBarWindow>> _appBars = new();
+    // Retreatable UI elements keyed by monitor handle — only primary monitor for now
+    private readonly ConcurrentDictionary<IntPtr, List<IRetreatable>> _retreatables = new();
 
     private Guid _foregroundSubscription;
     private bool _disposed;
@@ -64,15 +65,38 @@ public sealed class FullscreenRetreatCoordinator : IDisposable
     }
 
     /// <summary>
+    /// Registers a retreatable UI element on a specific monitor.
+    /// </summary>
+    public void RegisterRetreatable(IRetreatable retreatable, IntPtr monitorHandle)
+    {
+        var list = _retreatables.GetOrAdd(monitorHandle, _ => new List<IRetreatable>());
+        lock (list)
+        {
+            list.Add(retreatable);
+        }
+    }
+
+    /// <summary>
     /// Registers an AppBar window on a specific monitor for retreat management.
+    /// Wraps it in an adapter that implements IRetreatable.
     /// </summary>
     public void RegisterAppBar(AppBarWindow appBar, IntPtr monitorHandle)
     {
-        var list = _appBars.GetOrAdd(monitorHandle, _ => new List<AppBarWindow>());
-        lock (list)
+        RegisterRetreatable(new AppBarWindowRetreatable(appBar), monitorHandle);
+    }
+
+    /// <summary>
+    /// Adapter that wraps an AppBarWindow as an IRetreatable.
+    /// </summary>
+    private sealed class AppBarWindowRetreatable(AppBarWindow appBar) : IRetreatable
+    {
+        public Visibility Visibility
         {
-            list.Add(appBar);
+            get => appBar.Visibility;
+            set => appBar.Visibility = value;
         }
+
+        public void UpdatePosition() => appBar.UpdatePosition();
     }
 
     /// <summary>
@@ -139,15 +163,15 @@ public sealed class FullscreenRetreatCoordinator : IDisposable
         // Hide overlays on this monitor
         _overlayManager.Retreat(monitorHandle);
 
-        // Hide AppBars on this monitor
-        if (_appBars.TryGetValue(monitorHandle, out var appBars))
+        // Hide retreatable UI elements on this monitor
+        if (_retreatables.TryGetValue(monitorHandle, out var retreatables))
         {
-            lock (appBars)
+            lock (retreatables)
             {
-                foreach (var appBar in appBars)
+                foreach (var retreatable in retreatables)
                 {
-                    appBar.Visibility = System.Windows.Visibility.Collapsed;
-                    Trace.WriteLine($"[Harbor] FullscreenRetreatCoordinator: Collapsed AppBar on monitor {monitorHandle}.");
+                    retreatable.Visibility = Visibility.Collapsed;
+                    Trace.WriteLine($"[Harbor] FullscreenRetreatCoordinator: Collapsed retreatable on monitor {monitorHandle}.");
                 }
             }
         }
@@ -166,16 +190,16 @@ public sealed class FullscreenRetreatCoordinator : IDisposable
         // Restore overlays on this monitor
         _overlayManager.Restore(monitorHandle);
 
-        // Restore AppBars on this monitor
-        if (_appBars.TryGetValue(monitorHandle, out var appBars))
+        // Restore retreatable UI elements on this monitor
+        if (_retreatables.TryGetValue(monitorHandle, out var retreatables))
         {
-            lock (appBars)
+            lock (retreatables)
             {
-                foreach (var appBar in appBars)
+                foreach (var retreatable in retreatables)
                 {
-                    appBar.Visibility = System.Windows.Visibility.Visible;
-                    appBar.UpdatePosition();
-                    Trace.WriteLine($"[Harbor] FullscreenRetreatCoordinator: Restored AppBar on monitor {monitorHandle}.");
+                    retreatable.Visibility = Visibility.Visible;
+                    retreatable.UpdatePosition();
+                    Trace.WriteLine($"[Harbor] FullscreenRetreatCoordinator: Restored retreatable on monitor {monitorHandle}.");
                 }
             }
         }
@@ -198,7 +222,7 @@ public sealed class FullscreenRetreatCoordinator : IDisposable
         }
 
         _monitors.Clear();
-        _appBars.Clear();
+        _retreatables.Clear();
 
         Trace.WriteLine("[Harbor] FullscreenRetreatCoordinator: Disposed.");
     }

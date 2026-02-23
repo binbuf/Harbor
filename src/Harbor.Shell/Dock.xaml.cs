@@ -1,6 +1,7 @@
 using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -10,14 +11,13 @@ using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using Harbor.Core.Interop;
 using Harbor.Core.Services;
-using ManagedShell.AppBar;
-using ManagedShell.Common.Helpers;
 using ManagedShell.WindowsTasks;
 using Windows.Win32.Foundation;
+using Windows.Win32.UI.WindowsAndMessaging;
 
 namespace Harbor.Shell;
 
-public partial class Dock : AppBarWindow
+public partial class Dock : Window, IRetreatable
 {
     private DockItemManager? _itemManager;
     private readonly IconExtractionService _iconService = new();
@@ -77,17 +77,55 @@ public partial class Dock : AppBarWindow
     private static readonly IEasingFunction ShowEasing = new SplineEase(0.16, 1, 0.3, 1);
     private static readonly IEasingFunction HideEasing = new SplineEase(0.7, 0, 0.84, 0);
 
-    public Dock(
-        AppBarManager appBarManager,
-        ExplorerHelper explorerHelper,
-        FullScreenHelper fullScreenHelper,
-        AppBarScreen screen,
-        AppBarEdge edge,
-        AppBarMode mode,
-        double desiredHeight)
-        : base(appBarManager, explorerHelper, fullScreenHelper, screen, edge, mode, desiredHeight)
+    public Dock()
     {
         InitializeComponent();
+    }
+
+    /// <summary>
+    /// Returns the native window handle.
+    /// </summary>
+    public IntPtr Handle => new WindowInteropHelper(this).Handle;
+
+    /// <summary>
+    /// Positions the dock at the absolute bottom of the primary monitor,
+    /// spanning the full monitor width. Uses physical monitor bounds (rcMonitor)
+    /// and SetWindowPos to bypass WPF's layout system entirely.
+    /// </summary>
+    public void UpdatePosition()
+    {
+        var hwnd = new HWND(Handle);
+        if (hwnd == HWND.Null)
+        {
+            Trace.WriteLine("[Harbor] Dock: UpdatePosition skipped — HWND is null.");
+            return;
+        }
+
+        var bounds = DisplayInterop.GetMonitorBounds(hwnd);
+        if (bounds is null)
+        {
+            Trace.WriteLine("[Harbor] Dock: UpdatePosition skipped — GetMonitorBounds returned null.");
+            return;
+        }
+
+        var rc = bounds.Value;
+        var scale = DisplayInterop.GetScaleFactorForWindow(hwnd);
+        var physicalHeight = (int)(DockWindowHeight * scale);
+        var x = rc.left;
+        var y = rc.bottom - physicalHeight;
+        var cx = rc.right - rc.left;
+        var cy = physicalHeight;
+
+        Trace.WriteLine($"[Harbor] Dock: UpdatePosition: rcMonitor=({rc.left},{rc.top},{rc.right},{rc.bottom}) scale={scale} phyH={physicalHeight} -> SetWindowPos({x},{y},{cx},{cy})");
+
+        // Use SetWindowPos directly with physical pixel coordinates from rcMonitor.
+        // This is more reliable than WPF's Left/Top properties, which may be overridden
+        // by the layout system during window initialization.
+        WindowInterop.SetWindowPos(
+            hwnd,
+            new HWND(-1), // HWND_TOPMOST
+            x, y, cx, cy,
+            SET_WINDOW_POS_FLAGS.SWP_NOACTIVATE);
     }
 
     /// <summary>
@@ -183,11 +221,35 @@ public partial class Dock : AppBarWindow
         }
     }
 
+    // WndProc hook constants
+    private const int WM_WINDOWPOSCHANGING = 0x0046;
+    private static readonly int WposInsertAfterOffset = IntPtr.Size; // hwndInsertAfter follows hwnd in WINDOWPOS
+
     protected override void OnSourceInitialized(EventArgs e)
     {
         base.OnSourceInitialized(e);
-        // Window-level acrylic removed — DockContainer uses DynamicResource DockBackground
-        // for its semi-transparent fill, keeping the dock content-sized (not full-width).
+
+        // Add WS_EX_TOOLWINDOW to prevent the dock from appearing in Alt+Tab
+        var hwnd = new HWND(Handle);
+        var exStyle = WindowInterop.GetWindowLongPtr(hwnd, WINDOW_LONG_PTR_INDEX.GWL_EXSTYLE);
+        exStyle |= (nint)(WindowInterop.WS_EX_TOOLWINDOW | WindowInterop.WS_EX_NOACTIVATE);
+        WindowInterop.SetWindowLongPtr(hwnd, WINDOW_LONG_PTR_INDEX.GWL_EXSTYLE, exStyle);
+
+        UpdatePosition();
+
+        // Hook WndProc to enforce HWND_TOPMOST on any position change
+        var source = HwndSource.FromHwnd(Handle);
+        source?.AddHook(DockWndProc);
+    }
+
+    private IntPtr DockWndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if (msg == WM_WINDOWPOSCHANGING)
+        {
+            // Force HWND_TOPMOST (-1) so WPF or other windows can't push us down the z-order
+            Marshal.WriteIntPtr(lParam, WposInsertAfterOffset, (IntPtr)(-1));
+        }
+        return IntPtr.Zero;
     }
 
     /// <summary>

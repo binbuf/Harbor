@@ -1,7 +1,6 @@
-<appbar:AppBarWindow x:Class="Harbor.Shell.Dock"
+<Window x:Class="Harbor.Shell.Dock"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:appbar="clr-namespace:ManagedShell.AppBar;assembly=ManagedShell.AppBar"
         Title="Harbor Dock"
         AllowsTransparency="True"
         WindowStyle="None"
@@ -9,7 +8,7 @@
         Topmost="True"
         Background="Transparent">
 
-    <appbar:AppBarWindow.Resources>
+    <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter" />
 
         <!-- Custom tooltip style: rounded pill, 8px above icon -->
@@ -71,7 +70,7 @@
                          Visibility="{Binding IsRunning, Converter={StaticResource BoolToVisibilityConverter}}" />
             </Grid>
         </DataTemplate>
-    </appbar:AppBarWindow.Resources>
+    </Window.Resources>
 
     <Grid x:Name="DockRoot" Height="96" VerticalAlignment="Bottom">
         <!-- Auto-hide trigger zone: 6px tall, invisible, at bottom edge -->
@@ -172,4 +171,4 @@
             </StackPanel>
         </Border>
     </Grid>
-</appbar:AppBarWindow>
+</Window>

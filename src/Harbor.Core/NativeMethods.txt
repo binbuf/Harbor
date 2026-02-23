@@ -41,6 +41,8 @@ QueryPerformanceFrequency
 IsIconic
 FindWindow
 GetWindow
+EnumWindows
+IsZoomed
 
 // Keyboard Hooks
 SetWindowsHookEx

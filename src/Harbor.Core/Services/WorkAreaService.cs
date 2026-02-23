@@ -76,6 +76,7 @@ public sealed class WorkAreaService : IDisposable
 
     /// <summary>
     /// Restores the original work area. Safe to call multiple times.
+    /// After restoring, forces maximized windows to re-snap to the new work area.
     /// </summary>
     public void Restore()
     {
@@ -84,6 +85,41 @@ public sealed class WorkAreaService : IDisposable
         SetWorkArea(_originalWorkArea);
         _applied = false;
         Trace.WriteLine("[Harbor] WorkAreaService: Restored original work area.");
+
+        RestoreMaximizedWindows();
+    }
+
+    /// <summary>
+    /// Enumerates all visible, maximized, non-Harbor top-level windows and
+    /// restore+maximize them so they re-snap to the updated work area bounds.
+    /// </summary>
+    private static unsafe void RestoreMaximizedWindows()
+    {
+        var currentPid = PInvoke.GetCurrentProcessId();
+        var windows = new List<HWND>();
+
+        PInvoke.EnumWindows((hwnd, _) =>
+        {
+            if (!PInvoke.IsWindowVisible(hwnd)) return true;
+            if (!PInvoke.IsZoomed(hwnd)) return true;
+
+            // Skip our own windows
+            uint pid;
+            PInvoke.GetWindowThreadProcessId(hwnd, &pid);
+            if (pid == currentPid) return true;
+
+            windows.Add(hwnd);
+            return true;
+        }, 0);
+
+        foreach (var hwnd in windows)
+        {
+            PInvoke.ShowWindow(hwnd, SHOW_WINDOW_CMD.SW_RESTORE);
+            PInvoke.ShowWindow(hwnd, SHOW_WINDOW_CMD.SW_MAXIMIZE);
+        }
+
+        if (windows.Count > 0)
+            Trace.WriteLine($"[Harbor] WorkAreaService: Re-snapped {windows.Count} maximized window(s) to restored work area.");
     }
 
     public void Dispose()

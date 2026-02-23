@@ -44,7 +44,6 @@ public partial class App : Application
     private DockOverlapMonitorService? _overlapMonitor;
     private ExplorerSuppressionService? _explorerSuppression;
     private AppBarRegistration? _menuBarRegistration;
-    private AppBarRegistration? _dockRegistration;
     private TopMenuBar? _menuBar;
     private Dock? _dock;
 
@@ -136,14 +135,9 @@ public partial class App : Application
         _dockPinningService = new DockPinningService();
         _dockSettingsService = new DockSettingsService();
 
-        // Create and register the Dock as a bottom AppBar
-        _dock = AppBarHelper.CreateAppBar<Dock>(
-            _shellServices,
-            AppBarScreen.FromPrimaryScreen(),
-            AppBarEdge.Bottom,
-            96);
-
-        _dockRegistration = AppBarHelper.Register(_dock, AppBarEdge.Bottom);
+        // Create and show the Dock as a plain HWND_TOPMOST overlay (not an AppBar)
+        _dock = new Dock();
+        _dock.Show();
         _dock.Initialize(_shellServices.Tasks, _dockPinningService, _dockSettingsService);
 
         // Reserve screen space for the menu bar and dock via work area adjustment.
@@ -166,11 +160,11 @@ public partial class App : Application
         _fullscreenCoordinator = new FullscreenRetreatCoordinator(
             _fullscreenDetectionService, _windowEventManager, _overlayManager);
 
-        // Register AppBars on the primary monitor for retreat management
+        // Register UI elements on the primary monitor for retreat management
         var primaryMonitor = DisplayInterop.GetMonitorForWindow(
             new Windows.Win32.Foundation.HWND(_menuBar.Handle));
         _fullscreenCoordinator.RegisterAppBar(_menuBar, primaryMonitor);
-        _fullscreenCoordinator.RegisterAppBar(_dock, primaryMonitor);
+        _fullscreenCoordinator.RegisterRetreatable(_dock, primaryMonitor);
 
         // Auto-pin File Manager (explorer.exe) at front of dock
         _dockPinningService.PinAt(0, @"C:\Windows\explorer.exe", "Finder");
@@ -454,8 +448,8 @@ public partial class App : Application
         _titleBarService?.Dispose();
         _titleBarService = null;
 
-        _dockRegistration?.Dispose();
-        _dockRegistration = null;
+        _dock?.Close();
+        _dock = null;
 
         _menuBarRegistration?.Dispose();
         _menuBarRegistration = null;

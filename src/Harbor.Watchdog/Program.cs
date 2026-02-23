@@ -156,14 +156,14 @@ internal static class Program
             Console.Error.WriteLine($"[harbor-watchdog] Failed to restore animations: {ex.Message}");
         }
 
-        // Step 3: Launch explorer.exe
+        // Step 3: Restore explorer's hidden UI (or launch as fallback)
         try
         {
-            LaunchExplorer();
+            RestoreExplorer();
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"[harbor-watchdog] Failed to launch explorer: {ex.Message}");
+            Console.Error.WriteLine($"[harbor-watchdog] Failed to restore explorer: {ex.Message}");
         }
 
         // Step 4: Write crash dump
@@ -231,22 +231,43 @@ internal static class Program
         Console.WriteLine("[harbor-watchdog] Native animations restored.");
     }
 
-    private static void LaunchExplorer()
+    private static void RestoreExplorer()
     {
-        var explorerPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "explorer.exe");
-
-        if (File.Exists(explorerPath))
+        // Try to unhide explorer's taskbar windows first
+        var trayWnd = PInvoke.FindWindow("Shell_TrayWnd", null);
+        if (trayWnd != default)
         {
-            Process.Start(new ProcessStartInfo
+            PInvoke.ShowWindow(trayWnd, SHOW_WINDOW_CMD.SW_SHOW);
+            Console.WriteLine("[harbor-watchdog] Restored Shell_TrayWnd.");
+
+            // Restore secondary monitor taskbars
+            nint secondaryRaw = FindWindowExW(nint.Zero, nint.Zero, "Shell_SecondaryTrayWnd", null);
+            while (secondaryRaw != nint.Zero)
             {
-                FileName = explorerPath,
-                UseShellExecute = false,
-            });
-            Console.WriteLine("[harbor-watchdog] Launched explorer.exe as fallback shell.");
+                PInvoke.ShowWindow(new HWND(secondaryRaw), SHOW_WINDOW_CMD.SW_SHOW);
+                Console.WriteLine($"[harbor-watchdog] Restored Shell_SecondaryTrayWnd 0x{secondaryRaw:X}.");
+                secondaryRaw = FindWindowExW(nint.Zero, secondaryRaw, "Shell_SecondaryTrayWnd", null);
+            }
+
+            Console.WriteLine("[harbor-watchdog] Explorer UI restored.");
         }
         else
         {
-            Console.Error.WriteLine("[harbor-watchdog] explorer.exe not found!");
+            // Explorer isn't running — launch it as fallback
+            var explorerPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "explorer.exe");
+            if (File.Exists(explorerPath))
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = explorerPath,
+                    UseShellExecute = false,
+                });
+                Console.WriteLine("[harbor-watchdog] Explorer not found, launched explorer.exe as fallback.");
+            }
+            else
+            {
+                Console.Error.WriteLine("[harbor-watchdog] explorer.exe not found!");
+            }
         }
     }
 
@@ -307,4 +328,7 @@ internal static class Program
         long elapsed = now - timestamp;
         return (double)elapsed / Stopwatch.Frequency * 1000.0;
     }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "FindWindowExW", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+    private static extern nint FindWindowExW(nint hwndParent, nint hwndChildAfter, string? lpszClass, string? lpszWindow);
 }

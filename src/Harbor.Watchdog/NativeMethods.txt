@@ -1,3 +1,4 @@
 ShowWindow
 IsWindow
+FindWindow
 SystemParametersInfo

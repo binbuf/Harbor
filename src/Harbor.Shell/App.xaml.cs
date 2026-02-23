@@ -41,6 +41,7 @@ public partial class App : Application
     private WallpaperService? _wallpaperService;
     private DesktopBackgroundWindow? _desktopBackground;
     private DockOverlapMonitorService? _overlapMonitor;
+    private ExplorerSuppressionService? _explorerSuppression;
     private AppBarRegistration? _menuBarRegistration;
     private AppBarRegistration? _dockRegistration;
     private TopMenuBar? _menuBar;
@@ -67,13 +68,14 @@ public partial class App : Application
         // Launch watchdog process
         LaunchWatchdog();
 
-        // Load shell settings and kill explorer.exe if configured
+        // Load shell settings and suppress explorer's UI if configured
         _shellSettingsService = new ShellSettingsService();
         if (_shellSettingsService.ReplaceExplorer)
         {
-            KillExplorer();
+            _explorerSuppression = new ExplorerSuppressionService();
+            _explorerSuppression.Suppress();
 
-            // Render the desktop wallpaper to prevent black screen
+            // Render the desktop wallpaper to cover explorer's desktop
             _wallpaperService = new WallpaperService();
             _desktopBackground = new DesktopBackgroundWindow();
             _desktopBackground.Show();
@@ -310,7 +312,7 @@ public partial class App : Application
 
         if (_shellSettingsService?.ReplaceExplorer == true)
         {
-            CrashRecoveryService.LaunchExplorer();
+            _explorerSuppression?.Restore();
         }
     }
 
@@ -367,43 +369,6 @@ public partial class App : Application
         catch (Exception ex)
         {
             Trace.WriteLine($"[Harbor] App: Failed to launch watchdog: {ex.Message}");
-        }
-    }
-
-    /// <summary>
-    /// Gracefully exits the explorer shell by posting WM_QUIT to its tray window.
-    /// This prevents Windows from auto-restarting explorer (unlike killing the process).
-    /// </summary>
-    private static void KillExplorer()
-    {
-        const uint WM_QUIT = 0x0012;
-
-        try
-        {
-            var trayWnd = global::Windows.Win32.PInvoke.FindWindow("Shell_TrayWnd", null);
-            if (trayWnd != default)
-            {
-                WindowInterop.PostMessage(trayWnd, WM_QUIT, 0, 0);
-                Trace.WriteLine("[Harbor] App: Posted WM_QUIT to Shell_TrayWnd.");
-
-                // Wait for explorer to exit
-                var processes = Process.GetProcessesByName("explorer");
-                foreach (var proc in processes)
-                {
-                    proc.WaitForExit(3000);
-                    proc.Dispose();
-                }
-
-                Trace.WriteLine("[Harbor] App: Explorer shell exited.");
-            }
-            else
-            {
-                Trace.WriteLine("[Harbor] App: Shell_TrayWnd not found — explorer may not be running.");
-            }
-        }
-        catch (Exception ex)
-        {
-            Trace.WriteLine($"[Harbor] App: Failed to exit explorer: {ex.Message}");
         }
     }
 
@@ -531,11 +496,9 @@ public partial class App : Application
         TaskScheduler.UnobservedTaskException -= OnUnobservedTaskException;
         DispatcherUnhandledException -= OnDispatcherUnhandledException;
 
-        // Restart explorer.exe if we killed it on startup
-        if (_shellSettingsService?.ReplaceExplorer == true)
-        {
-            CrashRecoveryService.LaunchExplorer();
-        }
+        // Restore explorer's UI if we suppressed it on startup
+        _explorerSuppression?.Dispose();
+        _explorerSuppression = null;
 
         _shellSettingsService?.Dispose();
         _shellSettingsService = null;

@@ -30,8 +30,8 @@ public static class CrashRecoveryService
         try { RestoreNativeAnimations(); }
         catch (Exception ex) { Trace.WriteLine($"[Harbor] CrashRecoveryService: Failed to restore animations: {ex.Message}"); }
 
-        try { LaunchExplorer(); }
-        catch (Exception ex) { Trace.WriteLine($"[Harbor] CrashRecoveryService: Failed to launch explorer: {ex.Message}"); }
+        try { RestoreExplorer(); }
+        catch (Exception ex) { Trace.WriteLine($"[Harbor] CrashRecoveryService: Failed to restore explorer: {ex.Message}"); }
 
         try { WriteCrashDump(exception); }
         catch (Exception ex) { Trace.WriteLine($"[Harbor] CrashRecoveryService: Failed to write crash dump: {ex.Message}"); }
@@ -95,24 +95,34 @@ public static class CrashRecoveryService
     }
 
     /// <summary>
-    /// Launches explorer.exe as a fallback shell.
+    /// Restores explorer's hidden UI elements. Falls back to launching explorer.exe
+    /// if Shell_TrayWnd is not found (explorer somehow died on its own).
     /// </summary>
-    public static void LaunchExplorer()
+    public static void RestoreExplorer()
     {
-        var explorerPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "explorer.exe");
-
-        if (File.Exists(explorerPath))
+        var trayWnd = Windows.Win32.PInvoke.FindWindow("Shell_TrayWnd", null);
+        if (trayWnd != default)
         {
-            Process.Start(new ProcessStartInfo
-            {
-                FileName = explorerPath,
-                UseShellExecute = true,
-            });
-            Trace.WriteLine("[Harbor] CrashRecoveryService: Launched explorer.exe as fallback shell.");
+            ExplorerSuppressionService.RestoreExplorer();
+            Trace.WriteLine("[Harbor] CrashRecoveryService: Restored explorer UI.");
         }
         else
         {
-            Trace.WriteLine("[Harbor] CrashRecoveryService: explorer.exe not found!");
+            // Explorer somehow died — launch it as fallback
+            var explorerPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "explorer.exe");
+            if (File.Exists(explorerPath))
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = explorerPath,
+                    UseShellExecute = true,
+                });
+                Trace.WriteLine("[Harbor] CrashRecoveryService: Explorer not found, launched explorer.exe as fallback.");
+            }
+            else
+            {
+                Trace.WriteLine("[Harbor] CrashRecoveryService: explorer.exe not found!");
+            }
         }
     }
 

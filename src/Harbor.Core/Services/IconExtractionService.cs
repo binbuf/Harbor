@@ -20,6 +20,7 @@ public class IconExtractionService
     private readonly Dictionary<string, CacheEntry> _cache = new(StringComparer.OrdinalIgnoreCase);
     private readonly object _cacheLock = new();
     private readonly ImageSource _defaultIcon;
+    private ImageSource? _appsLauncherIcon;
 
     public IconExtractionService()
     {
@@ -31,10 +32,19 @@ public class IconExtractionService
     /// Gets the icon for an executable path with caching and fallback chain.
     /// Returns a frozen ImageSource safe for use on any thread.
     /// </summary>
+    /// <summary>
+    /// Sentinel path used by the dock for the Apps launcher icon.
+    /// </summary>
+    public const string AppsLauncherSentinel = "harbor:apps-launcher";
+
     public ImageSource GetIcon(string? exePath)
     {
         if (string.IsNullOrWhiteSpace(exePath))
             return _defaultIcon;
+
+        // Special-case: return built-in grid icon for the Apps launcher
+        if (string.Equals(exePath, AppsLauncherSentinel, StringComparison.OrdinalIgnoreCase))
+            return _appsLauncherIcon ??= CreateAppsLauncherIcon();
 
         // Check cache (with timestamp invalidation)
         lock (_cacheLock)
@@ -284,6 +294,44 @@ public class IconExtractionService
                 new Rect(14, 14, 20, 18), 2, 2);
 
             ctx.DrawLine(new Pen(whiteBrush, 1.5), new Point(14, 20), new Point(34, 20));
+        }
+
+        var renderTarget = new RenderTargetBitmap(48, 48, 96, 96, PixelFormats.Pbgra32);
+        renderTarget.Render(visual);
+        renderTarget.Freeze();
+        return renderTarget;
+    }
+
+    /// <summary>
+    /// Creates a macOS Launchpad-style 4x4 grid icon for the Apps launcher.
+    /// </summary>
+    private static ImageSource CreateAppsLauncherIcon()
+    {
+        var visual = new DrawingVisual();
+        const double size = 48;
+        const int gridSize = 4;
+        const double padding = 6;
+        const double spacing = 2;
+        const double available = size - padding * 2;
+        const double cellSize = (available - spacing * (gridSize - 1)) / gridSize;
+        const double cornerRadius = 2.0;
+
+        using (var ctx = visual.RenderOpen())
+        {
+            for (int row = 0; row < gridSize; row++)
+            {
+                for (int col = 0; col < gridSize; col++)
+                {
+                    var x = padding + col * (cellSize + spacing);
+                    var y = padding + row * (cellSize + spacing);
+
+                    var brush = new SolidColorBrush(Color.FromRgb(0xCC, 0xCC, 0xCC));
+                    brush.Freeze();
+                    ctx.DrawRoundedRectangle(brush, null,
+                        new Rect(x, y, cellSize, cellSize),
+                        cornerRadius, cornerRadius);
+                }
+            }
         }
 
         var renderTarget = new RenderTargetBitmap(48, 48, 96, 96, PixelFormats.Pbgra32);

@@ -46,6 +46,8 @@ public partial class App : Application
     private AppBarRegistration? _menuBarRegistration;
     private TopMenuBar? _menuBar;
     private Dock? _dock;
+    private InstalledAppService? _installedAppService;
+    private AppsLauncherWindow? _appsLauncher;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -169,6 +171,9 @@ public partial class App : Application
         // Auto-pin File Manager (explorer.exe) at front of dock
         _dockPinningService.PinAt(0, @"C:\Windows\explorer.exe", "Finder");
 
+        // Auto-pin Apps launcher at position 1 (after Finder)
+        _dockPinningService.PinAt(1, IconExtractionService.AppsLauncherSentinel, "Apps");
+
         // Create keyboard hook and hotkey services
         _lowLevelKeyboardHook = new LowLevelKeyboardHookService();
         _windowCycleService = new WindowCycleService(_lowLevelKeyboardHook, _shellServices.Tasks);
@@ -184,6 +189,14 @@ public partial class App : Application
             Dispatcher.Invoke(() => _appSwitcherOverlay.UpdateSelectedIndex(index));
         _appSwitcherService.HideRequested += () =>
             Dispatcher.Invoke(() => _appSwitcherOverlay.Hide());
+
+        // Create installed app service and apps launcher
+        _installedAppService = new InstalledAppService(iconService);
+        _ = _installedAppService.ScanAsync(); // fire-and-forget background scan
+
+        _appsLauncher = new AppsLauncherWindow(_installedAppService);
+        _appsLauncher.Show(); // Show once to get HWND, then collapse via OnSourceInitialized
+        _dock.SetAppsLauncher(_appsLauncher);
 
         // Create system tray icon
         _harborTrayIcon = new HarborTrayIcon(_dockSettingsService, _shellSettingsService);
@@ -413,6 +426,12 @@ public partial class App : Application
         // Dispose new services in reverse order of creation
         _recycleBinService?.Dispose();
         _recycleBinService = null;
+
+        _appsLauncher?.Close();
+        _appsLauncher = null;
+
+        _installedAppService?.Dispose();
+        _installedAppService = null;
 
         _harborTrayIcon?.Dispose();
         _harborTrayIcon = null;

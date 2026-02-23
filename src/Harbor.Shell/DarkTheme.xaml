@@ -51,4 +51,10 @@
     <SolidColorBrush x:Key="SettingsToggleOffBackground" Color="#555555" />
     <SolidColorBrush x:Key="SettingsCardBackground" Color="#FF2A2A2A" />
 
+    <!-- Apps Launcher -->
+    <SolidColorBrush x:Key="AppsLauncherBackground" Color="#CC1E1E1E" />
+    <SolidColorBrush x:Key="AppsLauncherSearchBackground" Color="#33FFFFFF" />
+    <SolidColorBrush x:Key="AppsLauncherSearchForeground" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="AppsLauncherLabelForeground" Color="#FFFFFF" />
+
 </ResourceDictionary>

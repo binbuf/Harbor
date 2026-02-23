@@ -34,6 +34,9 @@ public partial class Dock : Window, IRetreatable
     // Recycle bin
     private RecycleBinService? _recycleBinService;
 
+    // Apps launcher
+    private AppsLauncherWindow? _appsLauncher;
+
     // Drag reorder state
     private Point _dragStartPoint;
     private DockItem? _dragItem;
@@ -369,6 +372,13 @@ public partial class Dock : Window, IRetreatable
 
         if (element.DataContext is not DockItem dockItem)
             return;
+
+        // Special handling for the Apps launcher sentinel
+        if (string.Equals(dockItem.ExecutablePath, IconExtractionService.AppsLauncherSentinel, StringComparison.OrdinalIgnoreCase))
+        {
+            _appsLauncher?.Toggle();
+            return;
+        }
 
         // If launching a pinned non-running app, trigger bounce
         if (dockItem.IsPinned && !dockItem.IsRunning)
@@ -1022,6 +1032,11 @@ public partial class Dock : Window, IRetreatable
     #endregion
 
     #region Trash / Recycle Bin
+
+    public void SetAppsLauncher(AppsLauncherWindow launcher)
+    {
+        _appsLauncher = launcher;
+    }
 
     public void SetRecycleBinService(RecycleBinService service)
     {

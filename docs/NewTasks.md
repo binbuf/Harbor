@@ -5,12 +5,13 @@
     - New Window
     - Show All Windows
     - Hide
-  - The dock is currently reserving too much space on the bottom. It should be about 3x closer to the bottom then it currently is (e.g. if it's 100px from bottom it should be 30px).
-  - Magnification setting is overclipping the iconand the top can't be see now as the icon grows beyond the background but then is visually clipped.
+  - Magnification is not animating quite the way MacOS would do it
   - Long holding left click should bring up the context menu like short right clicking
   - Magnification only seems to work on trash icon and now all icons. It also doesn't zoom up the neighbors like the real MacOS dock effect does.
   - Dock should allow to move the icons around by long left clicking then dragging to a new location in the dock
   - Dock auto-hide from settings doesn't work right. "When overlapped" just hides the dock and it doesn't come up regardless if there is an app in the reservation area or not. "Always" never brings the dock up if your mouse is by it.
+- Desktop
+  - Allow icons and clicking the desktop again
 - Dock & Top Menu
   - 
 - Top Menu

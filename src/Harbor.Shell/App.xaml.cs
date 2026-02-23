@@ -74,11 +74,14 @@ public partial class App : Application
         // Create wallpaper service (needed for dynamic menu bar color and desktop background)
         _wallpaperService = new WallpaperService();
 
+        // Always hide the Windows taskbar so its AppBar reservation is released.
+        // This lets ManagedShell position Harbor's dock at the true screen bottom.
+        // The taskbar is restored on exit (Dispose/ProcessExit).
+        _explorerSuppression = new ExplorerSuppressionService();
+        _explorerSuppression.Suppress();
+
         if (_shellSettingsService.ReplaceExplorer)
         {
-            _explorerSuppression = new ExplorerSuppressionService();
-            _explorerSuppression.Suppress();
-
             // Render the desktop wallpaper to cover explorer's desktop
             _desktopBackground = new DesktopBackgroundWindow();
             _desktopBackground.Show();
@@ -138,18 +141,16 @@ public partial class App : Application
             _shellServices,
             AppBarScreen.FromPrimaryScreen(),
             AppBarEdge.Bottom,
-            86);
+            96);
 
         _dockRegistration = AppBarHelper.Register(_dock, AppBarEdge.Bottom);
         _dock.Initialize(_shellServices.Tasks, _dockPinningService, _dockSettingsService);
 
         // Reserve screen space for the menu bar and dock via work area adjustment.
-        // SHAppBarMessage can't work without explorer, so we do it manually.
-        if (_shellSettingsService.ReplaceExplorer)
-        {
-            _workAreaService = new WorkAreaService();
-            _workAreaService.Apply(topInset: 24, bottomInset: 58);
-        }
+        // This overrides any existing reservation (e.g. the Windows taskbar) so that
+        // Harbor's bars own the screen edges. The original work area is restored on exit.
+        _workAreaService = new WorkAreaService();
+        _workAreaService.Apply(topInset: 24, bottomInset: 58);
 
         // Apply initial auto-hide mode
         ApplyAutoHideMode(_dockSettingsService.AutoHideMode);
@@ -335,11 +336,7 @@ public partial class App : Application
         Trace.WriteLine("[Harbor] App: ProcessExit fired.");
 
         _workAreaService?.Restore();
-
-        if (_shellSettingsService?.ReplaceExplorer == true)
-        {
-            _explorerSuppression?.Restore();
-        }
+        _explorerSuppression?.Restore();
     }
 
     private void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)

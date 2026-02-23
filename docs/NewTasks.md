@@ -10,14 +10,15 @@
   - Long holding left click should bring up the context menu like short right clicking
   - Magnification only seems to work on trash icon and now all icons. It also doesn't zoom up the neighbors like the real MacOS dock effect does.
   - Dock should allow to move the icons around by long left clicking then dragging to a new location in the dock
+  - Dock auto-hide from settings doesn't work right. "When overlapped" just hides the dock and it doesn't come up regardless if there is an app in the reservation area or not. "Always" never brings the dock up if your mouse is by it.
 - Dock & Top Menu
   - 
 - Top Menu
   - The calendar popup doesn't show up below the calendar area in the top menu. It showed up on a differnt monitor but in the area where it should be if the top menu was on that monitor.
   - The calendar popup doesn't look like the big boxy flyout of Windows 10 era, improve the UI of it. 
   - I don't see any top menu menu ever appear or work for any apps at all. 
+  - Surpress volume/sound, removable disk, network, bluetooth system menus with our own custom menus that resemble MacOS Tahoe.
 - Settings
-  - Dock auto-hide doesn't work right. "When overlapped" just hides the dock and it doesn't come up regardless if there is an app in the reservation area or not. "Always" never brings the dock up if your mouse is by it.
   - Do we need to remove explorer.exe or represent the option? I think our design was updated to use explorer instead of removing it. Deeply review the changes to the codebase and also update docs/Design.md as needed.
   -Icon size doesn't appear to actually work
 - General

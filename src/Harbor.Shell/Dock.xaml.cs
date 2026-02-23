@@ -63,13 +63,13 @@ public partial class Dock : AppBarWindow
     public static readonly Duration HideAnimationDuration = new(TimeSpan.FromMilliseconds(200));
 
     // Dock layout constants
-    public const double DockWindowHeight = 86.0;   // AppBar window height (includes magnification headroom)
-    public const double DockVisibleHeight = 62.0;   // Visible pill height for slide animations
+    public const double DockWindowHeight = 96.0;   // AppBar window height (includes magnification headroom)
+    public const double DockVisibleHeight = 68.0;   // Visible pill height for slide animations
 
     // Magnification constants
     public const double MagnificationMaxScale = 1.5;
     public const double MagnificationEffectRadius = 3.0;
-    public const double MagnificationIconPitch = 56.0; // 48 + 8 margin
+    public const double MagnificationIconPitch = 60.0; // 48 + 12 margin
 
     // Easing functions matching the spec cubic-bezier curves
     private static readonly IEasingFunction EaseOut = new QuadraticEase { EasingMode = EasingMode.EaseOut };
@@ -1076,7 +1076,7 @@ public partial class Dock : AppBarWindow
         if (_itemManager is null) return;
 
         var pos = e.GetPosition(PinnedIconsControl);
-        var itemWidth = 56.0; // 48 icon + 4+4 margin
+        var itemWidth = 60.0; // 48 icon + 6+6 margin
         var newIndex = Math.Clamp((int)(pos.X / itemWidth), 0, _itemManager.PinnedItems.Count - 1);
         _dragTargetIndex = newIndex;
     }

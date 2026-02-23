@@ -2,14 +2,16 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Windows.Win32;
 using Windows.Win32.Foundation;
+using Windows.Win32.Graphics.Gdi;
 using Windows.Win32.UI.WindowsAndMessaging;
 
 namespace Harbor.Core.Services;
 
 /// <summary>
 /// Manually reserves screen space for AppBars by adjusting the Windows work area
-/// via SystemParametersInfo(SPI_SETWORKAREA). This is needed because SHAppBarMessage
-/// requires explorer.exe to be running, and Harbor kills explorer on startup.
+/// via SystemParametersInfo(SPI_SETWORKAREA). Computes from the full primary monitor
+/// bounds so that any existing reservations (e.g. the Windows taskbar) are overridden.
+/// The original work area is saved on first Apply and restored on Dispose/Restore.
 /// </summary>
 public sealed class WorkAreaService : IDisposable
 {
@@ -17,12 +19,13 @@ public sealed class WorkAreaService : IDisposable
     private const uint SPI_SETWORKAREA = 0x002F;
 
     private RECT _originalWorkArea;
+    private RECT _screenBounds;
     private bool _applied;
     private bool _disposed;
 
     /// <summary>
-    /// Captures the current work area and applies a reduced work area
-    /// accounting for the menu bar and dock.
+    /// Captures the current work area, reads the full primary monitor bounds,
+    /// and applies a work area that reserves space only for Harbor's bars.
     /// </summary>
     /// <param name="topInset">Pixels reserved at the top (menu bar height).</param>
     /// <param name="bottomInset">Pixels reserved at the bottom (dock height).</param>
@@ -30,17 +33,21 @@ public sealed class WorkAreaService : IDisposable
     {
         if (_applied) return;
 
-        // Save the original work area
+        // Save the original work area (includes taskbar reservation) so we can restore it
         _originalWorkArea = GetWorkArea();
         Trace.WriteLine($"[Harbor] WorkAreaService: Original work area: L={_originalWorkArea.left} T={_originalWorkArea.top} R={_originalWorkArea.right} B={_originalWorkArea.bottom}");
 
-        // Apply reduced work area
+        // Get the full primary monitor bounds (ignoring any AppBar reservations)
+        _screenBounds = GetPrimaryMonitorBounds();
+        Trace.WriteLine($"[Harbor] WorkAreaService: Screen bounds: L={_screenBounds.left} T={_screenBounds.top} R={_screenBounds.right} B={_screenBounds.bottom}");
+
+        // Compute from full screen bounds, not the current work area
         var reduced = new RECT
         {
-            left = _originalWorkArea.left,
-            top = _originalWorkArea.top + topInset,
-            right = _originalWorkArea.right,
-            bottom = _originalWorkArea.bottom - bottomInset,
+            left = _screenBounds.left,
+            top = _screenBounds.top + topInset,
+            right = _screenBounds.right,
+            bottom = _screenBounds.bottom - bottomInset,
         };
 
         SetWorkArea(reduced);
@@ -57,10 +64,10 @@ public sealed class WorkAreaService : IDisposable
 
         var reduced = new RECT
         {
-            left = _originalWorkArea.left,
-            top = _originalWorkArea.top + topInset,
-            right = _originalWorkArea.right,
-            bottom = _originalWorkArea.bottom - bottomInset,
+            left = _screenBounds.left,
+            top = _screenBounds.top + topInset,
+            right = _screenBounds.right,
+            bottom = _screenBounds.bottom - bottomInset,
         };
 
         SetWorkArea(reduced);
@@ -104,5 +111,17 @@ public sealed class WorkAreaService : IDisposable
             0,
             &rect,
             SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS.SPIF_SENDCHANGE);
+    }
+
+    /// <summary>
+    /// Gets the full bounds of the primary monitor (rcMonitor, not rcWork).
+    /// </summary>
+    private static RECT GetPrimaryMonitorBounds()
+    {
+        // MONITOR_DEFAULTTOPRIMARY = 1
+        var hMonitor = PInvoke.MonitorFromWindow(HWND.Null, MONITOR_FROM_FLAGS.MONITOR_DEFAULTTOPRIMARY);
+        var info = new MONITORINFO { cbSize = (uint)Marshal.SizeOf<MONITORINFO>() };
+        PInvoke.GetMonitorInfo(hMonitor, ref info);
+        return info.rcMonitor;
     }
 }

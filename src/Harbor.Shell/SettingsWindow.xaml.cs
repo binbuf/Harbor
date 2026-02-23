@@ -1,3 +1,5 @@
+using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using Harbor.Core.Services;
@@ -12,11 +14,17 @@ public partial class SettingsWindow : Window
 
     private static SettingsWindow? _instance;
 
+    // Map sidebar index to panel
+    private readonly ScrollViewer[] _panels;
+
     private SettingsWindow(DockSettingsService dockSettings, ShellSettingsService shellSettings)
     {
         _dockSettings = dockSettings;
         _shellSettings = shellSettings;
         InitializeComponent();
+
+        _panels = [GeneralPanel, AppearancePanel, DockPanel, MenuBarPanel, DesktopPanel, AboutPanel];
+
         LoadCurrentSettings();
     }
 
@@ -40,14 +48,85 @@ public partial class SettingsWindow : Window
     {
         _loading = true;
 
+        // General
+        ReplaceExplorerToggle.IsChecked = _shellSettings.ReplaceExplorer;
+
+        // Appearance
+        ThemeCombo.SelectedIndex = _shellSettings.ThemeOverride switch
+        {
+            "light" => 1,
+            "dark" => 2,
+            _ => 0, // auto
+        };
+
+        // Dock
         AutoHideModeCombo.SelectedIndex = (int)_dockSettings.AutoHideMode;
         IconSizeSlider.Value = _dockSettings.IconSize;
         IconSizeLabel.Text = $"Icon size: {_dockSettings.IconSize} px";
-        MagnificationCheckBox.IsChecked = _dockSettings.MagnificationEnabled;
-        ReplaceExplorerCheckBox.IsChecked = _shellSettings.ReplaceExplorer;
+        MagnificationToggle.IsChecked = _dockSettings.MagnificationEnabled;
+        AnimateOpeningAppsToggle.IsChecked = _shellSettings.AnimateOpeningApps;
+        ShowRecentAppsToggle.IsChecked = _shellSettings.ShowRecentApps;
+
+        // Menu Bar
+        ShowAppMenuItemsToggle.IsChecked = _shellSettings.ShowAppMenuItems;
+        MenuBarTranslucencyToggle.IsChecked = _shellSettings.MenuBarTranslucency;
+        ShowDayOfWeekToggle.IsChecked = _shellSettings.ShowDayOfWeek;
+        Use24HourClockToggle.IsChecked = _shellSettings.Use24HourClock;
+        ShowSecondsToggle.IsChecked = _shellSettings.ShowSeconds;
+
+        // Desktop
+        ShowDesktopIconsToggle.IsChecked = _shellSettings.ShowDesktopIcons;
+
+        // About
+        var version = Assembly.GetExecutingAssembly().GetName().Version;
+        VersionText.Text = $"Version {version?.ToString(3) ?? "0.0.0"}";
+        DotNetVersionText.Text = $".NET {RuntimeInformation.FrameworkDescription}";
+        SystemInfoText.Text = $"{RuntimeInformation.OSDescription} ({RuntimeInformation.OSArchitecture})";
 
         _loading = false;
     }
+
+    #region Category Navigation
+
+    private void CategoryList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_panels is null) return;
+
+        var index = CategoryList.SelectedIndex;
+        for (int i = 0; i < _panels.Length; i++)
+        {
+            _panels[i].Visibility = i == index ? Visibility.Visible : Visibility.Collapsed;
+        }
+    }
+
+    #endregion
+
+    #region General
+
+    private void ReplaceExplorerToggle_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_loading) return;
+        _shellSettings.ReplaceExplorer = ReplaceExplorerToggle.IsChecked == true;
+    }
+
+    #endregion
+
+    #region Appearance
+
+    private void ThemeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_loading) return;
+        _shellSettings.ThemeOverride = ThemeCombo.SelectedIndex switch
+        {
+            1 => "light",
+            2 => "dark",
+            _ => "auto",
+        };
+    }
+
+    #endregion
+
+    #region Dock
 
     private void AutoHideModeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
@@ -60,18 +139,71 @@ public partial class SettingsWindow : Window
         if (_loading) return;
         var size = (int)IconSizeSlider.Value;
         _dockSettings.IconSize = size;
-        IconSizeLabel.Text = $"Icon size: {size} px";
+        if (IconSizeLabel is not null)
+            IconSizeLabel.Text = $"Icon size: {size} px";
     }
 
-    private void MagnificationCheckBox_Changed(object sender, RoutedEventArgs e)
+    private void MagnificationToggle_Changed(object sender, RoutedEventArgs e)
     {
         if (_loading) return;
-        _dockSettings.MagnificationEnabled = MagnificationCheckBox.IsChecked == true;
+        _dockSettings.MagnificationEnabled = MagnificationToggle.IsChecked == true;
     }
 
-    private void ReplaceExplorerCheckBox_Changed(object sender, RoutedEventArgs e)
+    private void AnimateOpeningAppsToggle_Changed(object sender, RoutedEventArgs e)
     {
         if (_loading) return;
-        _shellSettings.ReplaceExplorer = ReplaceExplorerCheckBox.IsChecked == true;
+        _shellSettings.AnimateOpeningApps = AnimateOpeningAppsToggle.IsChecked == true;
     }
+
+    private void ShowRecentAppsToggle_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_loading) return;
+        _shellSettings.ShowRecentApps = ShowRecentAppsToggle.IsChecked == true;
+    }
+
+    #endregion
+
+    #region Menu Bar
+
+    private void ShowAppMenuItemsToggle_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_loading) return;
+        _shellSettings.ShowAppMenuItems = ShowAppMenuItemsToggle.IsChecked == true;
+    }
+
+    private void MenuBarTranslucencyToggle_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_loading) return;
+        _shellSettings.MenuBarTranslucency = MenuBarTranslucencyToggle.IsChecked == true;
+    }
+
+    private void ShowDayOfWeekToggle_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_loading) return;
+        _shellSettings.ShowDayOfWeek = ShowDayOfWeekToggle.IsChecked == true;
+    }
+
+    private void Use24HourClockToggle_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_loading) return;
+        _shellSettings.Use24HourClock = Use24HourClockToggle.IsChecked == true;
+    }
+
+    private void ShowSecondsToggle_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_loading) return;
+        _shellSettings.ShowSeconds = ShowSecondsToggle.IsChecked == true;
+    }
+
+    #endregion
+
+    #region Desktop
+
+    private void ShowDesktopIconsToggle_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_loading) return;
+        _shellSettings.ShowDesktopIcons = ShowDesktopIconsToggle.IsChecked == true;
+    }
+
+    #endregion
 }

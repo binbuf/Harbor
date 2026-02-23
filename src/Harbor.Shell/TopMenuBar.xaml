@@ -22,7 +22,9 @@
             <Border DockPanel.Dock="Right"
                     x:Name="ClockContainer"
                     Margin="0,0,12,0"
-                    VerticalAlignment="Stretch">
+                    VerticalAlignment="Stretch"
+                    Cursor="Hand"
+                    MouseLeftButtonUp="Clock_Click">
                 <TextBlock x:Name="ClockText"
                            VerticalAlignment="Center"
                            Foreground="{DynamicResource MenuBarTextBrush}"

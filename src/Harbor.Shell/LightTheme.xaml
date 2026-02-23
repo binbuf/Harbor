@@ -22,8 +22,33 @@
     <SolidColorBrush x:Key="AppSwitcherForeground" Color="#000000" />
     <SolidColorBrush x:Key="AppSwitcherAccentBrush" Color="#0078D4" />
 
+    <!-- Context Menu (macOS Tahoe) -->
+    <SolidColorBrush x:Key="ContextMenuBackground" Color="#E8F6F6F6" />
+    <SolidColorBrush x:Key="ContextMenuBorderBrush" Color="#D1D1D1" />
+    <SolidColorBrush x:Key="ContextMenuForeground" Color="#000000" />
+    <SolidColorBrush x:Key="ContextMenuItemHoverBackground" Color="#200078D4" />
+    <SolidColorBrush x:Key="ContextMenuSeparatorBrush" Color="#1F000000" />
+
+    <!-- Calendar Flyout -->
+    <SolidColorBrush x:Key="FlyoutBackground" Color="#E8F6F6F6" />
+    <SolidColorBrush x:Key="FlyoutBorderBrush" Color="#D1D1D1" />
+    <SolidColorBrush x:Key="FlyoutHeaderForeground" Color="#000000" />
+    <SolidColorBrush x:Key="CalendarDayHoverBackground" Color="#200078D4" />
+    <SolidColorBrush x:Key="CalendarSelectedBackground" Color="#0078D4" />
+    <SolidColorBrush x:Key="CalendarTodayBackground" Color="#E0E0E0" />
+
     <!-- Settings Window -->
     <SolidColorBrush x:Key="SettingsBackground" Color="#FFF6F6F6" />
     <SolidColorBrush x:Key="SettingsTextBrush" Color="#000000" />
+    <SolidColorBrush x:Key="SettingsSidebarBackground" Color="#FFECECEC" />
+    <SolidColorBrush x:Key="SettingsSidebarSelectedBackground" Color="#200078D4" />
+    <SolidColorBrush x:Key="SettingsSidebarHoverBackground" Color="#14000000" />
+    <SolidColorBrush x:Key="SettingsSidebarTextBrush" Color="#000000" />
+    <SolidColorBrush x:Key="SettingsContentBackground" Color="#FFF6F6F6" />
+    <SolidColorBrush x:Key="SettingsDividerBrush" Color="#1F000000" />
+    <SolidColorBrush x:Key="SettingsSecondaryTextBrush" Color="#80000000" />
+    <SolidColorBrush x:Key="SettingsToggleAccentBrush" Color="#0078D4" />
+    <SolidColorBrush x:Key="SettingsToggleOffBackground" Color="#CCCCCC" />
+    <SolidColorBrush x:Key="SettingsCardBackground" Color="#FFFFFFFF" />
 
 </ResourceDictionary>

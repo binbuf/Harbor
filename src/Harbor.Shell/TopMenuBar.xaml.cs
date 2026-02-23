@@ -21,8 +21,10 @@ public partial class TopMenuBar : AppBarWindow
 {
     private ForegroundWindowService? _foregroundService;
     private GlobalMenuBarService? _globalMenuService;
+    private ShellSettingsService? _shellSettings;
     private NotificationArea? _notificationArea;
     private DispatcherTimer? _clockTimer;
+    private CalendarFlyout? _calendarFlyout;
 
     // Hover animation colors — updated on theme change
     private static readonly SolidColorBrush TransparentBrush = new(Colors.Transparent);
@@ -35,8 +37,15 @@ public partial class TopMenuBar : AppBarWindow
     public const uint DarkAcrylicColor = 0xCC1E1E1E;  // #1E1E1E @ 80%
     public const uint LightAcrylicColor = 0xCCF6F6F6; // #F6F6F6 @ 80%
 
+    // Solid fallback colors (fully opaque, no acrylic)
+    public const uint DarkSolidColor = 0xFF1E1E1E;
+    public const uint LightSolidColor = 0xFFF6F6F6;
+
     private Color _hoverColor = DarkHoverColor;
     private Color _pressedColor = DarkPressedColor;
+
+    // Clock format string, rebuilt when settings change
+    private string _clockFormat = "ddd MMM d  h:mm tt";
 
     public TopMenuBar(
         AppBarManager appBarManager,
@@ -79,6 +88,88 @@ public partial class TopMenuBar : AppBarWindow
             _globalMenuService.UpdateForWindow(_foregroundService.ActiveWindowHandle);
 
         StartClock();
+    }
+
+    /// <summary>
+    /// Connects ShellSettingsService for configurable appearance options.
+    /// Call after Initialize().
+    /// </summary>
+    public void ConnectSettings(ShellSettingsService shellSettings)
+    {
+        _shellSettings = shellSettings;
+        _shellSettings.SettingsChanged += OnShellSettingsChanged;
+        ApplySettingsToUI();
+    }
+
+    private void OnShellSettingsChanged(object? sender, EventArgs e)
+    {
+        Dispatcher.Invoke(ApplySettingsToUI);
+    }
+
+    private void ApplySettingsToUI()
+    {
+        if (_shellSettings is null) return;
+
+        // Update clock format
+        RebuildClockFormat();
+        UpdateClock();
+
+        // Toggle menu items visibility
+        MenuItemsControl.Visibility = _shellSettings.ShowAppMenuItems
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+
+        // Toggle translucency
+        ApplyTranslucency(ThemeService.ReadThemeFromRegistry());
+    }
+
+    private void RebuildClockFormat()
+    {
+        if (_shellSettings is null)
+        {
+            _clockFormat = "ddd MMM d  h:mm tt";
+            return;
+        }
+
+        var parts = new List<string>();
+
+        if (_shellSettings.ShowDayOfWeek)
+            parts.Add("ddd");
+
+        parts.Add("MMM d");
+
+        string timePart;
+        if (_shellSettings.Use24HourClock)
+        {
+            timePart = _shellSettings.ShowSeconds ? "HH:mm:ss" : "HH:mm";
+        }
+        else
+        {
+            timePart = _shellSettings.ShowSeconds ? "h:mm:ss tt" : "h:mm tt";
+        }
+
+        // Join date parts with space, then double-space before time
+        _clockFormat = string.Join(" ", parts) + "  " + timePart;
+    }
+
+    /// <summary>
+    /// Applies translucency or solid background based on settings.
+    /// </summary>
+    private void ApplyTranslucency(AppTheme theme)
+    {
+        if (_shellSettings?.MenuBarTranslucency == true)
+        {
+            ApplyThemedAcrylic(theme);
+        }
+        else
+        {
+            // Disable acrylic, use solid background
+            var hwnd = new WindowInteropHelper(this).Handle;
+            if (hwnd == IntPtr.Zero) return;
+
+            var solidColor = theme == AppTheme.Light ? LightSolidColor : DarkSolidColor;
+            CompositionInterop.EnableAcrylic(new HWND(hwnd), solidColor);
+        }
     }
 
     protected override void OnSourceInitialized(EventArgs e)
@@ -154,15 +245,43 @@ public partial class TopMenuBar : AppBarWindow
 
     private void UpdateClock()
     {
-        ClockText.Text = FormatClock(DateTime.Now);
+        ClockText.Text = FormatClock(DateTime.Now, _clockFormat);
     }
 
     /// <summary>
-    /// Formats a DateTime for the menu bar clock display using Windows regional settings.
+    /// Formats a DateTime for the menu bar clock display.
+    /// </summary>
+    public static string FormatClock(DateTime time, string format = "ddd MMM d  h:mm tt")
+    {
+        return time.ToString(format, CultureInfo.CurrentCulture);
+    }
+
+    /// <summary>
+    /// Legacy overload for backward compatibility with tests.
     /// </summary>
     public static string FormatClock(DateTime time)
     {
-        return time.ToString("ddd MMM d  h:mm tt", CultureInfo.CurrentCulture);
+        return FormatClock(time, "ddd MMM d  h:mm tt");
+    }
+
+    private void Clock_Click(object sender, MouseButtonEventArgs e)
+    {
+        if (_calendarFlyout is not null)
+        {
+            _calendarFlyout.Close();
+            _calendarFlyout = null;
+            return;
+        }
+
+        _calendarFlyout = new CalendarFlyout();
+        _calendarFlyout.Closed += (_, _) => _calendarFlyout = null;
+
+        // Position below the clock
+        var clockScreenPos = ClockContainer.PointToScreen(new Point(0, ClockContainer.ActualHeight));
+        _calendarFlyout.Left = clockScreenPos.X - 200 + ClockContainer.ActualWidth;
+        _calendarFlyout.Top = clockScreenPos.Y + 4;
+
+        _calendarFlyout.Show();
     }
 
     #endregion
@@ -354,6 +473,9 @@ public partial class TopMenuBar : AppBarWindow
         _clockTimer?.Stop();
         _clockTimer = null;
 
+        _calendarFlyout?.Close();
+        _calendarFlyout = null;
+
         TrayIconsControl.ItemsSource = null;
         MenuItemsControl.ItemsSource = null;
         _notificationArea = null;
@@ -364,6 +486,10 @@ public partial class TopMenuBar : AppBarWindow
 
         if (_foregroundService != null)
             _foregroundService.PropertyChanged -= OnForegroundChanged;
+
+        if (_shellSettings != null)
+            _shellSettings.SettingsChanged -= OnShellSettingsChanged;
+        _shellSettings = null;
 
         base.OnClosing(e);
     }

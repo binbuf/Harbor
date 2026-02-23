@@ -120,6 +120,7 @@ public partial class App : Application
 
         _menuBarRegistration = AppBarHelper.Register(_menuBar, AppBarEdge.Top);
         _menuBar.Initialize(_foregroundService, _shellServices.NotificationArea, _globalMenuService);
+        _menuBar.ConnectSettings(_shellSettingsService);
 
         // Create dock pinning and settings services
         _dockPinningService = new DockPinningService();

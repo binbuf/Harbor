@@ -13,6 +13,51 @@ public class ShellSettings
     /// When true, Harbor kills explorer.exe on startup and restarts it on exit.
     /// </summary>
     public bool ReplaceExplorer { get; set; } = true;
+
+    /// <summary>
+    /// Show/hide the global menu items from the foreground app in the top menu bar.
+    /// </summary>
+    public bool ShowAppMenuItems { get; set; } = true;
+
+    /// <summary>
+    /// Enable acrylic blur on the menu bar (vs solid background).
+    /// </summary>
+    public bool MenuBarTranslucency { get; set; } = true;
+
+    /// <summary>
+    /// Show day of week in the menu bar clock.
+    /// </summary>
+    public bool ShowDayOfWeek { get; set; } = true;
+
+    /// <summary>
+    /// Use 24-hour clock format.
+    /// </summary>
+    public bool Use24HourClock { get; set; }
+
+    /// <summary>
+    /// Show seconds in the menu bar clock.
+    /// </summary>
+    public bool ShowSeconds { get; set; }
+
+    /// <summary>
+    /// Theme override: "auto", "light", or "dark".
+    /// </summary>
+    public string ThemeOverride { get; set; } = "auto";
+
+    /// <summary>
+    /// Show recent applications in the dock.
+    /// </summary>
+    public bool ShowRecentApps { get; set; } = true;
+
+    /// <summary>
+    /// Animate opening applications (bounce).
+    /// </summary>
+    public bool AnimateOpeningApps { get; set; } = true;
+
+    /// <summary>
+    /// Show desktop icons.
+    /// </summary>
+    public bool ShowDesktopIcons { get; set; } = true;
 }
 
 /// <summary>
@@ -61,6 +106,141 @@ public class ShellSettingsService : IDisposable
         }
     }
 
+    public bool ShowAppMenuItems
+    {
+        get { lock (_lock) return _settings.ShowAppMenuItems; }
+        set
+        {
+            lock (_lock)
+            {
+                if (_settings.ShowAppMenuItems == value) return;
+                _settings.ShowAppMenuItems = value;
+            }
+            Save();
+            SettingsChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    public bool MenuBarTranslucency
+    {
+        get { lock (_lock) return _settings.MenuBarTranslucency; }
+        set
+        {
+            lock (_lock)
+            {
+                if (_settings.MenuBarTranslucency == value) return;
+                _settings.MenuBarTranslucency = value;
+            }
+            Save();
+            SettingsChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    public bool ShowDayOfWeek
+    {
+        get { lock (_lock) return _settings.ShowDayOfWeek; }
+        set
+        {
+            lock (_lock)
+            {
+                if (_settings.ShowDayOfWeek == value) return;
+                _settings.ShowDayOfWeek = value;
+            }
+            Save();
+            SettingsChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    public bool Use24HourClock
+    {
+        get { lock (_lock) return _settings.Use24HourClock; }
+        set
+        {
+            lock (_lock)
+            {
+                if (_settings.Use24HourClock == value) return;
+                _settings.Use24HourClock = value;
+            }
+            Save();
+            SettingsChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    public bool ShowSeconds
+    {
+        get { lock (_lock) return _settings.ShowSeconds; }
+        set
+        {
+            lock (_lock)
+            {
+                if (_settings.ShowSeconds == value) return;
+                _settings.ShowSeconds = value;
+            }
+            Save();
+            SettingsChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    public string ThemeOverride
+    {
+        get { lock (_lock) return _settings.ThemeOverride; }
+        set
+        {
+            lock (_lock)
+            {
+                if (_settings.ThemeOverride == value) return;
+                _settings.ThemeOverride = value;
+            }
+            Save();
+            SettingsChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    public bool ShowRecentApps
+    {
+        get { lock (_lock) return _settings.ShowRecentApps; }
+        set
+        {
+            lock (_lock)
+            {
+                if (_settings.ShowRecentApps == value) return;
+                _settings.ShowRecentApps = value;
+            }
+            Save();
+            SettingsChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    public bool AnimateOpeningApps
+    {
+        get { lock (_lock) return _settings.AnimateOpeningApps; }
+        set
+        {
+            lock (_lock)
+            {
+                if (_settings.AnimateOpeningApps == value) return;
+                _settings.AnimateOpeningApps = value;
+            }
+            Save();
+            SettingsChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    public bool ShowDesktopIcons
+    {
+        get { lock (_lock) return _settings.ShowDesktopIcons; }
+        set
+        {
+            lock (_lock)
+            {
+                if (_settings.ShowDesktopIcons == value) return;
+                _settings.ShowDesktopIcons = value;
+            }
+            Save();
+            SettingsChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
     /// <summary>
     /// Raised when any setting changes.
     /// </summary>
@@ -102,7 +282,21 @@ public class ShellSettingsService : IDisposable
 
             ShellSettings snapshot;
             lock (_lock)
-                snapshot = new ShellSettings { ReplaceExplorer = _settings.ReplaceExplorer };
+            {
+                snapshot = new ShellSettings
+                {
+                    ReplaceExplorer = _settings.ReplaceExplorer,
+                    ShowAppMenuItems = _settings.ShowAppMenuItems,
+                    MenuBarTranslucency = _settings.MenuBarTranslucency,
+                    ShowDayOfWeek = _settings.ShowDayOfWeek,
+                    Use24HourClock = _settings.Use24HourClock,
+                    ShowSeconds = _settings.ShowSeconds,
+                    ThemeOverride = _settings.ThemeOverride,
+                    ShowRecentApps = _settings.ShowRecentApps,
+                    AnimateOpeningApps = _settings.AnimateOpeningApps,
+                    ShowDesktopIcons = _settings.ShowDesktopIcons,
+                };
+            }
 
             var json = JsonSerializer.Serialize(snapshot, s_jsonOptions);
             File.WriteAllText(_configPath, json);

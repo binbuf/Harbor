@@ -13,7 +13,9 @@
 - Dock & Top Menu
   - 
 - Top Menu
-  - 
+  - The calendar popup doesn't show up below the calendar area in the top menu. It showed up on a differnt monitor but in the area where it should be if the top menu was on that monitor.
+  - The calendar popup doesn't look like the big boxy flyout of Windows 10 era, improve the UI of it. 
+  - I don't see any top menu menu ever appear or work for any apps at all. 
 - Settings
   - Dock auto-hide doesn't work right. "When overlapped" just hides the dock and it doesn't come up regardless if there is an app in the reservation area or not. "Always" never brings the dock up if your mouse is by it.
   - Do we need to remove explorer.exe or represent the option? I think our design was updated to use explorer instead of removing it. Deeply review the changes to the codebase and also update docs/Design.md as needed.

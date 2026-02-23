@@ -1,0 +1,115 @@
+<Window x:Class="Harbor.Shell.CalendarFlyout"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Calendar"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        ShowInTaskbar="False"
+        Topmost="True"
+        Background="Transparent"
+        SizeToContent="WidthAndHeight"
+        ResizeMode="NoResize">
+
+    <Window.Resources>
+        <!-- CalendarDayButton style -->
+        <Style TargetType="CalendarDayButton">
+            <Setter Property="FontFamily" Value="Segoe UI Variable" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="MinWidth" Value="32" />
+            <Setter Property="MinHeight" Value="32" />
+            <Setter Property="Margin" Value="1" />
+            <Setter Property="Foreground" Value="{DynamicResource FlyoutHeaderForeground}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CalendarDayButton">
+                        <Grid>
+                            <Border x:Name="Bg"
+                                    Background="Transparent"
+                                    CornerRadius="16"
+                                    Width="32" Height="32">
+                                <ContentPresenter HorizontalAlignment="Center"
+                                                  VerticalAlignment="Center" />
+                            </Border>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bg" Property="Background"
+                                        Value="{DynamicResource CalendarDayHoverBackground}" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Bg" Property="Background"
+                                        Value="{DynamicResource CalendarSelectedBackground}" />
+                                <Setter Property="Foreground" Value="White" />
+                            </Trigger>
+                            <Trigger Property="IsToday" Value="True">
+                                <Setter TargetName="Bg" Property="Background"
+                                        Value="{DynamicResource CalendarTodayBackground}" />
+                            </Trigger>
+                            <Trigger Property="IsInactive" Value="True">
+                                <Setter Property="Opacity" Value="0.4" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- CalendarButton (month/year view) style -->
+        <Style TargetType="CalendarButton">
+            <Setter Property="FontFamily" Value="Segoe UI Variable" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{DynamicResource FlyoutHeaderForeground}" />
+            <Setter Property="MinWidth" Value="48" />
+            <Setter Property="MinHeight" Value="32" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CalendarButton">
+                        <Border x:Name="Bg"
+                                Background="Transparent"
+                                CornerRadius="8"
+                                Padding="8,4">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bg" Property="Background"
+                                        Value="{DynamicResource CalendarDayHoverBackground}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Border Background="{DynamicResource FlyoutBackground}"
+            BorderBrush="{DynamicResource FlyoutBorderBrush}"
+            BorderThickness="1"
+            CornerRadius="16"
+            Padding="16"
+            Margin="4">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="16" Opacity="0.3" ShadowDepth="4" Direction="270" />
+        </Border.Effect>
+
+        <StackPanel>
+            <!-- Header: Today's full date -->
+            <TextBlock x:Name="TodayDateText"
+                       FontFamily="Segoe UI Variable"
+                       FontSize="16"
+                       FontWeight="SemiBold"
+                       Foreground="{DynamicResource FlyoutHeaderForeground}"
+                       Margin="4,0,0,12" />
+
+            <!-- Calendar control -->
+            <Calendar x:Name="FlyoutCalendar"
+                      IsTodayHighlighted="True"
+                      SelectionMode="SingleDate"
+                      DisplayDateStart="2020-01-01"
+                      Background="Transparent"
+                      BorderThickness="0"
+                      Foreground="{DynamicResource FlyoutHeaderForeground}" />
+        </StackPanel>
+    </Border>
+</Window>

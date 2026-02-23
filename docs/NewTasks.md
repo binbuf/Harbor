@@ -1,10 +1,15 @@
 
 
 - Dock
+  - In the context menu add MacOS options like:
+    - New Window
+    - Show All Windows
+    - Hide
   - The dock is currently reserving too much space on the bottom. It should be about 3x closer to the bottom then it currently is (e.g. if it's 100px from bottom it should be 30px).
   - Magnification setting is overclipping the iconand the top can't be see now as the icon grows beyond the background but then is visually clipped.
   - Long holding left click should bring up the context menu like short right clicking
   - Magnification only seems to work on trash icon and now all icons. It also doesn't zoom up the neighbors like the real MacOS dock effect does.
+  - Dock should allow to move the icons around by long left clicking then dragging to a new location in the dock
 - Dock & Top Menu
   - 
 - Top Menu
@@ -13,3 +18,19 @@
   - Dock auto-hide doesn't work right. "When overlapped" just hides the dock and it doesn't come up regardless if there is an app in the reservation area or not. "Always" never brings the dock up if your mouse is by it.
   - Do we need to remove explorer.exe or represent the option? I think our design was updated to use explorer instead of removing it. Deeply review the changes to the codebase and also update docs/Design.md as needed.
   -Icon size doesn't appear to actually work
+- General
+  - When no specific app is selected or when the windows file manager is selected, we just call the app Explorer instead of Windows Explorer in the top left menu bar area. 
+  - When Explorer should be visible in the top menu, have options similar to MacOS top menu like:
+    - File
+      - New Explorer Window
+    - Go
+      - Rcents
+      - Documents
+      - Desktop
+      - Downloads
+      - Home
+      - Computer
+      - Network
+- Apps icon/action in Dock
+  - Similar to the older MacOS Mission Control, the new Apps section shows all the apps in a rounded rect translucent frosted glass window as icons that can be scrolled of all the apps that are installed. If we need to pre-cache or something to optimize (and scan on update) then let's do it; but if there's a way to do this without costly scans let's not.
+-Enable Microsoft PowerToys as part of the install to replace MacOS Spotlight Search that comes up when you use CMD+SPACE on a Mac?

@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Globalization;
 using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media;
@@ -152,8 +153,8 @@ public static class ShellAppEnumerator
         // launch target, which Process.Start with UseShellExecute handles uniformly.
         var launchPath = $"shell:AppsFolder\\{parsingName}";
 
-        // Extract icon via IShellItemImageFactory
-        var icon = ExtractIcon(item);
+        // Extract icon via IShellItemImageFactory, with placeholder fallback
+        var icon = ExtractIcon(item) ?? GeneratePlaceholderIcon(displayName);
 
         return new AppInfo
         {
@@ -171,7 +172,11 @@ public static class ShellAppEnumerator
                 return null;
 
             var size = new SIZE { cx = 48, cy = 48 };
+
+            // Try RESIZETOFIT first, then fall back to BIGGERSIZEOK
             var hr = imageFactory.GetImage(size, SIIGBF.RESIZETOFIT, out var hBitmap);
+            if (hr != 0 || hBitmap == IntPtr.Zero)
+                hr = imageFactory.GetImage(size, SIIGBF.BIGGERSIZEOK, out hBitmap);
 
             if (hr != 0 || hBitmap == IntPtr.Zero)
                 return null;
@@ -184,6 +189,11 @@ public static class ShellAppEnumerator
                     Int32Rect.Empty,
                     BitmapSizeOptions.FromEmptyOptions());
                 source.Freeze();
+
+                // Reject generic/blank document icons returned by the shell
+                if (IsLikelyGenericIcon(source))
+                    return null;
+
                 return source;
             }
             finally
@@ -196,6 +206,72 @@ public static class ShellAppEnumerator
             Trace.WriteLine($"[Harbor] ShellAppEnumerator: Icon extraction failed: {ex.Message}");
             return null;
         }
+    }
+
+    /// <summary>
+    /// Detects generic/blank icons (e.g. the Windows "blank document" icon) by checking
+    /// pixel color diversity. Real app icons have many distinct colors; generic icons
+    /// like the blank page have very few (white body, gray border, maybe a blue fold).
+    /// </summary>
+    private static bool IsLikelyGenericIcon(BitmapSource source)
+    {
+        try
+        {
+            var bgra = new FormatConvertedBitmap(source, PixelFormats.Bgra32, null, 0);
+            int w = bgra.PixelWidth, h = bgra.PixelHeight;
+            var pixels = new byte[w * h * 4];
+            bgra.CopyPixels(pixels, w * 4, 0);
+
+            // Count unique colors quantized to 4 bits per channel to reduce anti-aliasing noise
+            var colors = new HashSet<int>();
+            for (int i = 0; i < pixels.Length; i += 4)
+            {
+                if (pixels[i + 3] < 20) continue; // skip transparent
+
+                int quantized = ((pixels[i + 2] & 0xF0) << 4) |
+                                (pixels[i + 1] & 0xF0) |
+                                (pixels[i] >> 4);
+                colors.Add(quantized);
+
+                if (colors.Count >= 12) return false; // diverse enough = real icon
+            }
+
+            // Too few distinct colors — likely a generic blank document icon
+            return true;
+        }
+        catch
+        {
+            return false; // if analysis fails, assume icon is fine
+        }
+    }
+
+    private static ImageSource GeneratePlaceholderIcon(string displayName)
+    {
+        const int size = 48;
+        var visual = new DrawingVisual();
+
+        using (var ctx = visual.RenderOpen())
+        {
+            var background = new SolidColorBrush(Color.FromRgb(0x60, 0x60, 0x60));
+            ctx.DrawRoundedRectangle(background, null, new Rect(0, 0, size, size), 10, 10);
+
+            var letter = displayName.Length > 0 ? char.ToUpper(displayName[0]).ToString() : "?";
+            var text = new FormattedText(
+                letter,
+                CultureInfo.InvariantCulture,
+                FlowDirection.LeftToRight,
+                new Typeface("Segoe UI Variable"),
+                24,
+                Brushes.White,
+                96);
+            var origin = new Point((size - text.Width) / 2, (size - text.Height) / 2);
+            ctx.DrawText(text, origin);
+        }
+
+        var bitmap = new RenderTargetBitmap(size, size, 96, 96, PixelFormats.Pbgra32);
+        bitmap.Render(visual);
+        bitmap.Freeze();
+        return bitmap;
     }
 
     /// <summary>
@@ -235,6 +311,7 @@ public static class ShellAppEnumerator
     private enum SIIGBF : uint
     {
         RESIZETOFIT = 0x00000000,
+        BIGGERSIZEOK = 0x00000001,
     }
 
     [StructLayout(LayoutKind.Sequential)]

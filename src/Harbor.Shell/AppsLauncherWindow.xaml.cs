@@ -21,6 +21,7 @@ public partial class AppsLauncherWindow : Window
     private readonly ObservableCollection<AppInfo> _filteredApps = [];
     private bool _isVisible;
     private string _searchQuery = string.Empty;
+    private DateTime _lastDeactivateHide = DateTime.MinValue;
 
     // Animation constants
     private static readonly Duration FadeInDuration = new(TimeSpan.FromMilliseconds(200));
@@ -36,6 +37,7 @@ public partial class AppsLauncherWindow : Window
         AppsGrid.ItemsSource = _filteredApps;
 
         _appService.AppsChanged += OnAppsChanged;
+        Deactivated += OnDeactivated;
 
         // Initial populate
         RefreshFilteredApps();
@@ -78,9 +80,23 @@ public partial class AppsLauncherWindow : Window
     public void Toggle()
     {
         if (_isVisible)
+        {
             HideWithAnimation();
+        }
         else
+        {
+            // If we just hid due to deactivation (e.g. dock icon click), don't re-show
+            if ((DateTime.UtcNow - _lastDeactivateHide).TotalMilliseconds < 300)
+                return;
             ShowWithAnimation();
+        }
+    }
+
+    private void OnDeactivated(object? sender, EventArgs e)
+    {
+        if (!_isVisible) return;
+        _lastDeactivateHide = DateTime.UtcNow;
+        HideWithAnimation();
     }
 
     private void ShowWithAnimation()
@@ -235,6 +251,7 @@ public partial class AppsLauncherWindow : Window
 
     protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
     {
+        Deactivated -= OnDeactivated;
         _appService.AppsChanged -= OnAppsChanged;
         base.OnClosing(e);
     }

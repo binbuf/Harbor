@@ -117,7 +117,7 @@ public sealed class DockItemManager : IDisposable
             RunningItems.Add(new DockItem
             {
                 ExecutablePath = exePath,
-                DisplayName = Path.GetFileNameWithoutExtension(exePath),
+                DisplayName = ForegroundWindowService.GetFriendlyNameFromPath(exePath),
                 IsPinned = false,
                 IsRunning = true,
                 Windows = windows,

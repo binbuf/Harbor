@@ -185,7 +185,7 @@ public class DockPinningServiceTests : IDisposable
 
         svc.Pin(@"C:\app\myapp.exe");
 
-        Assert.Equal("myapp", svc.Pins[0].DisplayName);
+        Assert.Equal("Myapp", svc.Pins[0].DisplayName);
     }
 
     [Fact]

@@ -59,6 +59,98 @@ public static class ShellAppEnumerator
         return false;
     }
 
+    /// <summary>
+    /// Builds a case-insensitive dictionary mapping executable file paths to their
+    /// shell display names (the same names Windows shows in Start Menu and Alt+Tab).
+    /// This is the authoritative source for user-facing app names.
+    /// </summary>
+    public static Dictionary<string, string> BuildExeDisplayNameMap()
+    {
+        var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        var hr = SHCreateItemFromParsingName(
+            "shell:AppsFolder",
+            IntPtr.Zero,
+            typeof(IShellItem).GUID,
+            out var folderItem);
+
+        if (hr != 0 || folderItem is null)
+            return map;
+
+        try
+        {
+            hr = folderItem.BindToHandler(
+                IntPtr.Zero,
+                BHID_EnumItems,
+                typeof(IEnumShellItems).GUID,
+                out var enumObj);
+
+            if (hr != 0 || enumObj is not IEnumShellItems enumItems)
+                return map;
+
+            try
+            {
+                while (true)
+                {
+                    hr = enumItems.Next(1, out var childItem, out var fetched);
+                    if (hr != 0 || fetched == 0 || childItem is null)
+                        break;
+
+                    try
+                    {
+                        // Get display name
+                        var nameHr = childItem.GetDisplayName(SIGDN.NORMALDISPLAY, out var displayNamePtr);
+                        if (nameHr != 0 || displayNamePtr == IntPtr.Zero)
+                            continue;
+
+                        var displayName = Marshal.PtrToStringUni(displayNamePtr) ?? string.Empty;
+                        Marshal.FreeCoTaskMem(displayNamePtr);
+
+                        if (string.IsNullOrWhiteSpace(displayName))
+                            continue;
+
+                        // Get the parsing name (file path for Win32, AUMID for UWP)
+                        var parseHr = childItem.GetDisplayName(SIGDN.DESKTOPABSOLUTEPARSING, out var parsingNamePtr);
+                        if (parseHr != 0 || parsingNamePtr == IntPtr.Zero)
+                            continue;
+
+                        var parsingName = Marshal.PtrToStringUni(parsingNamePtr) ?? string.Empty;
+                        Marshal.FreeCoTaskMem(parsingNamePtr);
+
+                        // For Win32 apps, the parsing name IS the exe path
+                        if (parsingName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) && !map.ContainsKey(parsingName))
+                        {
+                            map[parsingName] = displayName;
+                        }
+
+                        // Also try to resolve the real exe path from shell properties
+                        // (handles cases where parsing name is an AUMID or indirect path)
+                        var resolvedPath = TryResolveExePath(childItem);
+                        if (!string.IsNullOrEmpty(resolvedPath) && !map.ContainsKey(resolvedPath))
+                        {
+                            map[resolvedPath] = displayName;
+                        }
+                    }
+                    finally
+                    {
+                        Marshal.ReleaseComObject(childItem);
+                    }
+                }
+            }
+            finally
+            {
+                Marshal.ReleaseComObject(enumItems);
+            }
+        }
+        finally
+        {
+            Marshal.ReleaseComObject(folderItem);
+        }
+
+        Trace.WriteLine($"[Harbor] ShellAppEnumerator: Built exe→name map with {map.Count} entries");
+        return map;
+    }
+
     public static List<AppInfo> EnumerateApps(bool filter = false)
     {
         var results = new List<AppInfo>();

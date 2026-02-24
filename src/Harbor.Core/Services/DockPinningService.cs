@@ -69,7 +69,7 @@ public class DockPinningService : IDisposable
             _pins.Add(new DockPin
             {
                 ExecutablePath = executablePath,
-                DisplayName = displayName ?? Path.GetFileNameWithoutExtension(executablePath),
+                DisplayName = displayName ?? ForegroundWindowService.GetFriendlyNameFromPath(executablePath),
             });
         }
 
@@ -93,7 +93,7 @@ public class DockPinningService : IDisposable
             var pin = new DockPin
             {
                 ExecutablePath = executablePath,
-                DisplayName = displayName ?? Path.GetFileNameWithoutExtension(executablePath),
+                DisplayName = displayName ?? ForegroundWindowService.GetFriendlyNameFromPath(executablePath),
             };
             index = Math.Clamp(index, 0, _pins.Count);
             _pins.Insert(index, pin);

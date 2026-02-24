@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Diagnostics;
+using System.IO;
 using System.Runtime.CompilerServices;
 using Harbor.Core.Interop;
 using Windows.Win32;
@@ -15,6 +16,18 @@ namespace Harbor.Core.Services;
 /// </summary>
 public sealed class ForegroundWindowService : INotifyPropertyChanged, IDisposable
 {
+    /// <summary>
+    /// Maps executable file paths to their shell display names (same names as Start Menu / Alt+Tab).
+    /// Built once from shell:AppsFolder enumeration, then used as the primary name source.
+    /// </summary>
+    private static Dictionary<string, string>? s_exeDisplayNameMap;
+
+    /// <summary>
+    /// Gets or lazily initializes the exe-to-display-name map from shell:AppsFolder.
+    /// </summary>
+    private static Dictionary<string, string> ExeDisplayNameMap
+        => s_exeDisplayNameMap ??= ShellAppEnumerator.BuildExeDisplayNameMap();
+
     private UnhookWinEventSafeHandle? _hook;
     private WINEVENTPROC? _callback; // prevent GC of the delegate
     private string _activeAppName = string.Empty;
@@ -102,9 +115,9 @@ public sealed class ForegroundWindowService : INotifyPropertyChanged, IDisposabl
             if (processId == 0) return string.Empty;
 
             using var process = Process.GetProcessById((int)processId);
-            var description = process.MainModule?.FileVersionInfo.FileDescription;
-            if (!string.IsNullOrWhiteSpace(description))
-                return description;
+            var mainModulePath = process.MainModule?.FileName;
+            if (!string.IsNullOrEmpty(mainModulePath))
+                return GetFriendlyNameFromPath(mainModulePath);
 
             // Fallback to process name
             return CleanProcessName(process.ProcessName);
@@ -114,6 +127,35 @@ public sealed class ForegroundWindowService : INotifyPropertyChanged, IDisposabl
             // Process may have exited or access denied
             return string.Empty;
         }
+    }
+
+    /// <summary>
+    /// Resolves a friendly display name from an executable path using FileVersionInfo.
+    /// Returns FileDescription if available (e.g. "Google Chrome", "Microsoft Visual Studio"),
+    /// otherwise falls back to a cleaned-up filename.
+    /// </summary>
+    public static string GetFriendlyNameFromPath(string executablePath)
+    {
+        if (string.IsNullOrEmpty(executablePath))
+            return string.Empty;
+
+        // Primary: use the shell display name (same source as Start Menu / Alt+Tab)
+        if (ExeDisplayNameMap.TryGetValue(executablePath, out var shellName))
+            return shellName;
+
+        // Fallback: FileVersionInfo.FileDescription
+        try
+        {
+            var versionInfo = FileVersionInfo.GetVersionInfo(executablePath);
+            if (!string.IsNullOrWhiteSpace(versionInfo.FileDescription))
+                return versionInfo.FileDescription;
+        }
+        catch
+        {
+            // File may not exist or be inaccessible
+        }
+
+        return CleanProcessName(Path.GetFileNameWithoutExtension(executablePath));
     }
 
     /// <summary>

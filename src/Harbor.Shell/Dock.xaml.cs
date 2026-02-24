@@ -226,6 +226,8 @@ public partial class Dock : Window, IRetreatable
 
     // WndProc hook constants
     private const int WM_WINDOWPOSCHANGING = 0x0046;
+    private const int WM_SYSCOMMAND = 0x0112;
+    private const int SC_MINIMIZE = 0xF020;
     private static readonly int WposInsertAfterOffset = IntPtr.Size; // hwndInsertAfter follows hwnd in WINDOWPOS
 
     protected override void OnSourceInitialized(EventArgs e)
@@ -247,10 +249,18 @@ public partial class Dock : Window, IRetreatable
 
     private IntPtr DockWndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
-        if (msg == WM_WINDOWPOSCHANGING)
+        switch (msg)
         {
-            // Force HWND_TOPMOST (-1) so WPF or other windows can't push us down the z-order
-            Marshal.WriteIntPtr(lParam, WposInsertAfterOffset, (IntPtr)(-1));
+            case WM_WINDOWPOSCHANGING:
+                // Force HWND_TOPMOST (-1) so WPF or other windows can't push us down the z-order
+                Marshal.WriteIntPtr(lParam, WposInsertAfterOffset, (IntPtr)(-1));
+                break;
+
+            case WM_SYSCOMMAND:
+                // Block minimize (triggered by "show desktop" or Win+D)
+                if ((wParam.ToInt32() & 0xFFF0) == SC_MINIMIZE)
+                    handled = true;
+                break;
         }
         return IntPtr.Zero;
     }

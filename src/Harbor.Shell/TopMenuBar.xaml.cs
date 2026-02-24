@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -15,6 +16,7 @@ using ManagedShell.AppBar;
 using ManagedShell.Common.Helpers;
 using ManagedShell.WindowsTray;
 using Windows.Win32.Foundation;
+using Windows.Win32.UI.WindowsAndMessaging;
 
 namespace Harbor.Shell;
 
@@ -416,10 +418,47 @@ public partial class TopMenuBar : AppBarWindow
         }
     }
 
+    // WndProc constants for Z-order and minimize protection
+    private const int WM_WINDOWPOSCHANGING = 0x0046;
+    private const int WM_SYSCOMMAND = 0x0112;
+    private const int SC_MINIMIZE = 0xF020;
+    private static readonly int WposInsertAfterOffset = IntPtr.Size;
+
     protected override void OnSourceInitialized(EventArgs e)
     {
         base.OnSourceInitialized(e);
+
+        var hwnd = new WindowInteropHelper(this).Handle;
+
+        // Add WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE to prevent Alt+Tab entry and
+        // ensure the menu bar is excluded from "show desktop" minimization
+        var exStyle = WindowInterop.GetWindowLongPtr(new HWND(hwnd), WINDOW_LONG_PTR_INDEX.GWL_EXSTYLE);
+        exStyle |= (nint)(WindowInterop.WS_EX_TOOLWINDOW | WindowInterop.WS_EX_NOACTIVATE);
+        WindowInterop.SetWindowLongPtr(new HWND(hwnd), WINDOW_LONG_PTR_INDEX.GWL_EXSTYLE, exStyle);
+
+        // Hook WndProc to enforce TOPMOST and block minimization
+        var source = HwndSource.FromHwnd(hwnd);
+        source?.AddHook(MenuBarWndProc);
+
         ApplyAcrylic();
+    }
+
+    private IntPtr MenuBarWndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        switch (msg)
+        {
+            case WM_WINDOWPOSCHANGING:
+                // Force HWND_TOPMOST so nothing can push us down the Z-order
+                Marshal.WriteIntPtr(lParam, WposInsertAfterOffset, (IntPtr)(-1));
+                break;
+
+            case WM_SYSCOMMAND:
+                // Block minimize (triggered by "show desktop" or Win+D)
+                if ((wParam.ToInt32() & 0xFFF0) == SC_MINIMIZE)
+                    handled = true;
+                break;
+        }
+        return IntPtr.Zero;
     }
 
     private void ApplyAcrylic()

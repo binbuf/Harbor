@@ -81,7 +81,7 @@ public partial class App : Application
         _explorerSuppression = new ExplorerSuppressionService();
         _explorerSuppression.Suppress();
 
-        if (_shellSettingsService.ReplaceExplorer)
+        if (_shellSettingsService.ReplaceExplorer && !_shellSettingsService.ShowDesktopIcons)
         {
             // Render the desktop wallpaper to cover explorer's desktop
             _desktopBackground = new DesktopBackgroundWindow();
@@ -153,6 +153,7 @@ public partial class App : Application
 
         // Subscribe to settings changes for runtime mode switching
         _dockSettingsService.SettingsChanged += OnDockSettingsChanged;
+        _shellSettingsService.SettingsChanged += OnShellSettingsChanged;
 
         // Register ProcessExit to restore explorer even on forced termination (e.g. VS debugger stop)
         AppDomain.CurrentDomain.ProcessExit += OnProcessExit;
@@ -266,6 +267,32 @@ public partial class App : Application
         {
             if (_dockSettingsService is not null)
                 ApplyAutoHideMode(_dockSettingsService.AutoHideMode);
+        });
+    }
+
+    private void OnShellSettingsChanged(object? sender, EventArgs e)
+    {
+        Dispatcher.Invoke(() =>
+        {
+            if (_shellSettingsService is null || !_shellSettingsService.ReplaceExplorer) return;
+
+            var showIcons = _shellSettingsService.ShowDesktopIcons;
+
+            if (showIcons && _desktopBackground is not null)
+            {
+                // User wants desktop icons visible — remove the covering window
+                _desktopBackground.Close();
+                _desktopBackground = null;
+                Trace.WriteLine("[Harbor] App: Desktop background hidden (ShowDesktopIcons=true).");
+            }
+            else if (!showIcons && _desktopBackground is null && _wallpaperService is not null)
+            {
+                // User wants desktop icons hidden — show the covering window
+                _desktopBackground = new DesktopBackgroundWindow();
+                _desktopBackground.Show();
+                _desktopBackground.Initialize(_wallpaperService);
+                Trace.WriteLine("[Harbor] App: Desktop background shown (ShowDesktopIcons=false).");
+            }
         });
     }
 
@@ -539,7 +566,11 @@ public partial class App : Application
         _explorerSuppression?.Dispose();
         _explorerSuppression = null;
 
-        _shellSettingsService?.Dispose();
+        if (_shellSettingsService is not null)
+        {
+            _shellSettingsService.SettingsChanged -= OnShellSettingsChanged;
+            _shellSettingsService.Dispose();
+        }
         _shellSettingsService = null;
 
         _shellServices?.Dispose();

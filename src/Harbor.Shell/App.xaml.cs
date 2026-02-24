@@ -191,7 +191,7 @@ public partial class App : Application
             Dispatcher.Invoke(() => _appSwitcherOverlay.Hide());
 
         // Create installed app service and apps launcher
-        _installedAppService = new InstalledAppService(iconService);
+        _installedAppService = new InstalledAppService();
         _ = _installedAppService.ScanAsync(); // fire-and-forget background scan
 
         _appsLauncher = new AppsLauncherWindow(_installedAppService);

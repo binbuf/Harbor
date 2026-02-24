@@ -159,6 +159,7 @@ public static class ShellAppEnumerator
         var icon = TryExtractViaResolvedPath(item)
                 ?? ExtractIconFallback(parsingName)
                 ?? ExtractIconFromShell(item)
+                ?? TryFindStartMenuIcon(displayName)
                 ?? GeneratePlaceholderIcon(displayName);
 
         return new AppInfo
@@ -343,12 +344,19 @@ public static class ShellAppEnumerator
 
     /// <summary>
     /// Win32 fallback: extracts icon from exe/lnk target via SHGetFileInfo or ExtractIconEx.
+    /// For .lnk files, tries the stored icon location first (critical for Steam/game launchers
+    /// where the target is the launcher exe but the icon points to the game's actual icon).
     /// </summary>
     private static ImageSource? TryExtractWin32Icon(string exePath)
     {
-        // Resolve .lnk targets
+        // For .lnk files, try the stored icon location first — this is how Steam,
+        // Epic, GOG etc. store game-specific icons even when the target is the launcher.
         if (exePath.EndsWith(".lnk", StringComparison.OrdinalIgnoreCase))
         {
+            var lnkIcon = TryExtractLnkIconLocation(exePath);
+            if (lnkIcon is not null)
+                return lnkIcon;
+
             var target = ResolveLnkTarget(exePath);
             if (!string.IsNullOrEmpty(target))
                 exePath = target;
@@ -364,6 +372,65 @@ public static class ShellAppEnumerator
 
         // Fall back to SHGetFileInfo
         return TryExtractViaSHGetFileInfo(exePath);
+    }
+
+    /// <summary>
+    /// Extracts an icon from a .lnk file's stored icon location (GetIconLocation).
+    /// This is separate from the .lnk target — Steam games set the icon to the game's
+    /// icon file while the target points to steam.exe with a protocol URL.
+    /// </summary>
+    private static ImageSource? TryExtractLnkIconLocation(string lnkPath)
+    {
+        try
+        {
+            if (!File.Exists(lnkPath)) return null;
+
+            var shellLink = (IShellLinkW)new CShellLink();
+            var persistFile = (IPersistFile)shellLink;
+            persistFile.Load(lnkPath, 0);
+
+            var iconPathBuilder = new StringBuilder(260);
+            shellLink.GetIconLocation(iconPathBuilder, iconPathBuilder.Capacity, out var iconIndex);
+            var iconPath = iconPathBuilder.ToString();
+
+            if (string.IsNullOrWhiteSpace(iconPath) || !File.Exists(iconPath))
+                return null;
+
+            // Try extracting the specific icon index from the file
+            if (iconPath.EndsWith(".ico", StringComparison.OrdinalIgnoreCase))
+            {
+                var bitmap = new BitmapImage();
+                bitmap.BeginInit();
+                bitmap.UriSource = new Uri(iconPath, UriKind.Absolute);
+                bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                bitmap.EndInit();
+                bitmap.Freeze();
+                return bitmap;
+            }
+
+            // For .exe/.dll files, extract using the icon index
+            var largeIcons = new IntPtr[1];
+            var extracted = ExtractIconEx(iconPath, iconIndex, largeIcons, null, 1);
+            if (extracted == 0 || largeIcons[0] == IntPtr.Zero)
+                return null;
+
+            try
+            {
+                var source = Imaging.CreateBitmapSourceFromHIcon(
+                    largeIcons[0], Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
+                source.Freeze();
+                return source;
+            }
+            finally
+            {
+                DestroyIcon(largeIcons[0]);
+            }
+        }
+        catch (Exception ex)
+        {
+            Trace.WriteLine($"[Harbor] ShellAppEnumerator: LnkIconLocation extraction failed for {lnkPath}: {ex.Message}");
+            return null;
+        }
     }
 
     private static ImageSource? TryExtractViaExtractIconEx(string exePath)
@@ -609,6 +676,58 @@ public static class ShellAppEnumerator
             return null;
 
         return TryExtractViaExtractIconEx(exePath) ?? TryExtractViaSHGetFileInfo(exePath);
+    }
+
+    /// <summary>
+    /// Last-resort fallback: searches Start Menu folders for a .lnk matching the display name
+    /// and extracts its icon. Covers games (Steam, Epic, GOG) that register with opaque
+    /// parsing names (GUIDs, protocol URLs) but create real shortcuts in the Start Menu.
+    /// </summary>
+    private static ImageSource? TryFindStartMenuIcon(string displayName)
+    {
+        try
+        {
+            var searchDirs = new[]
+            {
+                Environment.GetFolderPath(Environment.SpecialFolder.CommonStartMenu),
+                Environment.GetFolderPath(Environment.SpecialFolder.StartMenu),
+            };
+
+            foreach (var baseDir in searchDirs)
+            {
+                var programsDir = Path.Combine(baseDir, "Programs");
+                if (!Directory.Exists(programsDir))
+                    continue;
+
+                // Search recursively for .lnk files matching the display name
+                foreach (var lnkFile in Directory.EnumerateFiles(programsDir, "*.lnk", SearchOption.AllDirectories))
+                {
+                    var fileName = Path.GetFileNameWithoutExtension(lnkFile);
+                    if (!fileName.Equals(displayName, StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    // Try icon location first (game-specific icon), then target exe
+                    var icon = TryExtractLnkIconLocation(lnkFile);
+                    if (icon is not null)
+                        return icon;
+
+                    var target = ResolveLnkTarget(lnkFile);
+                    if (!string.IsNullOrEmpty(target) && File.Exists(target))
+                    {
+                        icon = TryExtractViaExtractIconEx(target) ?? TryExtractViaSHGetFileInfo(target);
+                        if (icon is not null)
+                            return icon;
+                    }
+                }
+            }
+
+            return null;
+        }
+        catch (Exception ex)
+        {
+            Trace.WriteLine($"[Harbor] ShellAppEnumerator: Start Menu search failed for {displayName}: {ex.Message}");
+            return null;
+        }
     }
 
     private static ImageSource GeneratePlaceholderIcon(string displayName)

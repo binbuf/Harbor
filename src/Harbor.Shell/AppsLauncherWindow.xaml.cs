@@ -18,6 +18,7 @@ namespace Harbor.Shell;
 public partial class AppsLauncherWindow : Window
 {
     private readonly InstalledAppService _appService;
+    private readonly ForegroundWindowService _foregroundService;
     private readonly ObservableCollection<AppInfo> _filteredApps = [];
     private bool _isVisible;
     private string _searchQuery = string.Empty;
@@ -29,15 +30,17 @@ public partial class AppsLauncherWindow : Window
     private static readonly IEasingFunction EaseOut = new QuadraticEase { EasingMode = EasingMode.EaseOut };
     private static readonly IEasingFunction EaseIn = new QuadraticEase { EasingMode = EasingMode.EaseIn };
 
-    public AppsLauncherWindow(InstalledAppService appService)
+    public AppsLauncherWindow(InstalledAppService appService, ForegroundWindowService foregroundService)
     {
         InitializeComponent();
 
         _appService = appService;
+        _foregroundService = foregroundService;
         AppsGrid.ItemsSource = _filteredApps;
 
         _appService.AppsChanged += OnAppsChanged;
         Deactivated += OnDeactivated;
+        _foregroundService.PropertyChanged += OnForegroundChanged;
 
         // Initial populate
         RefreshFilteredApps();
@@ -97,6 +100,18 @@ public partial class AppsLauncherWindow : Window
         if (!_isVisible) return;
         _lastDeactivateHide = DateTime.UtcNow;
         HideWithAnimation();
+    }
+
+    private void OnForegroundChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(ForegroundWindowService.ActiveWindowHandle)) return;
+        if (!_isVisible) return;
+        Dispatcher.Invoke(() =>
+        {
+            if (!_isVisible) return;
+            _lastDeactivateHide = DateTime.UtcNow;
+            HideWithAnimation();
+        });
     }
 
     private void ShowWithAnimation()
@@ -252,6 +267,7 @@ public partial class AppsLauncherWindow : Window
     protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
     {
         Deactivated -= OnDeactivated;
+        _foregroundService.PropertyChanged -= OnForegroundChanged;
         _appService.AppsChanged -= OnAppsChanged;
         base.OnClosing(e);
     }

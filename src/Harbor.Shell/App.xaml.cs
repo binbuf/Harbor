@@ -194,7 +194,7 @@ public partial class App : Application
         _installedAppService = new InstalledAppService(_shellSettingsService);
         _ = _installedAppService.ScanAsync(); // fire-and-forget background scan
 
-        _appsLauncher = new AppsLauncherWindow(_installedAppService);
+        _appsLauncher = new AppsLauncherWindow(_installedAppService, _foregroundService!);
         _appsLauncher.Show(); // Show once to get HWND, then collapse via OnSourceInitialized
         _dock.SetAppsLauncher(_appsLauncher);
 

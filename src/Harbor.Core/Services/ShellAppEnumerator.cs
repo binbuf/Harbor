@@ -154,9 +154,11 @@ public static class ShellAppEnumerator
         // launch target, which Process.Start with UseShellExecute handles uniformly.
         var launchPath = $"shell:AppsFolder\\{parsingName}";
 
-        // Multi-strategy icon extraction with fallbacks
-        var icon = ExtractIconFromShell(item)
+        // Multi-strategy icon extraction: prefer deterministic file-path-based extraction,
+        // fall back to shell image factory (which can return generic icons), then placeholder.
+        var icon = TryExtractViaResolvedPath(item)
                 ?? ExtractIconFallback(parsingName)
+                ?? ExtractIconFromShell(item)
                 ?? GeneratePlaceholderIcon(displayName);
 
         return new AppInfo
@@ -452,38 +454,161 @@ public static class ShellAppEnumerator
         }
     }
 
+    private static HashSet<long>? s_genericIconHashes;
+
     /// <summary>
-    /// Detects generic/blank icons by checking pixel color diversity.
-    /// Generic icons (blank document, default app) have very few distinct colors.
+    /// Detects generic/blank icons by comparing perceptual hashes against known
+    /// generic icons from shell32.dll and imageres.dll.
     /// </summary>
     private static bool IsLikelyGenericIcon(BitmapSource source)
     {
         try
         {
-            var bgra = new FormatConvertedBitmap(source, PixelFormats.Bgra32, null, 0);
-            int w = bgra.PixelWidth, h = bgra.PixelHeight;
-            var pixels = new byte[w * h * 4];
-            bgra.CopyPixels(pixels, w * 4, 0);
+            s_genericIconHashes ??= BuildGenericIconHashes();
+            if (s_genericIconHashes.Count == 0)
+                return false;
 
-            var colors = new HashSet<int>();
-            for (int i = 0; i < pixels.Length; i += 4)
+            var hash = ComputeAverageHash(source);
+            foreach (var genericHash in s_genericIconHashes)
             {
-                if (pixels[i + 3] < 20) continue;
-
-                int quantized = ((pixels[i + 2] & 0xF0) << 4) |
-                                (pixels[i + 1] & 0xF0) |
-                                (pixels[i] >> 4);
-                colors.Add(quantized);
-
-                if (colors.Count >= 12) return false;
+                if (HammingDistance(hash, genericHash) <= 10)
+                    return true;
             }
-
-            return true;
+            return false;
         }
         catch
         {
             return false;
         }
+    }
+
+    private static HashSet<long> BuildGenericIconHashes()
+    {
+        var hashes = new HashSet<long>();
+
+        // shell32.dll indices: 0 = blank doc, 2 = generic app, 3 = folder
+        AddIconHash(hashes, "shell32.dll", 0);
+        AddIconHash(hashes, "shell32.dll", 2);
+        AddIconHash(hashes, "shell32.dll", 3);
+        // imageres.dll index 11 = blank document variant
+        AddIconHash(hashes, "imageres.dll", 11);
+
+        return hashes;
+    }
+
+    private static void AddIconHash(HashSet<long> hashes, string dllName, int index)
+    {
+        try
+        {
+            var dllPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), dllName);
+            var largeIcons = new IntPtr[1];
+            var extracted = ExtractIconEx(dllPath, index, largeIcons, null, 1);
+            if (extracted == 0 || largeIcons[0] == IntPtr.Zero)
+                return;
+
+            try
+            {
+                var source = Imaging.CreateBitmapSourceFromHIcon(
+                    largeIcons[0], Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
+                source.Freeze();
+                hashes.Add(ComputeAverageHash(source));
+            }
+            finally
+            {
+                DestroyIcon(largeIcons[0]);
+            }
+        }
+        catch (Exception ex)
+        {
+            Trace.WriteLine($"[Harbor] ShellAppEnumerator: Failed to hash {dllName}:{index}: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Computes an average perceptual hash: resize to 16x16 grayscale,
+    /// threshold each pixel against mean brightness, produce 256-bit fingerprint
+    /// packed into 4 longs (we use the first long for comparison — 64 bits).
+    /// </summary>
+    private static long ComputeAverageHash(BitmapSource source)
+    {
+        // Resize to 16x16
+        const int hashSize = 8; // 8x8 = 64 bits fits in a long
+        var resized = new TransformedBitmap(source, new ScaleTransform(
+            hashSize / (double)source.PixelWidth,
+            hashSize / (double)source.PixelHeight));
+        var gray = new FormatConvertedBitmap(resized, PixelFormats.Gray8, null, 0);
+
+        var pixels = new byte[hashSize * hashSize];
+        gray.CopyPixels(pixels, hashSize, 0);
+
+        // Compute mean brightness
+        long sum = 0;
+        foreach (var p in pixels) sum += p;
+        var mean = sum / pixels.Length;
+
+        // Build hash: 1 bit per pixel (above/below mean)
+        long hash = 0;
+        for (int i = 0; i < 64; i++)
+        {
+            if (pixels[i] >= mean)
+                hash |= 1L << i;
+        }
+        return hash;
+    }
+
+    private static int HammingDistance(long a, long b)
+    {
+        return (int)long.PopCount(a ^ b);
+    }
+
+    /// <summary>
+    /// Queries IShellItem2 property store to resolve the real .exe path for a shell item.
+    /// Works for Win32 apps that have System.Link.TargetParsingPath or RelaunchIconResource set.
+    /// </summary>
+    private static string? TryResolveExePath(IShellItem item)
+    {
+        try
+        {
+            if (item is not IShellItem2 item2)
+                return null;
+
+            // Try System.Link.TargetParsingPath first — returns the exe path for Win32 apps
+            var key = PKEY_Link_TargetParsingPath;
+            var hr = item2.GetString(ref key, out var targetPath);
+            if (hr == 0 && !string.IsNullOrEmpty(targetPath) && File.Exists(targetPath))
+                return targetPath;
+
+            // Try System.AppUserModel.RelaunchIconResource — returns "path,index" or "path,-index"
+            key = PKEY_AppUserModel_RelaunchIconResource;
+            hr = item2.GetString(ref key, out var iconResource);
+            if (hr == 0 && !string.IsNullOrEmpty(iconResource))
+            {
+                // Parse "C:\path\to\app.exe,0" or "C:\path\to\app.exe,-101"
+                var lastComma = iconResource.LastIndexOf(',');
+                var path = lastComma > 0 ? iconResource[..lastComma] : iconResource;
+                if (File.Exists(path))
+                    return path;
+            }
+
+            return null;
+        }
+        catch (Exception ex)
+        {
+            Trace.WriteLine($"[Harbor] ShellAppEnumerator: TryResolveExePath failed: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Extracts an icon from a resolved exe path using ExtractIconEx and SHGetFileInfo.
+    /// </summary>
+    private static ImageSource? TryExtractViaResolvedPath(IShellItem item)
+    {
+        var exePath = TryResolveExePath(item);
+        if (exePath is null)
+            return null;
+
+        return TryExtractViaExtractIconEx(exePath) ?? TryExtractViaSHGetFileInfo(exePath);
     }
 
     private static ImageSource GeneratePlaceholderIcon(string displayName)
@@ -694,6 +819,74 @@ public static class ShellAppEnumerator
         [PreserveSig]
         int GetImage(SIZE size, SIIGBF flags, out IntPtr phbm);
     }
+
+    [ComImport]
+    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    [Guid("7e9fb0d3-919f-4307-ab2e-9b1860310c93")]
+    private interface IShellItem2
+    {
+        // IShellItem methods (vtable slots 0-4)
+        [PreserveSig]
+        int BindToHandler(IntPtr pbc,
+            [MarshalAs(UnmanagedType.LPStruct)] Guid bhid,
+            [MarshalAs(UnmanagedType.LPStruct)] Guid riid,
+            [MarshalAs(UnmanagedType.Interface)] out object? ppv);
+        void GetParent(out IShellItem ppsi);
+        [PreserveSig]
+        int GetDisplayName(SIGDN sigdnName, out IntPtr ppszName);
+        void GetAttributes(uint sfgaoMask, out uint psfgaoAttribs);
+        void Compare(IShellItem psi, uint hint, out int piOrder);
+
+        // IShellItem2 methods (vtable slots 5+)
+        [PreserveSig]
+        int GetPropertyStore(int flags, [MarshalAs(UnmanagedType.LPStruct)] Guid riid, out IntPtr ppv);
+        [PreserveSig]
+        int GetPropertyStoreWithCreateObject(int flags, [MarshalAs(UnmanagedType.IUnknown)] object punkCreateObject,
+            [MarshalAs(UnmanagedType.LPStruct)] Guid riid, out IntPtr ppv);
+        [PreserveSig]
+        int GetPropertyStoreForKeys(IntPtr rgKeys, uint cKeys, int flags,
+            [MarshalAs(UnmanagedType.LPStruct)] Guid riid, out IntPtr ppv);
+        [PreserveSig]
+        int GetPropertyDescriptionList(ref PROPERTYKEY key,
+            [MarshalAs(UnmanagedType.LPStruct)] Guid riid, out IntPtr ppv);
+        [PreserveSig]
+        int Update(IntPtr pbc);
+        [PreserveSig]
+        int GetProperty(ref PROPERTYKEY key, IntPtr ppropvar);
+        [PreserveSig]
+        int GetCLSID(ref PROPERTYKEY key, out Guid pclsid);
+        [PreserveSig]
+        int GetFileTime(ref PROPERTYKEY key, out long pft);
+        [PreserveSig]
+        int GetInt32(ref PROPERTYKEY key, out int pi);
+        [PreserveSig]
+        int GetString(ref PROPERTYKEY key, [MarshalAs(UnmanagedType.LPWStr)] out string ppsz);
+        [PreserveSig]
+        int GetUInt32(ref PROPERTYKEY key, out uint pui);
+        [PreserveSig]
+        int GetUInt64(ref PROPERTYKEY key, out ulong pull);
+        [PreserveSig]
+        int GetBool(ref PROPERTYKEY key, [MarshalAs(UnmanagedType.Bool)] out bool pf);
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct PROPERTYKEY
+    {
+        public Guid fmtid;
+        public uint pid;
+    }
+
+    private static readonly PROPERTYKEY PKEY_Link_TargetParsingPath = new()
+    {
+        fmtid = new Guid("B9B4B3FC-2B51-4A42-B5D8-324146AFCF25"),
+        pid = 2,
+    };
+
+    private static readonly PROPERTYKEY PKEY_AppUserModel_RelaunchIconResource = new()
+    {
+        fmtid = new Guid("9F4C2855-9F79-4B39-A8D0-E1D42DE1D5F3"),
+        pid = 2,
+    };
 
     #endregion
 }

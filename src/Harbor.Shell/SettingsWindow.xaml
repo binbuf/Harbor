@@ -146,6 +146,30 @@
                                           Unchecked="ReplaceExplorerToggle_Changed" />
                             </Grid>
                         </Border>
+                        <!-- Filter app list -->
+                        <Border Background="{DynamicResource SettingsCardBackground}" CornerRadius="8" Padding="16,12" Margin="0,0,0,8">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                    <TextBlock Text="Filter app list"
+                                               Foreground="{DynamicResource SettingsTextBrush}"
+                                               FontFamily="Segoe UI Variable" FontSize="13" />
+                                    <TextBlock Text="Hide utilities, documentation, and uninstallers from the Apps launcher"
+                                               Foreground="{DynamicResource SettingsSecondaryTextBrush}"
+                                               FontFamily="Segoe UI Variable" FontSize="11"
+                                               Margin="0,2,0,0" />
+                                </StackPanel>
+                                <CheckBox x:Name="FilterAppsFolderToggle"
+                                          Grid.Column="1"
+                                          Style="{StaticResource ToggleSwitchStyle}"
+                                          VerticalAlignment="Center"
+                                          Checked="FilterAppsFolderToggle_Changed"
+                                          Unchecked="FilterAppsFolderToggle_Changed" />
+                            </Grid>
+                        </Border>
                     </StackPanel>
                 </ScrollViewer>
 

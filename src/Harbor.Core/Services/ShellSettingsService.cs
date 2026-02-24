@@ -74,6 +74,11 @@ public class ShellSettings
     /// When disabled, text follows the current theme (white for dark, black for light).
     /// </summary>
     public bool DynamicMenuBarColor { get; set; } = true;
+
+    /// <summary>
+    /// Filter out utilities, documentation, and uninstallers from the Apps launcher.
+    /// </summary>
+    public bool FilterAppsFolder { get; set; } = true;
 }
 
 /// <summary>
@@ -302,6 +307,21 @@ public class ShellSettingsService : IDisposable
         }
     }
 
+    public bool FilterAppsFolder
+    {
+        get { lock (_lock) return _settings.FilterAppsFolder; }
+        set
+        {
+            lock (_lock)
+            {
+                if (_settings.FilterAppsFolder == value) return;
+                _settings.FilterAppsFolder = value;
+            }
+            Save();
+            SettingsChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
     /// <summary>
     /// Raised when any setting changes.
     /// </summary>
@@ -359,6 +379,7 @@ public class ShellSettingsService : IDisposable
                     AutoHideMenuBar = _settings.AutoHideMenuBar,
                     MonochromeTrayIcons = _settings.MonochromeTrayIcons,
                     DynamicMenuBarColor = _settings.DynamicMenuBarColor,
+                    FilterAppsFolder = _settings.FilterAppsFolder,
                 };
             }
 

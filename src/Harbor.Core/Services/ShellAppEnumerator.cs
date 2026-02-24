@@ -1,5 +1,7 @@
 using System.Diagnostics;
+using System.IO;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media;
@@ -15,7 +17,47 @@ namespace Harbor.Core.Services;
 /// </summary>
 public static class ShellAppEnumerator
 {
-    public static List<AppInfo> EnumerateApps()
+    private static readonly string[] s_filteredExtensions =
+        [".chm", ".txt", ".html", ".htm", ".url", ".pdf", ".rtf", ".msi", ".ini"];
+
+    private static readonly string[] s_filteredNamePatterns =
+    [
+        "uninstall", "readme", "release notes", "license",
+        "user's guide", "user guide", "user manual",
+        "getting started", "what is new", "frequently asked", "faq",
+        "documentation", "report a problem", "error reporter",
+        "website", "support center",
+    ];
+
+    public static bool IsFilteredOut(string displayName, string parsingName)
+    {
+        // Filter by parsing name extension (non-executable file targets)
+        var ext = Path.GetExtension(parsingName);
+        if (!string.IsNullOrEmpty(ext))
+        {
+            foreach (var filtered in s_filteredExtensions)
+            {
+                if (ext.Equals(filtered, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+        }
+
+        // Filter by parsing name prefix (web URLs)
+        if (parsingName.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+            parsingName.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        // Filter by display name patterns
+        foreach (var pattern in s_filteredNamePatterns)
+        {
+            if (displayName.Contains(pattern, StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        return false;
+    }
+
+    public static List<AppInfo> EnumerateApps(bool filter = false)
     {
         var results = new List<AppInfo>();
 
@@ -55,7 +97,7 @@ public static class ShellAppEnumerator
 
                     try
                     {
-                        var app = ProcessShellItem(childItem);
+                        var app = ProcessShellItem(childItem, filter);
                         if (app is not null)
                             results.Add(app);
                     }
@@ -78,7 +120,7 @@ public static class ShellAppEnumerator
         return results;
     }
 
-    private static AppInfo? ProcessShellItem(IShellItem item)
+    private static AppInfo? ProcessShellItem(IShellItem item, bool filter)
     {
         // Get display name (already resolved by the OS — no ms-resource: issues)
         var hr = item.GetDisplayName(SIGDN.NORMALDISPLAY, out var displayNamePtr);
@@ -100,6 +142,9 @@ public static class ShellAppEnumerator
         Marshal.FreeCoTaskMem(parsingNamePtr);
 
         if (string.IsNullOrWhiteSpace(parsingName))
+            return null;
+
+        if (filter && IsFilteredOut(displayName, parsingName))
             return null;
 
         // The parsing name is an AUMID like "Microsoft.WindowsCalculator_8wekyb3d8bbwe!App"
@@ -151,6 +196,29 @@ public static class ShellAppEnumerator
             Trace.WriteLine($"[Harbor] ShellAppEnumerator: Icon extraction failed: {ex.Message}");
             return null;
         }
+    }
+
+    /// <summary>
+    /// Writes a diagnostic TSV file listing every enumerated app with its display name,
+    /// parsing name, and whether an icon was extracted. Useful for reviewing what to filter.
+    /// </summary>
+    public static void DumpAppList(List<AppInfo> apps, string outputPath)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("DisplayName\tParsingName\tHasIcon");
+
+        foreach (var app in apps.OrderBy(a => a.DisplayName, StringComparer.OrdinalIgnoreCase))
+        {
+            // Strip the "shell:AppsFolder\" prefix to show the raw parsing name
+            var parsingName = app.ExecutablePath.StartsWith(@"shell:AppsFolder\", StringComparison.OrdinalIgnoreCase)
+                ? app.ExecutablePath[@"shell:AppsFolder\".Length..]
+                : app.ExecutablePath;
+
+            sb.AppendLine($"{app.DisplayName}\t{parsingName}\t{(app.Icon is not null ? "yes" : "NO")}");
+        }
+
+        File.WriteAllText(outputPath, sb.ToString(), Encoding.UTF8);
+        Trace.WriteLine($"[Harbor] ShellAppEnumerator: Dumped {apps.Count} apps to {outputPath}");
     }
 
     #region COM Interop

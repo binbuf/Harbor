@@ -50,6 +50,7 @@ public partial class SettingsWindow : Window
 
         // General
         ReplaceExplorerToggle.IsChecked = _shellSettings.ReplaceExplorer;
+        FilterAppsFolderToggle.IsChecked = _shellSettings.FilterAppsFolder;
 
         // Appearance
         ThemeCombo.SelectedIndex = _shellSettings.ThemeOverride switch
@@ -110,6 +111,12 @@ public partial class SettingsWindow : Window
     {
         if (_loading) return;
         _shellSettings.ReplaceExplorer = ReplaceExplorerToggle.IsChecked == true;
+    }
+
+    private void FilterAppsFolderToggle_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_loading) return;
+        _shellSettings.FilterAppsFolder = FilterAppsFolderToggle.IsChecked == true;
     }
 
     #endregion

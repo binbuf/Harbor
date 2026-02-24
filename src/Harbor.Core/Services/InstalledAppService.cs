@@ -14,6 +14,7 @@ namespace Harbor.Core.Services;
 public class InstalledAppService : IDisposable
 {
     private readonly Dispatcher _dispatcher;
+    private readonly ShellSettingsService? _shellSettings;
     private readonly List<FileSystemWatcher> _watchers = [];
     private readonly DispatcherTimer _debounceTimer;
     private bool _disposed;
@@ -29,9 +30,13 @@ public class InstalledAppService : IDisposable
     /// </summary>
     public event Action? AppsChanged;
 
-    public InstalledAppService()
+    public InstalledAppService(ShellSettingsService? shellSettings = null)
     {
         _dispatcher = Application.Current?.Dispatcher ?? Dispatcher.CurrentDispatcher;
+        _shellSettings = shellSettings;
+
+        if (_shellSettings is not null)
+            _shellSettings.SettingsChanged += OnSettingsChanged;
 
         _debounceTimer = new DispatcherTimer(DispatcherPriority.Background, _dispatcher)
         {
@@ -47,7 +52,16 @@ public class InstalledAppService : IDisposable
     {
         try
         {
-            var apps = await Task.Run(ShellAppEnumerator.EnumerateApps);
+            var filter = _shellSettings?.FilterAppsFolder ?? false;
+            var apps = await Task.Run(() => ShellAppEnumerator.EnumerateApps(filter));
+
+            // Dump diagnostic log for review
+            var dumpPath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "Harbor", "apps-dump.tsv");
+            Directory.CreateDirectory(Path.GetDirectoryName(dumpPath)!);
+            ShellAppEnumerator.DumpAppList(apps, dumpPath);
+
             _dispatcher.Invoke(() =>
             {
                 Apps.Clear();
@@ -144,10 +158,18 @@ public class InstalledAppService : IDisposable
 
     #endregion
 
+    private async void OnSettingsChanged(object? sender, EventArgs e)
+    {
+        await ScanAsync();
+    }
+
     public void Dispose()
     {
         if (_disposed) return;
         _disposed = true;
+
+        if (_shellSettings is not null)
+            _shellSettings.SettingsChanged -= OnSettingsChanged;
 
         _debounceTimer.Stop();
 

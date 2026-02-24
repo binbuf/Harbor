@@ -127,7 +127,7 @@ public sealed class AppSwitcherService : IDisposable
                 entry = new AppEntry
                 {
                     ExecutablePath = exePath,
-                    DisplayName = System.IO.Path.GetFileNameWithoutExtension(exePath),
+                    DisplayName = ForegroundWindowService.GetFriendlyNameFromPath(exePath),
                     Icon = _iconService.GetIcon(exePath),
                     Windows = [],
                 };

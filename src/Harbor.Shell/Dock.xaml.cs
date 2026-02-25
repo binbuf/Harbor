@@ -62,8 +62,8 @@ public partial class Dock : Window, IRetreatable
     public static readonly Duration SingleBounceDuration = new(TimeSpan.FromMilliseconds(300));
     public static readonly Duration TotalBounceDuration = new(TimeSpan.FromMilliseconds(900));
 
-    public static readonly Duration ShowAnimationDuration = new(TimeSpan.FromMilliseconds(250));
-    public static readonly Duration HideAnimationDuration = new(TimeSpan.FromMilliseconds(200));
+    public static readonly Duration ShowAnimationDuration = new(TimeSpan.FromMilliseconds(400));
+    public static readonly Duration HideAnimationDuration = new(TimeSpan.FromMilliseconds(350));
 
     // Dock layout constants
     public const double DockWindowHeight = 160.0;   // AppBar window height (includes magnification headroom)
@@ -205,12 +205,14 @@ public partial class Dock : Window, IRetreatable
             DockSlideTransform.BeginAnimation(TranslateTransform.YProperty, null);
             DockSlideTransform.Y = 0;
             DockContainer.Visibility = Visibility.Visible;
+            PeekIndicator.Visibility = Visibility.Collapsed;
         }
 
         if (enabled && startHidden && _autoHideService is not null)
         {
             _autoHideService.ForceHidden();
             DockContainer.Visibility = Visibility.Visible;
+            PeekIndicator.Visibility = Visibility.Collapsed;
             // Animate slide-down instead of instantly hiding
             DockSlideTransform.BeginAnimation(TranslateTransform.YProperty, null);
             DockSlideTransform.Y = 0;
@@ -221,6 +223,7 @@ public partial class Dock : Window, IRetreatable
             slideDown.Completed += (_, _) =>
             {
                 DockContainer.Visibility = Visibility.Collapsed;
+                PeekIndicator.Visibility = Visibility.Visible;
             };
             DockSlideTransform.BeginAnimation(TranslateTransform.YProperty, slideDown);
         }
@@ -463,6 +466,7 @@ public partial class Dock : Window, IRetreatable
     {
         Dispatcher.Invoke(() =>
         {
+            PeekIndicator.Visibility = Visibility.Collapsed;
             DockContainer.Visibility = Visibility.Visible;
             var slideUp = new DoubleAnimation(DockVisibleHeight, 0, ShowAnimationDuration)
             {
@@ -484,6 +488,7 @@ public partial class Dock : Window, IRetreatable
             slideDown.Completed += (_, _) =>
             {
                 DockContainer.Visibility = Visibility.Collapsed;
+                PeekIndicator.Visibility = Visibility.Visible;
                 _autoHideService?.OnHideAnimationCompleted();
             };
             DockSlideTransform.BeginAnimation(TranslateTransform.YProperty, slideDown);

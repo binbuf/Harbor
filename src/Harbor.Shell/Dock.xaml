@@ -73,6 +73,14 @@
     </Window.Resources>
 
     <Grid x:Name="DockRoot" Height="160" VerticalAlignment="Bottom">
+        <!-- Peek indicator: subtle 2px line visible when dock is auto-hidden -->
+        <Border x:Name="PeekIndicator"
+                Height="2"
+                VerticalAlignment="Bottom"
+                Background="{DynamicResource DockPeekIndicatorBrush}"
+                IsHitTestVisible="False"
+                Visibility="Collapsed" />
+
         <!-- Auto-hide trigger zone: 6px tall, invisible, at bottom edge -->
         <Border x:Name="AutoHideTriggerZone"
                 Height="6"

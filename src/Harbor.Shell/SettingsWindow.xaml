@@ -214,26 +214,28 @@
                                    Foreground="{DynamicResource SettingsTextBrush}"
                                    Margin="0,0,0,16" />
 
-                        <!-- Auto-hide mode -->
+                        <!-- Auto-hide dock -->
                         <Border Background="{DynamicResource SettingsCardBackground}" CornerRadius="8" Padding="16,12" Margin="0,0,0,8">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Text="Auto-hide"
-                                           Foreground="{DynamicResource SettingsTextBrush}"
-                                           FontFamily="Segoe UI Variable" FontSize="13"
-                                           VerticalAlignment="Center" />
-                                <ComboBox x:Name="AutoHideModeCombo"
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                    <TextBlock Text="Automatically hide and show the Dock"
+                                               Foreground="{DynamicResource SettingsTextBrush}"
+                                               FontFamily="Segoe UI Variable" FontSize="13" />
+                                    <TextBlock Text="Dock slides out of view until cursor hits the bottom edge"
+                                               Foreground="{DynamicResource SettingsSecondaryTextBrush}"
+                                               FontFamily="Segoe UI Variable" FontSize="11"
+                                               Margin="0,2,0,0" />
+                                </StackPanel>
+                                <CheckBox x:Name="AutoHideDockToggle"
                                           Grid.Column="1"
-                                          Width="160"
+                                          Style="{StaticResource ToggleSwitchStyle}"
                                           VerticalAlignment="Center"
-                                          SelectionChanged="AutoHideModeCombo_SelectionChanged">
-                                    <ComboBoxItem Content="Never" />
-                                    <ComboBoxItem Content="When Overlapped" />
-                                    <ComboBoxItem Content="Always" />
-                                </ComboBox>
+                                          Checked="AutoHideDockToggle_Changed"
+                                          Unchecked="AutoHideDockToggle_Changed" />
                             </Grid>
                         </Border>
 

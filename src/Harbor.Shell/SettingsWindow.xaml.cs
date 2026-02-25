@@ -61,7 +61,7 @@ public partial class SettingsWindow : Window
         };
 
         // Dock
-        AutoHideModeCombo.SelectedIndex = (int)_dockSettings.AutoHideMode;
+        AutoHideDockToggle.IsChecked = _dockSettings.AutoHideMode == DockAutoHideMode.Always;
         IconSizeSlider.Value = _dockSettings.IconSize;
         IconSizeLabel.Text = $"Icon size: {_dockSettings.IconSize} px";
         MagnificationToggle.IsChecked = _dockSettings.MagnificationEnabled;
@@ -144,10 +144,12 @@ public partial class SettingsWindow : Window
 
     #region Dock
 
-    private void AutoHideModeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private void AutoHideDockToggle_Changed(object sender, RoutedEventArgs e)
     {
         if (_loading) return;
-        _dockSettings.AutoHideMode = (DockAutoHideMode)AutoHideModeCombo.SelectedIndex;
+        _dockSettings.AutoHideMode = AutoHideDockToggle.IsChecked == true
+            ? DockAutoHideMode.Always
+            : DockAutoHideMode.Never;
     }
 
     private void IconSizeSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)

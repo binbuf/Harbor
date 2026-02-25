@@ -12,6 +12,7 @@
     <SolidColorBrush x:Key="DockBorderBrush" Color="#1FFFFFFF" />
     <SolidColorBrush x:Key="DockSeparatorBrush" Color="#33FFFFFF" />
     <SolidColorBrush x:Key="DockActiveDotBrush" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="DockPeekIndicatorBrush" Color="#33FFFFFF" />
 
     <!-- Dock Tooltip -->
     <SolidColorBrush x:Key="DockTooltipBackground" Color="#1E1E1E" />

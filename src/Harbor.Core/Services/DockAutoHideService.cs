@@ -21,13 +21,13 @@ public sealed class DockAutoHideService : IDisposable
     public static readonly TimeSpan RevealDelay = TimeSpan.FromMilliseconds(200);
 
     /// <summary>Delay before hiding the dock after cursor leaves the dock area.</summary>
-    public static readonly TimeSpan HideDelay = TimeSpan.FromMilliseconds(1000);
+    public static readonly TimeSpan HideDelay = TimeSpan.FromMilliseconds(300);
 
     /// <summary>Duration of the slide-up show animation.</summary>
-    public static readonly TimeSpan ShowAnimationDuration = TimeSpan.FromMilliseconds(250);
+    public static readonly TimeSpan ShowAnimationDuration = TimeSpan.FromMilliseconds(400);
 
     /// <summary>Duration of the slide-down hide animation.</summary>
-    public static readonly TimeSpan HideAnimationDuration = TimeSpan.FromMilliseconds(200);
+    public static readonly TimeSpan HideAnimationDuration = TimeSpan.FromMilliseconds(350);
 
     /// <summary>Height of the invisible trigger zone at the bottom screen edge (DIP).</summary>
     public const double TriggerZoneHeight = 2.0;

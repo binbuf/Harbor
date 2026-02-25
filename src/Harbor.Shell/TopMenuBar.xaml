@@ -76,6 +76,10 @@
                             Orientation="Horizontal"
                             VerticalAlignment="Center"
                             Margin="0,0,4,0">
+                    <controls:SystemIndicatorIcon x:Name="SafeRemoveIcon"
+                                                   Margin="2,0"
+                                                   VerticalAlignment="Center"
+                                                   Visibility="Collapsed" />
                     <controls:SystemIndicatorIcon x:Name="BluetoothIcon"
                                                    Margin="2,0"
                                                    VerticalAlignment="Center" />

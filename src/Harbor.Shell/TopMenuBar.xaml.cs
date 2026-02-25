@@ -46,6 +46,10 @@ public partial class TopMenuBar : AppBarWindow
     private BatteryService? _batteryService;
     private BatteryFlyout? _batteryFlyout;
 
+    // Safe Remove
+    private SafeRemoveService? _safeRemoveService;
+    private SafeRemoveFlyout? _safeRemoveFlyout;
+
     // Icon geometries (loaded from resource dictionary)
     private static ResourceDictionary? _indicatorIcons;
 
@@ -477,6 +481,77 @@ public partial class TopMenuBar : AppBarWindow
         _batteryFlyout.Top = iconScreenPos.Y / dpi + 4;
 
         _batteryFlyout.Show();
+    }
+
+    /// <summary>
+    /// Connects the safe remove service and wires up the eject indicator icon.
+    /// </summary>
+    public void ConnectSafeRemoveService(SafeRemoveService safeRemoveService)
+    {
+        _safeRemoveService = safeRemoveService;
+        _safeRemoveService.DevicesChanged += OnSafeRemoveDevicesChanged;
+
+        // Load icon geometries
+        _indicatorIcons ??= new ResourceDictionary
+        {
+            Source = new Uri("Resources/SystemIndicatorIcons.xaml", UriKind.Relative),
+        };
+
+        // Set initial icon and visibility
+        if (_indicatorIcons["SafeRemoveIcon"] is System.Windows.Media.Geometry geometry)
+            SafeRemoveIcon.IconData = geometry;
+
+        SafeRemoveIcon.Visibility = _safeRemoveService.HasDevices ? Visibility.Visible : Visibility.Collapsed;
+
+        // Wire click handlers (both left and right click open the flyout)
+        SafeRemoveIcon.Clicked += OnSafeRemoveIconClicked;
+        SafeRemoveIcon.MouseRightButtonUp += OnSafeRemoveIconRightClicked;
+
+        Trace.WriteLine("[Harbor] TopMenuBar: Safe remove service connected.");
+    }
+
+    private void OnSafeRemoveDevicesChanged(object? sender, EventArgs e)
+    {
+        Dispatcher.Invoke(() =>
+        {
+            SafeRemoveIcon.Visibility = _safeRemoveService?.HasDevices == true
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        });
+    }
+
+    private void OnSafeRemoveIconClicked(object? sender, EventArgs e)
+    {
+        OpenSafeRemoveFlyout();
+    }
+
+    private void OnSafeRemoveIconRightClicked(object sender, MouseButtonEventArgs e)
+    {
+        OpenSafeRemoveFlyout();
+        e.Handled = true;
+    }
+
+    private void OpenSafeRemoveFlyout()
+    {
+        if (_safeRemoveService is null) return;
+
+        if (_safeRemoveFlyout is not null)
+        {
+            _safeRemoveFlyout.Close();
+            _safeRemoveFlyout = null;
+            return;
+        }
+
+        _safeRemoveFlyout = new SafeRemoveFlyout(_safeRemoveService);
+        _safeRemoveFlyout.Closed += (_, _) => _safeRemoveFlyout = null;
+
+        // Position below the safe remove icon, converting physical pixels to DIPs
+        var iconScreenPos = SafeRemoveIcon.PointToScreen(new Point(0, SafeRemoveIcon.ActualHeight));
+        var dpi = GetDpiScale();
+        _safeRemoveFlyout.Left = iconScreenPos.X / dpi - 120 + SafeRemoveIcon.ActualWidth / 2;
+        _safeRemoveFlyout.Top = iconScreenPos.Y / dpi + 4;
+
+        _safeRemoveFlyout.Show();
     }
 
     /// <summary>
@@ -1233,6 +1308,17 @@ public partial class TopMenuBar : AppBarWindow
             _batteryService = null;
         }
         BatteryIcon.Clicked -= OnBatteryIconClicked;
+
+        _safeRemoveFlyout?.Close();
+        _safeRemoveFlyout = null;
+
+        if (_safeRemoveService is not null)
+        {
+            _safeRemoveService.DevicesChanged -= OnSafeRemoveDevicesChanged;
+            _safeRemoveService = null;
+        }
+        SafeRemoveIcon.Clicked -= OnSafeRemoveIconClicked;
+        SafeRemoveIcon.MouseRightButtonUp -= OnSafeRemoveIconRightClicked;
 
         TrayIconsControl.ItemsSource = null;
         MenuItemsControl.ItemsSource = null;

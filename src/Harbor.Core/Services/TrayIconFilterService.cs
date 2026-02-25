@@ -56,6 +56,13 @@ public sealed class TrayIconFilterService : IDisposable
         "Charging",
     };
 
+    // Title substrings that identify safe-remove / eject tray icons
+    private static readonly string[] SafeRemoveSubstrings =
+    {
+        "Safely Remove",
+        "Eject",
+    };
+
     public ICollectionView FilteredTrayIcons => _filteredView;
 
     public TrayIconFilterService(NotificationArea notificationArea)
@@ -108,6 +115,12 @@ public sealed class TrayIconFilterService : IDisposable
             }
 
             foreach (var substring in BatterySubstrings)
+            {
+                if (icon.Title.Contains(substring, StringComparison.OrdinalIgnoreCase))
+                    return false;
+            }
+
+            foreach (var substring in SafeRemoveSubstrings)
             {
                 if (icon.Title.Contains(substring, StringComparison.OrdinalIgnoreCase))
                     return false;

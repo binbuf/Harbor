@@ -51,6 +51,7 @@ public partial class App : Application
     private BluetoothService? _bluetoothService;
     private NetworkService? _networkService;
     private BatteryService? _batteryService;
+    private SafeRemoveService? _safeRemoveService;
     private TrayIconFilterService? _trayIconFilter;
     private InstalledAppService? _installedAppService;
     private AppsLauncherWindow? _appsLauncher;
@@ -137,6 +138,7 @@ public partial class App : Application
         _bluetoothService = new BluetoothService();
         _networkService = new NetworkService();
         _batteryService = new BatteryService();
+        _safeRemoveService = new SafeRemoveService();
         _trayIconFilter = new TrayIconFilterService(_shellServices.NotificationArea);
 
         _menuBar.Initialize(_foregroundService, _shellServices.NotificationArea, _globalMenuService, _trayIconFilter);
@@ -151,6 +153,7 @@ public partial class App : Application
         _menuBar.ConnectBluetoothService(_bluetoothService);
         _menuBar.ConnectNetworkService(_networkService);
         _menuBar.ConnectBatteryService(_batteryService);
+        _menuBar.ConnectSafeRemoveService(_safeRemoveService);
 
         // Create dock pinning and settings services
         _dockPinningService = new DockPinningService();
@@ -498,6 +501,9 @@ public partial class App : Application
         // Dispose new services in reverse order of creation
         _trayIconFilter?.Dispose();
         _trayIconFilter = null;
+
+        _safeRemoveService?.Dispose();
+        _safeRemoveService = null;
 
         _batteryService?.Dispose();
         _batteryService = null;

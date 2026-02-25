@@ -133,4 +133,21 @@
         </PathGeometry.Figures>
     </PathGeometry>
 
+    <!-- Safe Remove / Eject icon: upward triangle with horizontal bar (macOS eject symbol, 16x16 viewport) -->
+    <PathGeometry x:Key="SafeRemoveIcon">
+        <PathGeometry.Figures>
+            <!-- Upward triangle -->
+            <PathFigure StartPoint="8,2" IsClosed="True" IsFilled="True">
+                <LineSegment Point="14,10" />
+                <LineSegment Point="2,10" />
+            </PathFigure>
+            <!-- Horizontal bar below -->
+            <PathFigure StartPoint="2,12" IsClosed="True" IsFilled="True">
+                <LineSegment Point="14,12" />
+                <LineSegment Point="14,14" />
+                <LineSegment Point="2,14" />
+            </PathFigure>
+        </PathGeometry.Figures>
+    </PathGeometry>
+
 </ResourceDictionary>

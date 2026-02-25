@@ -243,26 +243,33 @@ public sealed class TitleBarDiscoveryService : IDisposable
             // Run UIA query on a thread pool thread with timeout
             var task = Task.Run(() =>
             {
-                var element = AutomationElement.FromHandle(handle);
-                if (element is null) return;
-
-                var titleBar = element.FindFirst(
-                    TreeScope.Children,
-                    new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.TitleBar));
-
-                if (titleBar is null) return;
-
-                var bounds = titleBar.Current.BoundingRectangle;
-                if (bounds.IsEmpty || bounds.Width <= 0 || bounds.Height <= 0)
-                    return;
-
-                rect = new RECT
+                try
                 {
-                    left = (int)bounds.Left,
-                    top = (int)bounds.Top,
-                    right = (int)(bounds.Left + bounds.Width),
-                    bottom = (int)(bounds.Top + bounds.Height),
-                };
+                    var element = AutomationElement.FromHandle(handle);
+                    if (element is null) return;
+
+                    var titleBar = element.FindFirst(
+                        TreeScope.Children,
+                        new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.TitleBar));
+
+                    if (titleBar is null) return;
+
+                    var bounds = titleBar.Current.BoundingRectangle;
+                    if (bounds.IsEmpty || bounds.Width <= 0 || bounds.Height <= 0)
+                        return;
+
+                    rect = new RECT
+                    {
+                        left = (int)bounds.Left,
+                        top = (int)bounds.Top,
+                        right = (int)(bounds.Left + bounds.Width),
+                        bottom = (int)(bounds.Top + bounds.Height),
+                    };
+                }
+                catch (Exception ex)
+                {
+                    Trace.WriteLine($"[Harbor] TitleBarDiscoveryService: UIA query failed for HWND {handle}: {ex.Message}");
+                }
             });
 
             if (!task.Wait(UiaTimeout))
@@ -445,8 +452,15 @@ public sealed class TitleBarDiscoveryService : IDisposable
 
         var task = Task.Run(() =>
         {
-            var element = AutomationElement.FromHandle(handle);
-            frameworkId = element?.Current.FrameworkId;
+            try
+            {
+                var element = AutomationElement.FromHandle(handle);
+                frameworkId = element?.Current.FrameworkId;
+            }
+            catch (Exception ex)
+            {
+                Trace.WriteLine($"[Harbor] TitleBarDiscoveryService: FrameworkId query failed for HWND {handle}: {ex.Message}");
+            }
         });
 
         if (!task.Wait(UiaTimeout))

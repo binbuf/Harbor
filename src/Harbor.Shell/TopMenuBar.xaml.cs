@@ -483,11 +483,20 @@ public partial class TopMenuBar : AppBarWindow
 
         if (opacity < 1.0)
         {
-            // Build acrylic color with alpha derived from opacity setting
+            // Build acrylic color with alpha derived from opacity setting.
+            // At 0% use fully transparent black (0x00000000) so the blur tint
+            // doesn't add residual colour.
             var alpha = (byte)(opacity * 255);
-            var baseColor = theme == AppTheme.Light ? LightAcrylicColor : DarkAcrylicColor;
-            // Replace alpha byte (top 8 bits) with the slider value
-            var acrylicColor = (baseColor & 0x00FFFFFF) | ((uint)alpha << 24);
+            uint acrylicColor;
+            if (alpha == 0)
+            {
+                acrylicColor = 0x00000000;
+            }
+            else
+            {
+                var baseColor = theme == AppTheme.Light ? LightAcrylicColor : DarkAcrylicColor;
+                acrylicColor = (baseColor & 0x00FFFFFF) | ((uint)alpha << 24);
+            }
 
             var hwnd = new WindowInteropHelper(this).Handle;
             if (hwnd != IntPtr.Zero)

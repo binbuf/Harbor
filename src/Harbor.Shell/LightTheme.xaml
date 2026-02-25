@@ -8,7 +8,7 @@
     <SolidColorBrush x:Key="MenuBarInactiveTextBrush" Color="#80000000" />
 
     <!-- Dock -->
-    <SolidColorBrush x:Key="DockBackground" Color="#80F6F6F6" />
+    <SolidColorBrush x:Key="DockBackground" Color="#D8E1E1E1" />
     <SolidColorBrush x:Key="DockBorderBrush" Color="#14000000" />
     <SolidColorBrush x:Key="DockSeparatorBrush" Color="#1F000000" />
     <SolidColorBrush x:Key="DockActiveDotBrush" Color="#000000" />

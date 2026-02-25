@@ -26,7 +26,7 @@ public class DockSettingsServiceTests : IDisposable
     {
         using var svc = new DockSettingsService(_configPath);
 
-        Assert.Equal(48, svc.IconSize);
+        Assert.Equal(102, svc.IconSize);
         Assert.False(svc.FullWidthDock);
     }
 
@@ -48,7 +48,7 @@ public class DockSettingsServiceTests : IDisposable
 
         using var svc = new DockSettingsService(_configPath);
 
-        Assert.Equal(48, svc.IconSize);
+        Assert.Equal(102, svc.IconSize);
         Assert.False(svc.FullWidthDock);
     }
 
@@ -58,7 +58,7 @@ public class DockSettingsServiceTests : IDisposable
         // Don't create the file
         using var svc = new DockSettingsService(_configPath);
 
-        Assert.Equal(48, svc.IconSize);
+        Assert.Equal(102, svc.IconSize);
         Assert.False(svc.FullWidthDock);
     }
 
@@ -149,7 +149,7 @@ public class DockSettingsServiceTests : IDisposable
         var fired = false;
         svc.SettingsChanged += (_, _) => fired = true;
 
-        svc.IconSize = 48; // same as default
+        svc.IconSize = 102; // same as default
 
         Assert.False(fired);
     }

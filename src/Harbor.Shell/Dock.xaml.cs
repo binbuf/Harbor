@@ -47,17 +47,17 @@ public partial class Dock : Window, IRetreatable
     private int _dragTargetIndex;
 
     // Animation constants (match Design.md Section 5B / 5D)
-    public const double IconDefaultSize = 48.0;
-    public const double IconHoverSize = 56.0;
-    public const double IconPressedSize = 44.0;
+    public const double IconDefaultSize = 102.0;
+    public const double IconHoverSize = 119.0;
+    public const double IconPressedSize = 94.0;
     public const double HoverScaleFactor = IconHoverSize / IconDefaultSize;   // 1.167
-    public const double PressedScaleFactor = IconPressedSize / IconDefaultSize; // 0.917
+    public const double PressedScaleFactor = IconPressedSize / IconDefaultSize; // 0.921
 
     public static readonly Duration HoverScaleDuration = new(TimeSpan.FromMilliseconds(150));
     public static readonly Duration PressScaleDownDuration = new(TimeSpan.FromMilliseconds(80));
     public static readonly Duration PressScaleUpDuration = new(TimeSpan.FromMilliseconds(100));
 
-    public const double BounceTranslation = -12.0; // 12 DIP upward (negative Y)
+    public const double BounceTranslation = -25.0; // 25 DIP upward (negative Y)
     public const int BounceCount = 3;
     public static readonly Duration SingleBounceDuration = new(TimeSpan.FromMilliseconds(300));
     public static readonly Duration TotalBounceDuration = new(TimeSpan.FromMilliseconds(900));
@@ -66,13 +66,13 @@ public partial class Dock : Window, IRetreatable
     public static readonly Duration HideAnimationDuration = new(TimeSpan.FromMilliseconds(200));
 
     // Dock layout constants
-    public const double DockWindowHeight = 96.0;   // AppBar window height (includes magnification headroom)
-    public const double DockVisibleHeight = 68.0;   // Visible pill height for slide animations
+    public const double DockWindowHeight = 200.0;   // AppBar window height (includes magnification headroom)
+    public const double DockVisibleHeight = 166.0;  // Visible pill height for slide animations
 
     // Magnification constants
     public const double MagnificationMaxScale = 1.5;
     public const double MagnificationEffectRadius = 3.0;
-    public const double MagnificationIconPitch = 60.0; // 48 + 12 margin
+    public const double MagnificationIconPitch = 134.0; // 102 + 32 margin
 
     // Easing functions matching the spec cubic-bezier curves
     private static readonly IEasingFunction EaseOut = new QuadraticEase { EasingMode = EasingMode.EaseOut };

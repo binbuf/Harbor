@@ -36,8 +36,8 @@
 
         <!-- Shared icon DataTemplate used by both pinned and running ItemsControls -->
         <DataTemplate x:Key="DockIconTemplate">
-            <Grid Width="48" Height="56"
-                  Margin="6,0"
+            <Grid Width="102" Height="114"
+                  Margin="16,0"
                   Cursor="Hand"
                   RenderTransformOrigin="0.5,1.0"
                   MouseLeftButtonDown="DockIcon_MouseLeftButtonDown"
@@ -58,11 +58,11 @@
                 </Grid.RenderTransform>
                 <!-- Application icon -->
                 <Image Source="{Binding Icon}"
-                       Width="48" Height="48"
+                       Width="102" Height="102"
                        VerticalAlignment="Top"
                        RenderOptions.BitmapScalingMode="HighQuality" />
                 <!-- Active indicator dot (visible only when running) -->
-                <Ellipse Width="4" Height="4"
+                <Ellipse Width="6" Height="6"
                          Fill="{DynamicResource DockActiveDotBrush}"
                          HorizontalAlignment="Center"
                          VerticalAlignment="Bottom"
@@ -72,7 +72,7 @@
         </DataTemplate>
     </Window.Resources>
 
-    <Grid x:Name="DockRoot" Height="96" VerticalAlignment="Bottom">
+    <Grid x:Name="DockRoot" Height="200" VerticalAlignment="Bottom">
         <!-- Auto-hide trigger zone: 6px tall, invisible, at bottom edge -->
         <Border x:Name="AutoHideTriggerZone"
                 Height="6"
@@ -85,12 +85,12 @@
         <Border x:Name="DockContainer"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Bottom"
-                Margin="0,0,0,0"
-                CornerRadius="16,16,0,0"
+                CornerRadius="16"
                 Background="{DynamicResource DockBackground}"
                 BorderBrush="{DynamicResource DockBorderBrush}"
-                BorderThickness="1,1,1,0"
-                Padding="8,6,8,2"
+                BorderThickness="1"
+                Margin="0,0,0,13"
+                Padding="16,12,16,8"
                 ClipToBounds="False"
                 RenderTransformOrigin="0.5,1"
                 MouseEnter="DockContainer_MouseEnter"
@@ -115,10 +115,10 @@
 
                 <!-- Separator: 1px vertical line between pinned and running sections -->
                 <Border x:Name="DockSeparator"
-                        Width="1"
-                        Height="24"
+                        Width="2"
+                        Height="60"
                         VerticalAlignment="Center"
-                        Margin="2,0"
+                        Margin="30,0"
                         Background="{DynamicResource DockSeparatorBrush}"
                         Visibility="Collapsed" />
 
@@ -136,16 +136,16 @@
 
                 <!-- Trash separator -->
                 <Border x:Name="TrashSeparator"
-                        Width="1"
-                        Height="24"
+                        Width="2"
+                        Height="60"
                         VerticalAlignment="Center"
-                        Margin="2,0"
+                        Margin="30,0"
                         Background="{DynamicResource DockSeparatorBrush}" />
 
                 <!-- Trash / Recycle Bin -->
                 <Grid x:Name="TrashIcon"
-                      Width="48" Height="56"
-                      Margin="6,0"
+                      Width="102" Height="114"
+                      Margin="16,0"
                       Cursor="Hand"
                       RenderTransformOrigin="0.5,1.0"
                       MouseLeftButtonUp="TrashIcon_Click"
@@ -164,7 +164,7 @@
                     </Grid.ToolTip>
                     <ToolTipService.InitialShowDelay>500</ToolTipService.InitialShowDelay>
                     <Image x:Name="TrashIconImage"
-                           Width="48" Height="48"
+                           Width="102" Height="102"
                            VerticalAlignment="Top"
                            RenderOptions.BitmapScalingMode="HighQuality" />
                 </Grid>

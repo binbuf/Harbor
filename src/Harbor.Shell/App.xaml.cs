@@ -6,6 +6,7 @@ using Harbor.Core.Interop;
 using Harbor.Core.Services;
 using ManagedShell.AppBar;
 using ManagedShell.Common.Helpers;
+using Windows.Win32.Foundation;
 
 namespace Harbor.Shell;
 
@@ -146,7 +147,7 @@ public partial class App : Application
         // This overrides any existing reservation (e.g. the Windows taskbar) so that
         // Harbor's bars own the screen edges. The original work area is restored on exit.
         _workAreaService = new WorkAreaService();
-        _workAreaService.Apply(topInset: 24, bottomInset: (int)Dock.DockVisibleHeight);
+        _workAreaService.Apply(topInset: ScaledTopInset(), bottomInset: ScaledBottomInset());
 
         // Apply initial auto-hide mode
         ApplyAutoHideMode(_dockSettingsService.AutoHideMode);
@@ -306,20 +307,20 @@ public partial class App : Application
         {
             case DockAutoHideMode.Never:
                 _dock?.SetAutoHide(false);
-                _workAreaService?.Reapply(topInset: 24, bottomInset: (int)Dock.DockVisibleHeight);
+                _workAreaService?.Reapply(topInset: ScaledTopInset(), bottomInset: ScaledBottomInset());
                 break;
 
             case DockAutoHideMode.Always:
                 _dock?.SetAutoHide(true, startHidden: true);
-                _workAreaService?.Reapply(topInset: 24, bottomInset: 0);
+                _workAreaService?.Reapply(topInset: ScaledTopInset(), bottomInset: 0);
                 break;
 
             case DockAutoHideMode.WhenOverlapped:
                 _dock?.SetAutoHide(false);
-                _workAreaService?.Reapply(topInset: 24, bottomInset: (int)Dock.DockVisibleHeight);
+                _workAreaService?.Reapply(topInset: ScaledTopInset(), bottomInset: ScaledBottomInset());
                 if (_windowEventManager is not null)
                 {
-                    _overlapMonitor = new DockOverlapMonitorService(_windowEventManager);
+                    _overlapMonitor = new DockOverlapMonitorService(_windowEventManager, ScaledBottomInset());
                     if (_dock is not null)
                         _overlapMonitor.ExcludedWindow = new Windows.Win32.Foundation.HWND(_dock.Handle);
                     _overlapMonitor.OverlapChanged += OnOverlapChanged;
@@ -343,7 +344,7 @@ public partial class App : Application
             if (isOverlapped)
             {
                 _dock?.SetAutoHide(true, startHidden: true);
-                _workAreaService?.Reapply(topInset: 24, bottomInset: 0);
+                _workAreaService?.Reapply(topInset: ScaledTopInset(), bottomInset: 0);
             }
             else
             {
@@ -354,12 +355,38 @@ public partial class App : Application
                     _overlapCooldownTimer?.Stop();
                     _overlapCooldownTimer = null;
                     _dock?.SetAutoHide(false);
-                    _workAreaService?.Reapply(topInset: 24, bottomInset: (int)Dock.DockVisibleHeight);
+                    _workAreaService?.Reapply(topInset: ScaledTopInset(), bottomInset: ScaledBottomInset());
                 };
                 _overlapCooldownTimer.Start();
             }
         });
     }
+
+    /// <summary>
+    /// Menu bar height in DIPs (matches TopMenuBar.xaml Grid height).
+    /// </summary>
+    private const double MenuBarHeight = 30.0;
+
+    /// <summary>
+    /// Returns the DPI scale factor for the dock window (physical pixels per DIP).
+    /// Falls back to 1.0 if the dock has no HWND yet.
+    /// </summary>
+    private double GetDockScale()
+    {
+        if (_dock is null) return 1.0;
+        var hwnd = new HWND(_dock.Handle);
+        return hwnd == HWND.Null ? 1.0 : DisplayInterop.GetScaleFactorForWindow(hwnd);
+    }
+
+    /// <summary>
+    /// Computes the physical-pixel top inset for the menu bar, scaled by DPI.
+    /// </summary>
+    private int ScaledTopInset() => (int)(MenuBarHeight * GetDockScale());
+
+    /// <summary>
+    /// Computes the physical-pixel bottom inset for the dock, scaled by DPI.
+    /// </summary>
+    private int ScaledBottomInset() => (int)(Dock.DockVisibleHeight * GetDockScale());
 
     /// <summary>
     /// Fires when the process exits — including forced termination by the debugger.

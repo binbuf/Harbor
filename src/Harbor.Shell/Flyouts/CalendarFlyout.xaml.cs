@@ -84,6 +84,13 @@ public partial class CalendarFlyout : Window
         var hwnd = new WindowInteropHelper(this).Handle;
         if (hwnd == IntPtr.Zero) return;
 
+        // Round the HWND at the DWM level so acrylic is clipped to rounded corners
+        var cornerPref = DwmInterop.DWMWCP_ROUND;
+        DwmInterop.SetWindowAttribute(
+            new HWND(hwnd),
+            (Windows.Win32.Graphics.Dwm.DWMWINDOWATTRIBUTE)DwmInterop.DWMWA_WINDOW_CORNER_PREFERENCE,
+            in cornerPref);
+
         var result = CompositionInterop.EnableAcrylic(new HWND(hwnd), AcrylicTintColor);
         if (result)
             FlyoutBorder.Background = Brushes.Transparent;
@@ -150,7 +157,7 @@ public partial class CalendarFlyout : Window
                 Text = dayName[..2],
                 FontFamily = new FontFamily("Segoe UI Variable"),
                 FontSize = 12,
-                Foreground = (Brush)FindResource("CalendarDayHeaderForeground"),
+                Foreground = new SolidColorBrush(Color.FromArgb(0x80, 0xFF, 0xFF, 0xFF)),
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(0, 2, 0, 2)
@@ -268,11 +275,11 @@ public partial class CalendarFlyout : Window
         var startDow = (int)firstOfMonth.DayOfWeek; // 0=Sun
 
         var today = DateTime.Today;
-        var foreground = (Brush)FindResource("FlyoutHeaderForeground");
-        var inactiveFg = (Brush)FindResource("CalendarDayInactiveForeground");
-        var todayBg = (Brush)FindResource("CalendarTodayBackground");
-        var todayFg = (Brush)FindResource("CalendarTodayForeground");
-        var selectedBorder = (Brush)FindResource("CalendarSelectedBorderBrush");
+        var foreground = Brushes.White;
+        var inactiveFg = new SolidColorBrush(Color.FromArgb(0x4D, 0xFF, 0xFF, 0xFF));
+        var todayBg = new SolidColorBrush(Color.FromRgb(0x00, 0x78, 0xD4));
+        var todayFg = Brushes.White;
+        var selectedBorder = new SolidColorBrush(Color.FromRgb(0x00, 0x78, 0xD4));
 
         for (int i = 0; i < 42; i++)
         {
@@ -322,9 +329,9 @@ public partial class CalendarFlyout : Window
     {
         YearButton.Content = _displayYear.ToString();
 
-        var foreground = (Brush)FindResource("FlyoutHeaderForeground");
-        var todayBg = (Brush)FindResource("CalendarTodayBackground");
-        var todayFg = (Brush)FindResource("CalendarTodayForeground");
+        var foreground = Brushes.White;
+        var todayBg = new SolidColorBrush(Color.FromRgb(0x00, 0x78, 0xD4));
+        var todayFg = Brushes.White;
         var today = DateTime.Today;
 
         for (int i = 0; i < 12; i++)
@@ -353,10 +360,10 @@ public partial class CalendarFlyout : Window
     {
         DecadeButton.Content = $"{_displayDecadeStart} – {_displayDecadeStart + 9}";
 
-        var foreground = (Brush)FindResource("FlyoutHeaderForeground");
-        var inactiveFg = (Brush)FindResource("CalendarDayInactiveForeground");
-        var todayBg = (Brush)FindResource("CalendarTodayBackground");
-        var todayFg = (Brush)FindResource("CalendarTodayForeground");
+        var foreground = Brushes.White;
+        var inactiveFg = new SolidColorBrush(Color.FromArgb(0x4D, 0xFF, 0xFF, 0xFF));
+        var todayBg = new SolidColorBrush(Color.FromRgb(0x00, 0x78, 0xD4));
+        var todayFg = Brushes.White;
         var currentYear = DateTime.Today.Year;
 
         for (int i = 0; i < 12; i++)
@@ -394,7 +401,7 @@ public partial class CalendarFlyout : Window
         {
             var isToday = date.Date == DateTime.Today;
             if (!isToday)
-                cell.Background = (Brush)FindResource("CalendarDayHoverBackground");
+                cell.Background = new SolidColorBrush(Color.FromArgb(0x2D, 0xFF, 0xFF, 0xFF));
         }
     }
 
@@ -431,7 +438,7 @@ public partial class CalendarFlyout : Window
             var month = (int)cell.Tag;
             var today = DateTime.Today;
             if (!(_displayYear == today.Year && month == today.Month))
-                cell.Background = (Brush)FindResource("CalendarDayHoverBackground");
+                cell.Background = new SolidColorBrush(Color.FromArgb(0x2D, 0xFF, 0xFF, 0xFF));
         }
     }
 
@@ -462,7 +469,7 @@ public partial class CalendarFlyout : Window
         if (sender is Border cell && cell.Tag is int year)
         {
             if (year != DateTime.Today.Year)
-                cell.Background = (Brush)FindResource("CalendarDayHoverBackground");
+                cell.Background = new SolidColorBrush(Color.FromArgb(0x2D, 0xFF, 0xFF, 0xFF));
         }
     }
 
@@ -596,7 +603,7 @@ public partial class CalendarFlyout : Window
 
     private void InitRevealHighlight()
     {
-        var revealColor = (Color)FindResource("CalendarRevealBorderColor");
+        var revealColor = Color.FromArgb(0x33, 0xFF, 0xFF, 0xFF);
 
         _revealBrush = new RadialGradientBrush
         {

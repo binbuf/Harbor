@@ -15,7 +15,7 @@
         <Style x:Key="CalendarNavButton" TargetType="Button">
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="Foreground" Value="{DynamicResource FlyoutHeaderForeground}" />
+            <Setter Property="Foreground" Value="White" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Width" Value="32" />
             <Setter Property="Height" Value="32" />
@@ -30,8 +30,7 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background"
-                                        Value="{DynamicResource CalendarDayHoverBackground}" />
+                                <Setter TargetName="Bd" Property="Background" Value="#1AFFFFFF" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -43,7 +42,7 @@
         <Style x:Key="CalendarHeaderButton" TargetType="Button">
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="Foreground" Value="{DynamicResource FlyoutHeaderForeground}" />
+            <Setter Property="Foreground" Value="White" />
             <Setter Property="FontFamily" Value="Segoe UI Variable" />
             <Setter Property="FontSize" Value="14" />
             <Setter Property="FontWeight" Value="SemiBold" />
@@ -61,8 +60,7 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background"
-                                        Value="{DynamicResource CalendarDayHoverBackground}" />
+                                <Setter TargetName="Bd" Property="Background" Value="#1AFFFFFF" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -72,16 +70,12 @@
     </Window.Resources>
 
     <Border x:Name="FlyoutBorder"
-            Background="{DynamicResource FlyoutBackground}"
-            BorderBrush="{DynamicResource FlyoutBorderBrush}"
+            Background="#B01E1E1E"
+            BorderBrush="#33FFFFFF"
             BorderThickness="1"
-            CornerRadius="16"
+            CornerRadius="8"
             Padding="16"
-            Margin="4"
             Width="320">
-        <Border.Effect>
-            <DropShadowEffect BlurRadius="20" Opacity="0.4" ShadowDepth="6" Direction="270" />
-        </Border.Effect>
 
         <StackPanel>
             <!-- HEADER: Live clock -->
@@ -89,19 +83,19 @@
                        FontFamily="Segoe UI Variable"
                        FontSize="46"
                        FontWeight="Light"
-                       Foreground="{DynamicResource CalendarClockForeground}"
+                       Foreground="White"
                        Margin="4,0,0,0" />
 
             <!-- Full date -->
             <TextBlock x:Name="DateText"
                        FontFamily="Segoe UI Variable"
                        FontSize="14"
-                       Foreground="{DynamicResource CalendarDateForeground}"
+                       Foreground="#CCFFFFFF"
                        Margin="4,0,0,8" />
 
             <!-- Separator -->
             <Border Height="1"
-                    Background="{DynamicResource FlyoutBorderBrush}"
+                    Background="#33FFFFFF"
                     Margin="0,0,0,8" />
 
             <!-- CALENDAR CONTENT -->
@@ -137,8 +131,7 @@
                                 Style="{StaticResource CalendarNavButton}"
                                 Click="DayPrev_Click">
                             <Path Data="M8,0 L0,6 L8,12"
-                                  Stroke="{DynamicResource FlyoutHeaderForeground}"
-                                  StrokeThickness="1.5"
+                                  Stroke="White" StrokeThickness="1.5"
                                   Width="8" Height="12" Stretch="Uniform" />
                         </Button>
 
@@ -147,8 +140,7 @@
                                 Style="{StaticResource CalendarNavButton}"
                                 Click="DayNext_Click">
                             <Path Data="M0,0 L8,6 L0,12"
-                                  Stroke="{DynamicResource FlyoutHeaderForeground}"
-                                  StrokeThickness="1.5"
+                                  Stroke="White" StrokeThickness="1.5"
                                   Width="8" Height="12" Stretch="Uniform" />
                         </Button>
                     </Grid>
@@ -195,8 +187,7 @@
                                 Style="{StaticResource CalendarNavButton}"
                                 Click="MonthViewPrev_Click">
                             <Path Data="M8,0 L0,6 L8,12"
-                                  Stroke="{DynamicResource FlyoutHeaderForeground}"
-                                  StrokeThickness="1.5"
+                                  Stroke="White" StrokeThickness="1.5"
                                   Width="8" Height="12" Stretch="Uniform" />
                         </Button>
 
@@ -204,8 +195,7 @@
                                 Style="{StaticResource CalendarNavButton}"
                                 Click="MonthViewNext_Click">
                             <Path Data="M0,0 L8,6 L0,12"
-                                  Stroke="{DynamicResource FlyoutHeaderForeground}"
-                                  StrokeThickness="1.5"
+                                  Stroke="White" StrokeThickness="1.5"
                                   Width="8" Height="12" Stretch="Uniform" />
                         </Button>
                     </Grid>
@@ -247,8 +237,7 @@
                                 Style="{StaticResource CalendarNavButton}"
                                 Click="DecadeViewPrev_Click">
                             <Path Data="M8,0 L0,6 L8,12"
-                                  Stroke="{DynamicResource FlyoutHeaderForeground}"
-                                  StrokeThickness="1.5"
+                                  Stroke="White" StrokeThickness="1.5"
                                   Width="8" Height="12" Stretch="Uniform" />
                         </Button>
 
@@ -256,8 +245,7 @@
                                 Style="{StaticResource CalendarNavButton}"
                                 Click="DecadeViewNext_Click">
                             <Path Data="M0,0 L8,6 L0,12"
-                                  Stroke="{DynamicResource FlyoutHeaderForeground}"
-                                  StrokeThickness="1.5"
+                                  Stroke="White" StrokeThickness="1.5"
                                   Width="8" Height="12" Stretch="Uniform" />
                         </Button>
                     </Grid>

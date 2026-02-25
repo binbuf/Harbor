@@ -555,21 +555,8 @@ public partial class Dock : Window, IRetreatable
             }
         }
 
-        // Expand the dock container to ~80% of the magnified height so icons poke above
-        // the pill (matching macOS). The container is bottom-anchored so it grows upward.
-        var fullMagnifiedHeight = IconDefaultSize * maxScale + DockContainerVerticalPadding;
-        var baseHeight = IconDefaultSize + DockContainerVerticalPadding;
-        var targetHeight = baseHeight + (fullMagnifiedHeight - baseHeight) * 0.8;
-
-        // Use explicit From value since Height may be Auto (NaN) which DoubleAnimation can't interpolate from.
-        var currentHeight = DockContainer.ActualHeight;
-        if (double.IsNaN(currentHeight) || currentHeight == 0)
-            currentHeight = baseHeight;
-        var heightAnim = new DoubleAnimation(currentHeight, targetHeight, MagnificationHeightAnimDuration)
-        {
-            EasingFunction = EaseOut,
-        };
-        DockContainer.BeginAnimation(FrameworkElement.HeightProperty, heightAnim);
+        // Dock container height stays fixed — icons poke above the pill via
+        // ClipToBounds="False" and bottom-anchored RenderTransformOrigin, matching real macOS.
     }
 
     private void ResetMagnification()
@@ -577,9 +564,7 @@ public partial class Dock : Window, IRetreatable
         ResetItemsControlScales(PinnedIconsControl);
         ResetItemsControlScales(RunningIconsControl);
 
-        // Reset container height to auto
-        DockContainer.BeginAnimation(FrameworkElement.HeightProperty, null);
-        DockContainer.ClearValue(FrameworkElement.HeightProperty);
+        // Container height is fixed — nothing to reset.
     }
 
     /// <summary>
@@ -609,18 +594,7 @@ public partial class Dock : Window, IRetreatable
         AnimateItemsControlElements(PinnedIconsControl, AnimateElement);
         AnimateItemsControlElements(RunningIconsControl, AnimateElement);
 
-        // Animate the container height back to its base size, then clear to Auto
-        var baseHeight = IconDefaultSize + DockContainerVerticalPadding;
-        var currentHeight = DockContainer.ActualHeight;
-        if (double.IsNaN(currentHeight) || currentHeight == 0)
-            currentHeight = baseHeight;
-        var heightAnim = new DoubleAnimation(currentHeight, baseHeight, duration) { EasingFunction = EaseOut };
-        heightAnim.Completed += (_, _) =>
-        {
-            DockContainer.BeginAnimation(FrameworkElement.HeightProperty, null);
-            DockContainer.ClearValue(FrameworkElement.HeightProperty);
-        };
-        DockContainer.BeginAnimation(FrameworkElement.HeightProperty, heightAnim);
+        // Container height is fixed — icons shrink back within the pill naturally.
     }
 
     private static void CollectIconElements(ItemsControl itemsControl, List<double> centers, List<FrameworkElement> elements, UIElement referencePanel)

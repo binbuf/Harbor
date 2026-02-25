@@ -15,6 +15,7 @@
 
   <ItemGroup>
     <Resource Include="Assets\windows-logo.svg" />
+    <Resource Include="Assets\apps-drawer.png" />
   </ItemGroup>
 
   <ItemGroup>

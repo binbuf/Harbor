@@ -303,41 +303,25 @@ public class IconExtractionService
     }
 
     /// <summary>
-    /// Creates a macOS Launchpad-style 4x4 grid icon for the Apps launcher.
+    /// Loads the Apps launcher icon from the embedded resource PNG.
+    /// Falls back to a simple default icon if the resource is unavailable.
     /// </summary>
     private static ImageSource CreateAppsLauncherIcon()
     {
-        var visual = new DrawingVisual();
-        const double size = 48;
-        const int gridSize = 4;
-        const double padding = 6;
-        const double spacing = 2;
-        const double available = size - padding * 2;
-        const double cellSize = (available - spacing * (gridSize - 1)) / gridSize;
-        const double cornerRadius = 2.0;
-
-        using (var ctx = visual.RenderOpen())
+        try
         {
-            for (int row = 0; row < gridSize; row++)
-            {
-                for (int col = 0; col < gridSize; col++)
-                {
-                    var x = padding + col * (cellSize + spacing);
-                    var y = padding + row * (cellSize + spacing);
-
-                    var brush = new SolidColorBrush(Color.FromRgb(0xCC, 0xCC, 0xCC));
-                    brush.Freeze();
-                    ctx.DrawRoundedRectangle(brush, null,
-                        new Rect(x, y, cellSize, cellSize),
-                        cornerRadius, cornerRadius);
-                }
-            }
+            var bitmap = new BitmapImage();
+            bitmap.BeginInit();
+            bitmap.UriSource = new Uri("pack://application:,,,/Harbor.Shell;component/Assets/apps-drawer.png", UriKind.Absolute);
+            bitmap.CacheOption = BitmapCacheOption.OnLoad;
+            bitmap.EndInit();
+            bitmap.Freeze();
+            return bitmap;
         }
-
-        var renderTarget = new RenderTargetBitmap(48, 48, 96, 96, PixelFormats.Pbgra32);
-        renderTarget.Render(visual);
-        renderTarget.Freeze();
-        return renderTarget;
+        catch
+        {
+            return CreateDefaultIcon();
+        }
     }
 
     /// <summary>

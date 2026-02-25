@@ -34,7 +34,7 @@ public sealed class DockOverlapMonitorService : IDisposable
     /// </summary>
     /// <param name="eventManager">The window event manager to subscribe to.</param>
     /// <param name="dockZoneHeight">Height of the dock zone in physical pixels (default 82).</param>
-    public DockOverlapMonitorService(WindowEventManager eventManager, int dockZoneHeight = 66)
+    public DockOverlapMonitorService(WindowEventManager eventManager, int dockZoneHeight = 68)
     {
         _eventManager = eventManager;
         _dockZoneHeight = dockZoneHeight;

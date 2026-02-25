@@ -146,7 +146,7 @@ public partial class App : Application
         // This overrides any existing reservation (e.g. the Windows taskbar) so that
         // Harbor's bars own the screen edges. The original work area is restored on exit.
         _workAreaService = new WorkAreaService();
-        _workAreaService.Apply(topInset: 24, bottomInset: 58);
+        _workAreaService.Apply(topInset: 24, bottomInset: (int)Dock.DockVisibleHeight);
 
         // Apply initial auto-hide mode
         ApplyAutoHideMode(_dockSettingsService.AutoHideMode);
@@ -306,7 +306,7 @@ public partial class App : Application
         {
             case DockAutoHideMode.Never:
                 _dock?.SetAutoHide(false);
-                _workAreaService?.Reapply(topInset: 24, bottomInset: 58);
+                _workAreaService?.Reapply(topInset: 24, bottomInset: (int)Dock.DockVisibleHeight);
                 break;
 
             case DockAutoHideMode.Always:
@@ -316,7 +316,7 @@ public partial class App : Application
 
             case DockAutoHideMode.WhenOverlapped:
                 _dock?.SetAutoHide(false);
-                _workAreaService?.Reapply(topInset: 24, bottomInset: 58);
+                _workAreaService?.Reapply(topInset: 24, bottomInset: (int)Dock.DockVisibleHeight);
                 if (_windowEventManager is not null)
                 {
                     _overlapMonitor = new DockOverlapMonitorService(_windowEventManager);
@@ -354,7 +354,7 @@ public partial class App : Application
                     _overlapCooldownTimer?.Stop();
                     _overlapCooldownTimer = null;
                     _dock?.SetAutoHide(false);
-                    _workAreaService?.Reapply(topInset: 24, bottomInset: 58);
+                    _workAreaService?.Reapply(topInset: 24, bottomInset: (int)Dock.DockVisibleHeight);
                 };
                 _overlapCooldownTimer.Start();
             }

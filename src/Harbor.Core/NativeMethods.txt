@@ -38,6 +38,7 @@ QueryPerformanceCounter
 QueryPerformanceFrequency
 
 // Window State
+GetClassName
 IsIconic
 FindWindow
 GetWindow

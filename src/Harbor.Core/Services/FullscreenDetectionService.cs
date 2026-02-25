@@ -40,6 +40,12 @@ public sealed class FullscreenDetectionService
         if (!WindowInterop.IsWindow(hwnd) || !WindowInterop.IsWindowVisible(hwnd))
             return new FullscreenInfo(false, IntPtr.Zero, FullscreenKind.None);
 
+        // Exclude known desktop shell windows — these cover the full monitor
+        // but are NOT fullscreen applications.
+        var className = WindowInterop.GetClassName(hwnd);
+        if (className is "Progman" or "WorkerW" or "Shell_TrayWnd" or "Shell_SecondaryTrayWnd")
+            return new FullscreenInfo(false, IntPtr.Zero, FullscreenKind.None);
+
         var monitorHandle = DisplayInterop.GetMonitorForWindow(hwnd);
         var monitorBounds = DisplayInterop.GetMonitorBounds(hwnd);
         if (monitorBounds is null)

@@ -126,6 +126,16 @@ public static class WindowInterop
         }
     }
 
+    public static string GetClassName(HWND hwnd)
+    {
+        unsafe
+        {
+            var buffer = stackalloc char[256];
+            var length = PInvoke.GetClassName(hwnd, buffer, 256);
+            return length > 0 ? new string(buffer, 0, length) : string.Empty;
+        }
+    }
+
     public static uint GetWindowThreadProcessId(HWND hwnd, out uint processId)
     {
         unsafe

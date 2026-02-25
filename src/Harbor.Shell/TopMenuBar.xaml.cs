@@ -14,6 +14,7 @@ using Harbor.Core.Interop;
 using Harbor.Core.Services;
 using ManagedShell.AppBar;
 using ManagedShell.Common.Helpers;
+using Harbor.Shell.Flyouts;
 using ManagedShell.WindowsTray;
 using Windows.Win32.Foundation;
 using Windows.Win32.UI.WindowsAndMessaging;
@@ -28,6 +29,13 @@ public partial class TopMenuBar : AppBarWindow
     private NotificationArea? _notificationArea;
     private DispatcherTimer? _clockTimer;
     private CalendarFlyout? _calendarFlyout;
+
+    // Volume
+    private VolumeService? _volumeService;
+    private VolumeFlyout? _volumeFlyout;
+
+    // Icon geometries (loaded from resource dictionary)
+    private static ResourceDictionary? _indicatorIcons;
 
     // Auto-hide
     private MenuBarAutoHideService? _autoHideService;
@@ -85,7 +93,7 @@ public partial class TopMenuBar : AppBarWindow
     /// Initializes services after the window source is available.
     /// Called after Show() so we have an HWND for acrylic.
     /// </summary>
-    public void Initialize(ForegroundWindowService foregroundService, NotificationArea notificationArea, GlobalMenuBarService globalMenuService)
+    public void Initialize(ForegroundWindowService foregroundService, NotificationArea notificationArea, GlobalMenuBarService globalMenuService, TrayIconFilterService? trayIconFilter = null)
     {
         _foregroundService = foregroundService;
         _foregroundService.PropertyChanged += OnForegroundChanged;
@@ -95,9 +103,12 @@ public partial class TopMenuBar : AppBarWindow
             ? "Harbor"
             : _foregroundService.ActiveAppName;
 
-        // Bind system tray icons
+        // Bind system tray icons (use filtered view if available)
         _notificationArea = notificationArea;
-        TrayIconsControl.ItemsSource = _notificationArea.TrayIcons;
+        if (trayIconFilter is not null)
+            TrayIconsControl.ItemsSource = trayIconFilter.FilteredTrayIcons;
+        else
+            TrayIconsControl.ItemsSource = _notificationArea.TrayIcons;
 
         // Wire up global menu bar
         _globalMenuService = globalMenuService;
@@ -124,6 +135,73 @@ public partial class TopMenuBar : AppBarWindow
         _shellSettings = shellSettings;
         _shellSettings.SettingsChanged += OnShellSettingsChanged;
         ApplySettingsToUI();
+    }
+
+    /// <summary>
+    /// Connects the volume service and wires up the volume indicator icon.
+    /// </summary>
+    public void ConnectVolumeService(VolumeService volumeService)
+    {
+        _volumeService = volumeService;
+        _volumeService.VolumeChanged += OnVolumeServiceChanged;
+
+        // Load icon geometries
+        _indicatorIcons ??= new ResourceDictionary
+        {
+            Source = new Uri("Resources/SystemIndicatorIcons.xaml", UriKind.Relative),
+        };
+
+        // Set initial icon state
+        UpdateVolumeIcon(_volumeService.IconState);
+
+        // Wire click handler
+        VolumeIcon.Clicked += OnVolumeIconClicked;
+
+        Trace.WriteLine("[Harbor] TopMenuBar: Volume service connected.");
+    }
+
+    private void OnVolumeServiceChanged(object? sender, VolumeChangedEventArgs e)
+    {
+        Dispatcher.Invoke(() => UpdateVolumeIcon(e.IconState));
+    }
+
+    private void UpdateVolumeIcon(VolumeIconState state)
+    {
+        if (_indicatorIcons is null) return;
+
+        var key = state switch
+        {
+            VolumeIconState.Muted => "VolumeMutedIcon",
+            VolumeIconState.Low => "VolumeLowIcon",
+            VolumeIconState.Medium => "VolumeMediumIcon",
+            VolumeIconState.High => "VolumeHighIcon",
+            _ => "VolumeHighIcon",
+        };
+
+        if (_indicatorIcons[key] is System.Windows.Media.Geometry geometry)
+            VolumeIcon.IconData = geometry;
+    }
+
+    private void OnVolumeIconClicked(object? sender, EventArgs e)
+    {
+        if (_volumeService is null) return;
+
+        if (_volumeFlyout is not null)
+        {
+            _volumeFlyout.Close();
+            _volumeFlyout = null;
+            return;
+        }
+
+        _volumeFlyout = new VolumeFlyout(_volumeService);
+        _volumeFlyout.Closed += (_, _) => _volumeFlyout = null;
+
+        // Position below the volume icon
+        var iconScreenPos = VolumeIcon.PointToScreen(new Point(0, VolumeIcon.ActualHeight));
+        _volumeFlyout.Left = iconScreenPos.X - 120 + VolumeIcon.ActualWidth / 2;
+        _volumeFlyout.Top = iconScreenPos.Y + 4;
+
+        _volumeFlyout.Show();
     }
 
     /// <summary>
@@ -792,6 +870,16 @@ public partial class TopMenuBar : AppBarWindow
 
         _calendarFlyout?.Close();
         _calendarFlyout = null;
+
+        _volumeFlyout?.Close();
+        _volumeFlyout = null;
+
+        if (_volumeService is not null)
+        {
+            _volumeService.VolumeChanged -= OnVolumeServiceChanged;
+            _volumeService = null;
+        }
+        VolumeIcon.Clicked -= OnVolumeIconClicked;
 
         TrayIconsControl.ItemsSource = null;
         MenuItemsControl.ItemsSource = null;

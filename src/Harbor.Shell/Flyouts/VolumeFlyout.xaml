@@ -1,0 +1,178 @@
+<Window x:Class="Harbor.Shell.Flyouts.VolumeFlyout"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Volume"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        ShowInTaskbar="False"
+        Topmost="True"
+        Background="Transparent"
+        SizeToContent="WidthAndHeight"
+        ResizeMode="NoResize">
+
+    <Window.Resources>
+        <DropShadowEffect x:Key="ThumbShadow" BlurRadius="4" Opacity="0.25" ShadowDepth="1" Direction="270" />
+    </Window.Resources>
+
+    <Border Background="{DynamicResource FlyoutBackground}"
+            BorderBrush="{DynamicResource FlyoutBorderBrush}"
+            BorderThickness="1"
+            CornerRadius="16"
+            Padding="16"
+            Margin="4"
+            MinWidth="280">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="16" Opacity="0.3" ShadowDepth="4" Direction="270" />
+        </Border.Effect>
+
+        <StackPanel>
+            <!-- Header -->
+            <TextBlock Text="Sound"
+                       FontFamily="Segoe UI Variable"
+                       FontSize="14"
+                       FontWeight="SemiBold"
+                       Foreground="{DynamicResource FlyoutHeaderForeground}"
+                       Margin="4,0,0,12" />
+
+            <!-- Volume slider -->
+            <Grid Margin="0,0,0,12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <Slider x:Name="VolumeSlider"
+                        Grid.Column="0"
+                        Minimum="0" Maximum="100"
+                        IsSnapToTickEnabled="True"
+                        TickFrequency="1"
+                        VerticalAlignment="Center"
+                        ValueChanged="VolumeSlider_ValueChanged">
+                    <Slider.Template>
+                        <ControlTemplate TargetType="Slider">
+                            <Grid Height="24">
+                                <!-- Track background (pill shape) -->
+                                <Border Height="6"
+                                        CornerRadius="3"
+                                        Background="{DynamicResource FlyoutSliderTrackBackground}"
+                                        VerticalAlignment="Center" />
+
+                                <!-- Invisible native track for thumb dragging -->
+                                <Track x:Name="PART_Track" Margin="8,0">
+                                    <Track.DecreaseRepeatButton>
+                                        <RepeatButton Command="Slider.DecreaseLarge" Opacity="0" />
+                                    </Track.DecreaseRepeatButton>
+                                    <Track.IncreaseRepeatButton>
+                                        <RepeatButton Command="Slider.IncreaseLarge" Opacity="0" />
+                                    </Track.IncreaseRepeatButton>
+                                    <Track.Thumb>
+                                        <Thumb>
+                                            <Thumb.Template>
+                                                <ControlTemplate TargetType="Thumb">
+                                                    <Ellipse Width="16" Height="16"
+                                                             Fill="White"
+                                                             Effect="{StaticResource ThumbShadow}" />
+                                                </ControlTemplate>
+                                            </Thumb.Template>
+                                        </Thumb>
+                                    </Track.Thumb>
+                                </Track>
+                            </Grid>
+                        </ControlTemplate>
+                    </Slider.Template>
+                </Slider>
+
+                <TextBlock x:Name="VolumePercentText"
+                           Grid.Column="1"
+                           Width="36"
+                           TextAlignment="Right"
+                           VerticalAlignment="Center"
+                           Margin="8,0,0,0"
+                           FontFamily="Segoe UI Variable"
+                           FontSize="12"
+                           Foreground="{DynamicResource FlyoutSecondaryText}"
+                           Text="50%" />
+            </Grid>
+
+            <!-- Separator -->
+            <Border Height="1"
+                    Background="{DynamicResource FlyoutBorderBrush}"
+                    Margin="0,0,0,8" />
+
+            <!-- Output label -->
+            <TextBlock Text="Output"
+                       FontFamily="Segoe UI Variable"
+                       FontSize="11"
+                       Foreground="{DynamicResource FlyoutSecondaryText}"
+                       Margin="4,0,0,6" />
+
+            <!-- Device list -->
+            <ItemsControl x:Name="DeviceList">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border CornerRadius="8"
+                                Padding="8,6"
+                                Margin="0,1"
+                                Cursor="Hand"
+                                Background="Transparent"
+                                MouseLeftButtonUp="DeviceRow_Click"
+                                MouseEnter="DeviceRow_MouseEnter"
+                                MouseLeave="DeviceRow_MouseLeave">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="20" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+
+                                <!-- Checkmark for active device -->
+                                <TextBlock Grid.Column="0"
+                                           Text="&#x2713;"
+                                           FontSize="12"
+                                           VerticalAlignment="Center"
+                                           Foreground="{DynamicResource FlyoutCheckmarkBrush}">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsActive}" Value="True">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+
+                                <TextBlock Grid.Column="1"
+                                           Text="{Binding Name}"
+                                           FontFamily="Segoe UI Variable"
+                                           FontSize="13"
+                                           Foreground="{DynamicResource FlyoutHeaderForeground}"
+                                           VerticalAlignment="Center"
+                                           TextTrimming="CharacterEllipsis" />
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <!-- Separator -->
+            <Border Height="1"
+                    Background="{DynamicResource FlyoutBorderBrush}"
+                    Margin="0,8,0,4" />
+
+            <!-- Sound Settings link -->
+            <Border CornerRadius="8"
+                    Padding="8,6"
+                    Cursor="Hand"
+                    Background="Transparent"
+                    MouseLeftButtonUp="SoundSettings_Click"
+                    MouseEnter="DeviceRow_MouseEnter"
+                    MouseLeave="DeviceRow_MouseLeave">
+                <TextBlock Text="Sound Settings..."
+                           FontFamily="Segoe UI Variable"
+                           FontSize="13"
+                           Foreground="{DynamicResource FlyoutHeaderForeground}" />
+            </Border>
+        </StackPanel>
+    </Border>
+</Window>

@@ -47,6 +47,8 @@ public partial class App : Application
     private AppBarRegistration? _menuBarRegistration;
     private TopMenuBar? _menuBar;
     private Dock? _dock;
+    private VolumeService? _volumeService;
+    private TrayIconFilterService? _trayIconFilter;
     private InstalledAppService? _installedAppService;
     private AppsLauncherWindow? _appsLauncher;
 
@@ -127,12 +129,19 @@ public partial class App : Application
             30);
 
         _menuBarRegistration = AppBarHelper.Register(_menuBar, AppBarEdge.Top);
-        _menuBar.Initialize(_foregroundService, _shellServices.NotificationArea, _globalMenuService);
+        // Create volume service and tray icon filter before menu bar initialization
+        _volumeService = new VolumeService();
+        _trayIconFilter = new TrayIconFilterService(_shellServices.NotificationArea);
+
+        _menuBar.Initialize(_foregroundService, _shellServices.NotificationArea, _globalMenuService, _trayIconFilter);
         _menuBar.ConnectSettings(_shellSettingsService);
 
         // Connect wallpaper brightness service for dynamic menu bar color
         _wallpaperBrightnessService = new WallpaperBrightnessService(_wallpaperService);
         _menuBar.ConnectBrightnessService(_wallpaperBrightnessService);
+
+        // Connect volume service to menu bar
+        _menuBar.ConnectVolumeService(_volumeService);
 
         // Create dock pinning and settings services
         _dockPinningService = new DockPinningService();
@@ -478,6 +487,12 @@ public partial class App : Application
         _watchdogProcess = null;
 
         // Dispose new services in reverse order of creation
+        _volumeService?.Dispose();
+        _volumeService = null;
+
+        _trayIconFilter?.Dispose();
+        _trayIconFilter = null;
+
         _recycleBinService?.Dispose();
         _recycleBinService = null;
 

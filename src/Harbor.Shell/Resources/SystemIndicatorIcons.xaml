@@ -1,0 +1,85 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- Volume High: speaker body + 3 wave arcs (16x16 viewport) -->
+    <PathGeometry x:Key="VolumeHighIcon">
+        <PathGeometry.Figures>
+            <!-- Speaker body -->
+            <PathFigure StartPoint="1,5.5" IsClosed="True" IsFilled="True">
+                <LineSegment Point="4,5.5" />
+                <LineSegment Point="7.5,2" />
+                <LineSegment Point="7.5,14" />
+                <LineSegment Point="4,10.5" />
+                <LineSegment Point="1,10.5" />
+            </PathFigure>
+            <!-- Wave arc 1 (small) -->
+            <PathFigure StartPoint="9.5,6" IsClosed="False" IsFilled="False">
+                <ArcSegment Point="9.5,10" Size="2.5,2.5" SweepDirection="Clockwise" IsLargeArc="False" />
+            </PathFigure>
+            <!-- Wave arc 2 (medium) -->
+            <PathFigure StartPoint="10.5,4" IsClosed="False" IsFilled="False">
+                <ArcSegment Point="10.5,12" Size="4.5,4.5" SweepDirection="Clockwise" IsLargeArc="False" />
+            </PathFigure>
+            <!-- Wave arc 3 (large) -->
+            <PathFigure StartPoint="11.5,2" IsClosed="False" IsFilled="False">
+                <ArcSegment Point="11.5,14" Size="6.5,6.5" SweepDirection="Clockwise" IsLargeArc="False" />
+            </PathFigure>
+        </PathGeometry.Figures>
+    </PathGeometry>
+
+    <!-- Volume Medium: speaker body + 2 wave arcs -->
+    <PathGeometry x:Key="VolumeMediumIcon">
+        <PathGeometry.Figures>
+            <PathFigure StartPoint="1,5.5" IsClosed="True" IsFilled="True">
+                <LineSegment Point="4,5.5" />
+                <LineSegment Point="7.5,2" />
+                <LineSegment Point="7.5,14" />
+                <LineSegment Point="4,10.5" />
+                <LineSegment Point="1,10.5" />
+            </PathFigure>
+            <PathFigure StartPoint="9.5,6" IsClosed="False" IsFilled="False">
+                <ArcSegment Point="9.5,10" Size="2.5,2.5" SweepDirection="Clockwise" IsLargeArc="False" />
+            </PathFigure>
+            <PathFigure StartPoint="10.5,4" IsClosed="False" IsFilled="False">
+                <ArcSegment Point="10.5,12" Size="4.5,4.5" SweepDirection="Clockwise" IsLargeArc="False" />
+            </PathFigure>
+        </PathGeometry.Figures>
+    </PathGeometry>
+
+    <!-- Volume Low: speaker body + 1 wave arc -->
+    <PathGeometry x:Key="VolumeLowIcon">
+        <PathGeometry.Figures>
+            <PathFigure StartPoint="1,5.5" IsClosed="True" IsFilled="True">
+                <LineSegment Point="4,5.5" />
+                <LineSegment Point="7.5,2" />
+                <LineSegment Point="7.5,14" />
+                <LineSegment Point="4,10.5" />
+                <LineSegment Point="1,10.5" />
+            </PathFigure>
+            <PathFigure StartPoint="9.5,6" IsClosed="False" IsFilled="False">
+                <ArcSegment Point="9.5,10" Size="2.5,2.5" SweepDirection="Clockwise" IsLargeArc="False" />
+            </PathFigure>
+        </PathGeometry.Figures>
+    </PathGeometry>
+
+    <!-- Volume Muted: speaker body + diagonal slash -->
+    <PathGeometry x:Key="VolumeMutedIcon">
+        <PathGeometry.Figures>
+            <PathFigure StartPoint="1,5.5" IsClosed="True" IsFilled="True">
+                <LineSegment Point="4,5.5" />
+                <LineSegment Point="7.5,2" />
+                <LineSegment Point="7.5,14" />
+                <LineSegment Point="4,10.5" />
+                <LineSegment Point="1,10.5" />
+            </PathFigure>
+            <!-- Diagonal slash -->
+            <PathFigure StartPoint="10,4" IsClosed="False" IsFilled="False">
+                <LineSegment Point="14,12" />
+            </PathFigure>
+            <PathFigure StartPoint="14,4" IsClosed="False" IsFilled="False">
+                <LineSegment Point="10,12" />
+            </PathFigure>
+        </PathGeometry.Figures>
+    </PathGeometry>
+
+</ResourceDictionary>

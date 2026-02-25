@@ -51,6 +51,13 @@
     <SolidColorBrush x:Key="SettingsToggleOffBackground" Color="#CCCCCC" />
     <SolidColorBrush x:Key="SettingsCardBackground" Color="#FFFFFFFF" />
 
+    <!-- System Indicator Flyouts -->
+    <SolidColorBrush x:Key="FlyoutSliderTrackBackground" Color="#1A000000" />
+    <SolidColorBrush x:Key="FlyoutSliderFillBrush" Color="#000000" />
+    <SolidColorBrush x:Key="FlyoutSecondaryText" Color="#80000000" />
+    <SolidColorBrush x:Key="FlyoutItemHoverBackground" Color="#14000000" />
+    <SolidColorBrush x:Key="FlyoutCheckmarkBrush" Color="#0078D4" />
+
     <!-- Apps Launcher -->
     <SolidColorBrush x:Key="AppsLauncherBackground" Color="#E6F0F0F0" />
     <SolidColorBrush x:Key="AppsLauncherSearchBackground" Color="#1A000000" />

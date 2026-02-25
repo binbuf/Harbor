@@ -57,6 +57,9 @@ public sealed class WorkAreaService : IDisposable
 
     /// <summary>
     /// Re-applies the work area with new insets without resetting the saved original work area.
+    /// Uses a silent update (no SPIF_SENDCHANGE) to prevent the hidden Windows taskbar
+    /// from re-asserting its AppBar reservation in response to WM_SETTINGCHANGE.
+    /// Maximized windows are manually re-snapped after the update.
     /// </summary>
     public void Reapply(int topInset, int bottomInset)
     {
@@ -70,8 +73,10 @@ public sealed class WorkAreaService : IDisposable
             bottom = _screenBounds.bottom - bottomInset,
         };
 
-        SetWorkArea(reduced);
+        SetWorkAreaSilent(reduced);
         Trace.WriteLine($"[Harbor] WorkAreaService: Reapplied work area: L={reduced.left} T={reduced.top} R={reduced.right} B={reduced.bottom}");
+
+        RestoreMaximizedWindows();
     }
 
     /// <summary>
@@ -147,6 +152,19 @@ public sealed class WorkAreaService : IDisposable
             0,
             &rect,
             SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS.SPIF_SENDCHANGE);
+    }
+
+    /// <summary>
+    /// Sets the work area without broadcasting WM_SETTINGCHANGE.
+    /// This prevents the hidden Windows taskbar from re-asserting its AppBar reservation.
+    /// </summary>
+    private static unsafe void SetWorkAreaSilent(RECT rect)
+    {
+        PInvoke.SystemParametersInfo(
+            (SYSTEM_PARAMETERS_INFO_ACTION)SPI_SETWORKAREA,
+            0,
+            &rect,
+            0);
     }
 
     /// <summary>

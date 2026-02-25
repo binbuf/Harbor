@@ -64,3 +64,6 @@ GetSystemMetrics
 GetDoubleClickTime
 ExitWindowsEx
 LockWorkStation
+
+// Battery
+GetSystemPowerStatus

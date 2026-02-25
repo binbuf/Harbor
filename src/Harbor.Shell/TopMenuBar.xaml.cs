@@ -42,6 +42,10 @@ public partial class TopMenuBar : AppBarWindow
     private NetworkService? _networkService;
     private NetworkFlyout? _networkFlyout;
 
+    // Battery
+    private BatteryService? _batteryService;
+    private BatteryFlyout? _batteryFlyout;
+
     // Icon geometries (loaded from resource dictionary)
     private static ResourceDictionary? _indicatorIcons;
 
@@ -386,6 +390,93 @@ public partial class TopMenuBar : AppBarWindow
         _networkFlyout.Top = iconScreenPos.Y / dpi + 4;
 
         _networkFlyout.Show();
+    }
+
+    // Battery icon geometries built from Segoe Fluent Icons font glyphs
+    private static Dictionary<BatteryIconState, Geometry>? _batteryIconGeometries;
+
+    /// <summary>
+    /// Connects the battery service and wires up the battery indicator icon.
+    /// </summary>
+    public void ConnectBatteryService(BatteryService batteryService)
+    {
+        _batteryService = batteryService;
+        _batteryService.BatteryChanged += OnBatteryServiceChanged;
+
+        // Build battery icon geometries from Segoe Fluent Icons glyphs (one-time)
+        _batteryIconGeometries ??= BuildBatteryIconGeometries();
+
+        // Set initial icon state and visibility
+        UpdateBatteryIcon(_batteryService.IconState);
+        BatteryIcon.Visibility = _batteryService.HasBattery ? Visibility.Visible : Visibility.Collapsed;
+
+        // Wire click handler
+        BatteryIcon.Clicked += OnBatteryIconClicked;
+
+        Trace.WriteLine("[Harbor] TopMenuBar: Battery service connected.");
+    }
+
+    private static Dictionary<BatteryIconState, Geometry> BuildBatteryIconGeometries()
+    {
+        // Segoe Fluent Icons codepoints for Windows 11 battery icons
+        const string batteryCritical = "\uEBA0"; // Battery0 (empty/critical)
+        const string batteryLow = "\uEBA2";      // Battery2 (~20%)
+        const string batteryMedium = "\uEBA5";    // Battery5 (~50%)
+        const string batteryHigh = "\uEBA7";      // Battery7 (~70%)
+        const string batteryFull = "\uEBAA";      // Battery10 (full)
+        const string batteryCharging = "\uEBB5";  // BatteryCharging10 (charging)
+
+        var dict = new Dictionary<BatteryIconState, Geometry>
+        {
+            [BatteryIconState.Critical] = GlyphToGeometry(batteryCritical),
+            [BatteryIconState.Low] = GlyphToGeometry(batteryLow),
+            [BatteryIconState.Medium] = GlyphToGeometry(batteryMedium),
+            [BatteryIconState.High] = GlyphToGeometry(batteryHigh),
+            [BatteryIconState.Full] = GlyphToGeometry(batteryFull),
+            [BatteryIconState.Charging] = GlyphToGeometry(batteryCharging),
+        };
+
+        return dict;
+    }
+
+    private void OnBatteryServiceChanged(object? sender, BatteryChangedEventArgs e)
+    {
+        Dispatcher.Invoke(() =>
+        {
+            UpdateBatteryIcon(e.IconState);
+            BatteryIcon.Visibility = e.HasBattery ? Visibility.Visible : Visibility.Collapsed;
+        });
+    }
+
+    private void UpdateBatteryIcon(BatteryIconState state)
+    {
+        if (_batteryIconGeometries is null) return;
+
+        if (_batteryIconGeometries.TryGetValue(state, out var geometry))
+            BatteryIcon.IconData = geometry;
+    }
+
+    private void OnBatteryIconClicked(object? sender, EventArgs e)
+    {
+        if (_batteryService is null) return;
+
+        if (_batteryFlyout is not null)
+        {
+            _batteryFlyout.Close();
+            _batteryFlyout = null;
+            return;
+        }
+
+        _batteryFlyout = new BatteryFlyout(_batteryService);
+        _batteryFlyout.Closed += (_, _) => _batteryFlyout = null;
+
+        // Position below the battery icon, converting physical pixels to DIPs
+        var iconScreenPos = BatteryIcon.PointToScreen(new Point(0, BatteryIcon.ActualHeight));
+        var dpi = GetDpiScale();
+        _batteryFlyout.Left = iconScreenPos.X / dpi - 120 + BatteryIcon.ActualWidth / 2;
+        _batteryFlyout.Top = iconScreenPos.Y / dpi + 4;
+
+        _batteryFlyout.Show();
     }
 
     /// <summary>
@@ -1132,6 +1223,16 @@ public partial class TopMenuBar : AppBarWindow
             _networkService = null;
         }
         WiFiIcon.Clicked -= OnWiFiIconClicked;
+
+        _batteryFlyout?.Close();
+        _batteryFlyout = null;
+
+        if (_batteryService is not null)
+        {
+            _batteryService.BatteryChanged -= OnBatteryServiceChanged;
+            _batteryService = null;
+        }
+        BatteryIcon.Clicked -= OnBatteryIconClicked;
 
         TrayIconsControl.ItemsSource = null;
         MenuItemsControl.ItemsSource = null;

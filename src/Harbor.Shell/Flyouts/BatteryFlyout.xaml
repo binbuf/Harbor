@@ -1,0 +1,76 @@
+<Window x:Class="Harbor.Shell.Flyouts.BatteryFlyout"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Battery"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        ShowInTaskbar="False"
+        Topmost="True"
+        Background="Transparent"
+        SizeToContent="WidthAndHeight"
+        ResizeMode="NoResize">
+
+    <Border Background="{DynamicResource FlyoutBackground}"
+            BorderBrush="{DynamicResource FlyoutBorderBrush}"
+            BorderThickness="1"
+            CornerRadius="16"
+            Padding="16"
+            Margin="4"
+            MinWidth="280">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="16" Opacity="0.3" ShadowDepth="4" Direction="270" />
+        </Border.Effect>
+
+        <StackPanel>
+            <!-- Header -->
+            <TextBlock Text="Battery"
+                       FontFamily="Segoe UI Variable"
+                       FontSize="14"
+                       FontWeight="SemiBold"
+                       Foreground="{DynamicResource FlyoutHeaderForeground}"
+                       Margin="4,0,0,12" />
+
+            <!-- Percentage display -->
+            <TextBlock x:Name="PercentageText"
+                       FontFamily="Segoe UI Variable"
+                       FontSize="28"
+                       FontWeight="Light"
+                       Foreground="{DynamicResource FlyoutHeaderForeground}"
+                       Margin="4,0,0,4" />
+
+            <!-- Status line -->
+            <TextBlock x:Name="StatusText"
+                       FontFamily="Segoe UI Variable"
+                       FontSize="12"
+                       Foreground="{DynamicResource FlyoutSecondaryText}"
+                       Margin="4,0,0,4" />
+
+            <!-- Time remaining -->
+            <TextBlock x:Name="TimeRemainingText"
+                       FontFamily="Segoe UI Variable"
+                       FontSize="12"
+                       Foreground="{DynamicResource FlyoutSecondaryText}"
+                       Margin="4,0,0,8"
+                       Visibility="Collapsed" />
+
+            <!-- Separator -->
+            <Border Height="1"
+                    Background="{DynamicResource FlyoutBorderBrush}"
+                    Margin="0,4,0,4" />
+
+            <!-- Battery Settings link -->
+            <Border CornerRadius="8"
+                    Padding="8,6"
+                    Cursor="Hand"
+                    Background="Transparent"
+                    MouseLeftButtonUp="BatterySettings_Click"
+                    MouseEnter="SettingsRow_MouseEnter"
+                    MouseLeave="SettingsRow_MouseLeave">
+                <TextBlock Text="Battery Settings..."
+                           FontFamily="Segoe UI Variable"
+                           FontSize="13"
+                           Foreground="{DynamicResource FlyoutHeaderForeground}" />
+            </Border>
+        </StackPanel>
+    </Border>
+</Window>

@@ -47,6 +47,15 @@ public sealed class TrayIconFilterService : IDisposable
         "Internet",
     };
 
+    // Title substrings that identify battery-related tray icons
+    private static readonly string[] BatterySubstrings =
+    {
+        "Battery",
+        "battery",
+        "Power",
+        "Charging",
+    };
+
     public ICollectionView FilteredTrayIcons => _filteredView;
 
     public TrayIconFilterService(NotificationArea notificationArea)
@@ -93,6 +102,12 @@ public sealed class TrayIconFilterService : IDisposable
             }
 
             foreach (var substring in NetworkSubstrings)
+            {
+                if (icon.Title.Contains(substring, StringComparison.OrdinalIgnoreCase))
+                    return false;
+            }
+
+            foreach (var substring in BatterySubstrings)
             {
                 if (icon.Title.Contains(substring, StringComparison.OrdinalIgnoreCase))
                     return false;

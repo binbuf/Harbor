@@ -50,6 +50,7 @@ public partial class App : Application
     private VolumeService? _volumeService;
     private BluetoothService? _bluetoothService;
     private NetworkService? _networkService;
+    private BatteryService? _batteryService;
     private TrayIconFilterService? _trayIconFilter;
     private InstalledAppService? _installedAppService;
     private AppsLauncherWindow? _appsLauncher;
@@ -135,6 +136,7 @@ public partial class App : Application
         _volumeService = new VolumeService();
         _bluetoothService = new BluetoothService();
         _networkService = new NetworkService();
+        _batteryService = new BatteryService();
         _trayIconFilter = new TrayIconFilterService(_shellServices.NotificationArea);
 
         _menuBar.Initialize(_foregroundService, _shellServices.NotificationArea, _globalMenuService, _trayIconFilter);
@@ -144,10 +146,11 @@ public partial class App : Application
         _wallpaperBrightnessService = new WallpaperBrightnessService(_wallpaperService);
         _menuBar.ConnectBrightnessService(_wallpaperBrightnessService);
 
-        // Connect volume, Bluetooth, and network services to menu bar
+        // Connect volume, Bluetooth, network, and battery services to menu bar
         _menuBar.ConnectVolumeService(_volumeService);
         _menuBar.ConnectBluetoothService(_bluetoothService);
         _menuBar.ConnectNetworkService(_networkService);
+        _menuBar.ConnectBatteryService(_batteryService);
 
         // Create dock pinning and settings services
         _dockPinningService = new DockPinningService();
@@ -493,6 +496,12 @@ public partial class App : Application
         _watchdogProcess = null;
 
         // Dispose new services in reverse order of creation
+        _trayIconFilter?.Dispose();
+        _trayIconFilter = null;
+
+        _batteryService?.Dispose();
+        _batteryService = null;
+
         _networkService?.Dispose();
         _networkService = null;
 
@@ -501,9 +510,6 @@ public partial class App : Application
 
         _volumeService?.Dispose();
         _volumeService = null;
-
-        _trayIconFilter?.Dispose();
-        _trayIconFilter = null;
 
         _recycleBinService?.Dispose();
         _recycleBinService = null;

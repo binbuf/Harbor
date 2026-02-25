@@ -47,16 +47,20 @@ public static class DockMagnificationCalculator
     }
 
     /// <summary>
-    /// Computes the vertical offset (upward Y translation) to keep icons bottom-aligned
-    /// when scaled.
+    /// Computes the vertical offset (upward Y translation) for the macOS-style
+    /// "pop out" effect where magnified icons rise above the dock surface.
     /// </summary>
     /// <param name="scale">The icon's current scale factor.</param>
     /// <param name="iconHeight">The icon's unscaled height in pixels.</param>
     /// <returns>Negative Y translation to apply (moves icon upward).</returns>
     public static double ComputeVerticalOffset(double scale, double iconHeight)
     {
-        // With RenderTransformOrigin at (0.5, 1.0), scaling grows upward from bottom.
-        // No additional Y translation needed for bottom-aligned growth.
-        return 0;
+        // Icons already grow upward from RenderTransformOrigin (0.5, 1.0).
+        // Add extra upward translation proportional to magnification to create
+        // the macOS-style "pop out" rise effect above the dock pill.
+        if (scale <= 1.0)
+            return 0;
+
+        return -(scale - 1.0) * iconHeight * 0.35;
     }
 }

@@ -66,12 +66,12 @@ public partial class Dock : Window, IRetreatable
     public static readonly Duration HideAnimationDuration = new(TimeSpan.FromMilliseconds(200));
 
     // Dock layout constants
-    public const double DockWindowHeight = 120.0;   // AppBar window height (includes magnification headroom)
+    public const double DockWindowHeight = 160.0;   // AppBar window height (includes magnification headroom)
     public const double DockVisibleHeight = 83.0;   // Visible pill height for slide animations
 
     // Magnification constants
-    public const double MagnificationMaxScale = 1.5;
-    public const double MagnificationEffectRadius = 3.0;
+    public const double MagnificationMaxScale = 1.4;
+    public const double MagnificationEffectRadius = 2.1;
     public const double MagnificationIconPitch = 80.0; // 52 + 28 margin
     public const double DockContainerVerticalPadding = 22.0; // top(12) + bottom(8) + border for container height calc
     public static readonly Duration MagnificationHeightAnimDuration = new(TimeSpan.FromMilliseconds(80));

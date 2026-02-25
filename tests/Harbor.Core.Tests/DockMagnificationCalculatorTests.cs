@@ -4,8 +4,8 @@ namespace Harbor.Core.Tests;
 
 public class DockMagnificationCalculatorTests
 {
-    private const double MaxScale = 1.5;
-    private const double EffectRadius = 3.0;
+    private const double MaxScale = 2.0;
+    private const double EffectRadius = 2.5;
     private const double IconPitch = 80.0;
 
     [Fact]
@@ -59,12 +59,14 @@ public class DockMagnificationCalculatorTests
     }
 
     [Fact]
-    public void VerticalOffset_ScaleGreaterThanOne_ReturnsZero()
+    public void VerticalOffset_ScaleGreaterThanOne_ReturnsNegative()
     {
-        var offset = DockMagnificationCalculator.ComputeVerticalOffset(1.5, 52.0);
+        var offset = DockMagnificationCalculator.ComputeVerticalOffset(2.0, 52.0);
 
-        // With bottom-origin RenderTransformOrigin, no Y translation needed
-        Assert.Equal(0.0, offset, precision: 6);
+        // Should return negative value (upward translation) for pop-out effect
+        Assert.True(offset < 0);
+        // Expected: -(2.0 - 1.0) * 52.0 * 0.35 = -18.2
+        Assert.Equal(-18.2, offset, precision: 6);
     }
 
     [Fact]

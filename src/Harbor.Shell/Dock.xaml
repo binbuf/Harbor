@@ -72,7 +72,7 @@
         </DataTemplate>
     </Window.Resources>
 
-    <Grid x:Name="DockRoot" Height="120" VerticalAlignment="Bottom">
+    <Grid x:Name="DockRoot" Height="160" VerticalAlignment="Bottom">
         <!-- Auto-hide trigger zone: 6px tall, invisible, at bottom edge -->
         <Border x:Name="AutoHideTriggerZone"
                 Height="6"
@@ -103,7 +103,7 @@
             <StackPanel x:Name="DockPanel" Orientation="Horizontal" ClipToBounds="False">
                 <!-- Pinned application icons -->
                 <ItemsControl x:Name="PinnedIconsControl"
-                              VerticalAlignment="Center"
+                              VerticalAlignment="Bottom"
                               ClipToBounds="False"
                               ItemTemplate="{StaticResource DockIconTemplate}">
                     <ItemsControl.ItemsPanel>
@@ -124,7 +124,7 @@
 
                 <!-- Running (unpinned) application icons -->
                 <ItemsControl x:Name="RunningIconsControl"
-                              VerticalAlignment="Center"
+                              VerticalAlignment="Bottom"
                               ClipToBounds="False"
                               ItemTemplate="{StaticResource DockIconTemplate}">
                     <ItemsControl.ItemsPanel>

@@ -31,6 +31,12 @@ public sealed class TrayIconFilterService : IDisposable
         "Headphones",
     };
 
+    // Title substrings that identify Bluetooth-related tray icons
+    private static readonly string[] BluetoothSubstrings =
+    {
+        "Bluetooth",
+    };
+
     public ICollectionView FilteredTrayIcons => _filteredView;
 
     public TrayIconFilterService(NotificationArea notificationArea)
@@ -65,6 +71,12 @@ public sealed class TrayIconFilterService : IDisposable
         if (!string.IsNullOrEmpty(icon.Title))
         {
             foreach (var substring in VolumeSubstrings)
+            {
+                if (icon.Title.Contains(substring, StringComparison.OrdinalIgnoreCase))
+                    return false;
+            }
+
+            foreach (var substring in BluetoothSubstrings)
             {
                 if (icon.Title.Contains(substring, StringComparison.OrdinalIgnoreCase))
                     return false;

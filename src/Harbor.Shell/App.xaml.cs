@@ -48,6 +48,7 @@ public partial class App : Application
     private TopMenuBar? _menuBar;
     private Dock? _dock;
     private VolumeService? _volumeService;
+    private BluetoothService? _bluetoothService;
     private TrayIconFilterService? _trayIconFilter;
     private InstalledAppService? _installedAppService;
     private AppsLauncherWindow? _appsLauncher;
@@ -129,8 +130,9 @@ public partial class App : Application
             30);
 
         _menuBarRegistration = AppBarHelper.Register(_menuBar, AppBarEdge.Top);
-        // Create volume service and tray icon filter before menu bar initialization
+        // Create volume service, Bluetooth service, and tray icon filter before menu bar initialization
         _volumeService = new VolumeService();
+        _bluetoothService = new BluetoothService();
         _trayIconFilter = new TrayIconFilterService(_shellServices.NotificationArea);
 
         _menuBar.Initialize(_foregroundService, _shellServices.NotificationArea, _globalMenuService, _trayIconFilter);
@@ -140,8 +142,9 @@ public partial class App : Application
         _wallpaperBrightnessService = new WallpaperBrightnessService(_wallpaperService);
         _menuBar.ConnectBrightnessService(_wallpaperBrightnessService);
 
-        // Connect volume service to menu bar
+        // Connect volume and Bluetooth services to menu bar
         _menuBar.ConnectVolumeService(_volumeService);
+        _menuBar.ConnectBluetoothService(_bluetoothService);
 
         // Create dock pinning and settings services
         _dockPinningService = new DockPinningService();
@@ -487,6 +490,9 @@ public partial class App : Application
         _watchdogProcess = null;
 
         // Dispose new services in reverse order of creation
+        _bluetoothService?.Dispose();
+        _bluetoothService = null;
+
         _volumeService?.Dispose();
         _volumeService = null;
 

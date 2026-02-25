@@ -34,6 +34,10 @@ public partial class TopMenuBar : AppBarWindow
     private VolumeService? _volumeService;
     private VolumeFlyout? _volumeFlyout;
 
+    // Bluetooth
+    private BluetoothService? _bluetoothService;
+    private BluetoothFlyout? _bluetoothFlyout;
+
     // Icon geometries (loaded from resource dictionary)
     private static ResourceDictionary? _indicatorIcons;
 
@@ -203,6 +207,78 @@ public partial class TopMenuBar : AppBarWindow
         _volumeFlyout.Top = iconScreenPos.Y / dpi + 4;
 
         _volumeFlyout.Show();
+    }
+
+    /// <summary>
+    /// Connects the Bluetooth service and wires up the Bluetooth indicator icon.
+    /// </summary>
+    public void ConnectBluetoothService(BluetoothService bluetoothService)
+    {
+        _bluetoothService = bluetoothService;
+        _bluetoothService.BluetoothChanged += OnBluetoothServiceChanged;
+
+        // Load icon geometries
+        _indicatorIcons ??= new ResourceDictionary
+        {
+            Source = new Uri("Resources/SystemIndicatorIcons.xaml", UriKind.Relative),
+        };
+
+        // Set initial icon state and visibility
+        UpdateBluetoothIcon(_bluetoothService.IconState);
+        BluetoothIcon.Visibility = _bluetoothService.IsAvailable ? Visibility.Visible : Visibility.Collapsed;
+
+        // Wire click handler
+        BluetoothIcon.Clicked += OnBluetoothIconClicked;
+
+        Trace.WriteLine("[Harbor] TopMenuBar: Bluetooth service connected.");
+    }
+
+    private void OnBluetoothServiceChanged(object? sender, BluetoothChangedEventArgs e)
+    {
+        Dispatcher.Invoke(() =>
+        {
+            UpdateBluetoothIcon(e.IconState);
+            BluetoothIcon.Visibility = e.IsAvailable ? Visibility.Visible : Visibility.Collapsed;
+        });
+    }
+
+    private void UpdateBluetoothIcon(BluetoothIconState state)
+    {
+        if (_indicatorIcons is null) return;
+
+        var key = state switch
+        {
+            BluetoothIconState.Off => "BluetoothOffIcon",
+            BluetoothIconState.On => "BluetoothOnIcon",
+            BluetoothIconState.Connected => "BluetoothConnectedIcon",
+            _ => "BluetoothOnIcon",
+        };
+
+        if (_indicatorIcons[key] is System.Windows.Media.Geometry geometry)
+            BluetoothIcon.IconData = geometry;
+    }
+
+    private void OnBluetoothIconClicked(object? sender, EventArgs e)
+    {
+        if (_bluetoothService is null) return;
+
+        if (_bluetoothFlyout is not null)
+        {
+            _bluetoothFlyout.Close();
+            _bluetoothFlyout = null;
+            return;
+        }
+
+        _bluetoothFlyout = new BluetoothFlyout(_bluetoothService);
+        _bluetoothFlyout.Closed += (_, _) => _bluetoothFlyout = null;
+
+        // Position below the Bluetooth icon, converting physical pixels to DIPs
+        var iconScreenPos = BluetoothIcon.PointToScreen(new Point(0, BluetoothIcon.ActualHeight));
+        var dpi = GetDpiScale();
+        _bluetoothFlyout.Left = iconScreenPos.X / dpi - 120 + BluetoothIcon.ActualWidth / 2;
+        _bluetoothFlyout.Top = iconScreenPos.Y / dpi + 4;
+
+        _bluetoothFlyout.Show();
     }
 
     /// <summary>
@@ -929,6 +1005,16 @@ public partial class TopMenuBar : AppBarWindow
             _volumeService = null;
         }
         VolumeIcon.Clicked -= OnVolumeIconClicked;
+
+        _bluetoothFlyout?.Close();
+        _bluetoothFlyout = null;
+
+        if (_bluetoothService is not null)
+        {
+            _bluetoothService.BluetoothChanged -= OnBluetoothServiceChanged;
+            _bluetoothService = null;
+        }
+        BluetoothIcon.Clicked -= OnBluetoothIconClicked;
 
         TrayIconsControl.ItemsSource = null;
         MenuItemsControl.ItemsSource = null;

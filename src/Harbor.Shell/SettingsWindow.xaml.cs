@@ -86,6 +86,7 @@ public partial class SettingsWindow : Window
 
         // Desktop
         ShowDesktopIconsToggle.IsChecked = _shellSettings.ShowDesktopIcons;
+        HideRecycleBinToggle.IsChecked = _shellSettings.HideRecycleBin;
 
         // About
         var version = Assembly.GetExecutingAssembly().GetName().Version;
@@ -247,6 +248,12 @@ public partial class SettingsWindow : Window
     {
         if (_loading) return;
         _shellSettings.ShowDesktopIcons = ShowDesktopIconsToggle.IsChecked == true;
+    }
+
+    private void HideRecycleBinToggle_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_loading) return;
+        _shellSettings.HideRecycleBin = HideRecycleBinToggle.IsChecked == true;
     }
 
     #endregion

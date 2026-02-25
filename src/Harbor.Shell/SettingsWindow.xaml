@@ -539,6 +539,31 @@
                                           Unchecked="ShowDesktopIconsToggle_Changed" />
                             </Grid>
                         </Border>
+
+                        <!-- Hide Recycle Bin -->
+                        <Border Background="{DynamicResource SettingsCardBackground}" CornerRadius="8" Padding="16,12" Margin="0,0,0,8">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                    <TextBlock Text="Hide Recycle Bin"
+                                               Foreground="{DynamicResource SettingsTextBrush}"
+                                               FontFamily="Segoe UI Variable" FontSize="13" />
+                                    <TextBlock Text="Remove the Recycle Bin icon from the desktop"
+                                               Foreground="{DynamicResource SettingsSecondaryTextBrush}"
+                                               FontFamily="Segoe UI Variable" FontSize="11"
+                                               Margin="0,2,0,0" />
+                                </StackPanel>
+                                <CheckBox x:Name="HideRecycleBinToggle"
+                                          Grid.Column="1"
+                                          Style="{StaticResource ToggleSwitchStyle}"
+                                          VerticalAlignment="Center"
+                                          Checked="HideRecycleBinToggle_Changed"
+                                          Unchecked="HideRecycleBinToggle_Changed" />
+                            </Grid>
+                        </Border>
                     </StackPanel>
                 </ScrollViewer>
 

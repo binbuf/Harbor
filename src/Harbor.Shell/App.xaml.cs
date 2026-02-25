@@ -55,6 +55,7 @@ public partial class App : Application
     private TrayIconFilterService? _trayIconFilter;
     private InstalledAppService? _installedAppService;
     private AppsLauncherWindow? _appsLauncher;
+    private DesktopIconService? _desktopIconService;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -228,6 +229,11 @@ public partial class App : Application
         _recycleBinService = new RecycleBinService();
         _dock.SetRecycleBinService(_recycleBinService);
 
+        // Hide Recycle Bin desktop icon if configured
+        _desktopIconService = new DesktopIconService();
+        if (_shellSettingsService.HideRecycleBin)
+            _desktopIconService.SetRecycleBinHidden(true);
+
         Trace.WriteLine("[Harbor] App: Startup complete.");
     }
 
@@ -296,25 +302,31 @@ public partial class App : Application
     {
         Dispatcher.Invoke(() =>
         {
-            if (_shellSettingsService is null || !_shellSettingsService.ReplaceExplorer) return;
+            if (_shellSettingsService is null) return;
 
-            var showIcons = _shellSettingsService.ShowDesktopIcons;
+            if (_shellSettingsService.ReplaceExplorer)
+            {
+                var showIcons = _shellSettingsService.ShowDesktopIcons;
 
-            if (showIcons && _desktopBackground is not null)
-            {
-                // User wants desktop icons visible — remove the covering window
-                _desktopBackground.Close();
-                _desktopBackground = null;
-                Trace.WriteLine("[Harbor] App: Desktop background hidden (ShowDesktopIcons=true).");
+                if (showIcons && _desktopBackground is not null)
+                {
+                    // User wants desktop icons visible — remove the covering window
+                    _desktopBackground.Close();
+                    _desktopBackground = null;
+                    Trace.WriteLine("[Harbor] App: Desktop background hidden (ShowDesktopIcons=true).");
+                }
+                else if (!showIcons && _desktopBackground is null && _wallpaperService is not null)
+                {
+                    // User wants desktop icons hidden — show the covering window
+                    _desktopBackground = new DesktopBackgroundWindow();
+                    _desktopBackground.Show();
+                    _desktopBackground.Initialize(_wallpaperService);
+                    Trace.WriteLine("[Harbor] App: Desktop background shown (ShowDesktopIcons=false).");
+                }
             }
-            else if (!showIcons && _desktopBackground is null && _wallpaperService is not null)
-            {
-                // User wants desktop icons hidden — show the covering window
-                _desktopBackground = new DesktopBackgroundWindow();
-                _desktopBackground.Show();
-                _desktopBackground.Initialize(_wallpaperService);
-                Trace.WriteLine("[Harbor] App: Desktop background shown (ShowDesktopIcons=false).");
-            }
+
+            // Apply Recycle Bin visibility change (works regardless of ReplaceExplorer)
+            _desktopIconService?.SetRecycleBinHidden(_shellSettingsService.HideRecycleBin);
         });
     }
 
@@ -419,6 +431,7 @@ public partial class App : Application
 
         _workAreaService?.Restore();
         _explorerSuppression?.Restore();
+        _desktopIconService?.Restore();
     }
 
     private void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)
@@ -631,6 +644,11 @@ public partial class App : Application
         // Restore explorer's UI if we suppressed it on startup
         _explorerSuppression?.Dispose();
         _explorerSuppression = null;
+
+        // Restore Recycle Bin AFTER explorer is visible, so the
+        // SHChangeNotify refresh is processed by a running shell.
+        _desktopIconService?.Dispose();
+        _desktopIconService = null;
 
         if (_shellSettingsService is not null)
         {

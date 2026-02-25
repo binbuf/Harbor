@@ -448,6 +448,20 @@ public partial class Dock : Window, IRetreatable
             _autoHideService?.OnTriggerZoneEnter();
     }
 
+    private void TriggerZone_MouseLeave(object sender, MouseEventArgs e)
+    {
+        if (!_isAutoHideEnabled) return;
+
+        // If the mouse left the trigger zone but didn't enter the DockContainer,
+        // start hiding. Check if the mouse moved upward into the dock area —
+        // if so, DockContainer_MouseEnter will handle it.
+        var pos = e.GetPosition(DockContainer);
+        bool enteredDockContainer = pos.X >= 0 && pos.X <= DockContainer.ActualWidth
+                                 && pos.Y >= 0 && pos.Y <= DockContainer.ActualHeight;
+        if (!enteredDockContainer)
+            _autoHideService?.OnDockAreaLeave();
+    }
+
     private void DockContainer_MouseEnter(object sender, MouseEventArgs e)
     {
         _autoHideService?.OnDockAreaEnter();
@@ -456,7 +470,15 @@ public partial class Dock : Window, IRetreatable
     private void DockContainer_MouseLeave(object sender, MouseEventArgs e)
     {
         if (_isAutoHideEnabled)
-            _autoHideService?.OnDockAreaLeave();
+        {
+            // If the mouse moved into the trigger zone area (bottom of screen),
+            // don't start hiding — the dock should stay visible while the cursor
+            // is near the screen edge to prevent a show/hide bounce loop.
+            var pos = e.GetPosition(DockRoot);
+            var triggerTop = DockRoot.ActualHeight - AutoHideTriggerZone.ActualHeight;
+            if (pos.Y < triggerTop)
+                _autoHideService?.OnDockAreaLeave();
+        }
 
         if (_magnificationEnabled && !_isDragging)
             AnimateResetMagnification();

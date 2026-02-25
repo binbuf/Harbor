@@ -79,6 +79,11 @@ public class ShellSettings
     /// Filter out utilities, documentation, and uninstallers from the Apps launcher.
     /// </summary>
     public bool FilterAppsFolder { get; set; } = true;
+
+    /// <summary>
+    /// Hide the Recycle Bin desktop icon.
+    /// </summary>
+    public bool HideRecycleBin { get; set; } = true;
 }
 
 /// <summary>
@@ -323,6 +328,21 @@ public class ShellSettingsService : IDisposable
         }
     }
 
+    public bool HideRecycleBin
+    {
+        get { lock (_lock) return _settings.HideRecycleBin; }
+        set
+        {
+            lock (_lock)
+            {
+                if (_settings.HideRecycleBin == value) return;
+                _settings.HideRecycleBin = value;
+            }
+            Save();
+            SettingsChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
     /// <summary>
     /// Raised when any setting changes.
     /// </summary>
@@ -381,6 +401,7 @@ public class ShellSettingsService : IDisposable
                     MonochromeTrayIcons = _settings.MonochromeTrayIcons,
                     MenuBarTextColor = _settings.MenuBarTextColor,
                     FilterAppsFolder = _settings.FilterAppsFolder,
+                    HideRecycleBin = _settings.HideRecycleBin,
                 };
             }
 

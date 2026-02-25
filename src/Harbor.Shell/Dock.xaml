@@ -87,7 +87,8 @@
                 VerticalAlignment="Bottom"
                 Background="Transparent"
                 IsHitTestVisible="True"
-                MouseEnter="TriggerZone_MouseEnter" />
+                MouseEnter="TriggerZone_MouseEnter"
+                MouseLeave="TriggerZone_MouseLeave" />
 
         <!-- Dock container: centered, auto-width, rounded corners, acrylic background -->
         <Border x:Name="DockContainer"

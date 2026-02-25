@@ -436,9 +436,8 @@ public partial class TopMenuBar : AppBarWindow
             _hoverColor = isBlack ? LightHoverColor : DarkHoverColor;
             _pressedColor = isBlack ? LightPressedColor : DarkPressedColor;
 
-            // Restore standard acrylic tint if translucency is on
-            if (_shellSettings.MenuBarOpacity < 1.0)
-                ApplyThemedAcrylic(ThemeService.ReadThemeFromRegistry());
+            // Restore standard acrylic with the user's opacity setting
+            ApplyTranslucency(ThemeService.ReadThemeFromRegistry());
 
             Trace.WriteLine($"[Harbor] TopMenuBar: Explicit color applied (mode={mode})");
         }

@@ -497,9 +497,8 @@ public partial class TopMenuBar : AppBarWindow
             Source = new Uri("Resources/SystemIndicatorIcons.xaml", UriKind.Relative),
         };
 
-        // Set initial icon and visibility
-        if (_indicatorIcons["SafeRemoveIcon"] is System.Windows.Media.Geometry geometry)
-            SafeRemoveIcon.IconData = geometry;
+        // Set initial icon from Segoe Fluent Icons eject glyph
+        SafeRemoveIcon.IconData = GlyphToGeometry("\uECF3");
 
         SafeRemoveIcon.Visibility = _safeRemoveService.HasDevices ? Visibility.Visible : Visibility.Collapsed;
 

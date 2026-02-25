@@ -79,6 +79,9 @@
                     <controls:SystemIndicatorIcon x:Name="BluetoothIcon"
                                                    Margin="2,0"
                                                    VerticalAlignment="Center" />
+                    <controls:SystemIndicatorIcon x:Name="WiFiIcon"
+                                                   Margin="2,0"
+                                                   VerticalAlignment="Center" />
                     <controls:SystemIndicatorIcon x:Name="VolumeIcon"
                                                    Margin="2,0"
                                                    VerticalAlignment="Center" />

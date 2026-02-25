@@ -38,6 +38,10 @@ public partial class TopMenuBar : AppBarWindow
     private BluetoothService? _bluetoothService;
     private BluetoothFlyout? _bluetoothFlyout;
 
+    // Network
+    private NetworkService? _networkService;
+    private NetworkFlyout? _networkFlyout;
+
     // Icon geometries (loaded from resource dictionary)
     private static ResourceDictionary? _indicatorIcons;
 
@@ -279,6 +283,109 @@ public partial class TopMenuBar : AppBarWindow
         _bluetoothFlyout.Top = iconScreenPos.Y / dpi + 4;
 
         _bluetoothFlyout.Show();
+    }
+
+    // Network icon geometries built from Segoe Fluent Icons font glyphs
+    private static Dictionary<NetworkIconState, Geometry>? _networkIconGeometries;
+
+    /// <summary>
+    /// Connects the network service and wires up the Wi-Fi/Network indicator icon.
+    /// </summary>
+    public void ConnectNetworkService(NetworkService networkService)
+    {
+        _networkService = networkService;
+        _networkService.NetworkChanged += OnNetworkServiceChanged;
+
+        // Build network icon geometries from Segoe Fluent Icons glyphs (one-time)
+        _networkIconGeometries ??= BuildNetworkIconGeometries();
+
+        // Set initial icon state
+        UpdateNetworkIcon(_networkService.IconState);
+
+        // Wire click handler
+        WiFiIcon.Clicked += OnWiFiIconClicked;
+
+        Trace.WriteLine("[Harbor] TopMenuBar: Network service connected.");
+    }
+
+    private static Dictionary<NetworkIconState, Geometry> BuildNetworkIconGeometries()
+    {
+        // Segoe Fluent Icons codepoints for Windows 11 system tray icons
+        const string wifiFull = "\uE701";   // Wi-Fi (3 bars, full signal)
+        const string wifiGood = "\uE702";   // Wi-Fi (2 bars)
+        const string wifiFair = "\uE703";   // Wi-Fi (1 bar)
+        const string wifiWeak = "\uE704";   // Wi-Fi (0 bars)
+        const string ethernet = "\uE839";   // Ethernet (LAN cable icon)
+
+        var dict = new Dictionary<NetworkIconState, Geometry>
+        {
+            [NetworkIconState.WiFiExcellent] = GlyphToGeometry(wifiFull),
+            [NetworkIconState.WiFiGood] = GlyphToGeometry(wifiGood),
+            [NetworkIconState.WiFiFair] = GlyphToGeometry(wifiFair),
+            [NetworkIconState.WiFiWeak] = GlyphToGeometry(wifiWeak),
+            [NetworkIconState.Disconnected] = GlyphToGeometry(wifiWeak),
+            [NetworkIconState.Ethernet] = GlyphToGeometry(ethernet),
+        };
+
+        return dict;
+    }
+
+    private static Geometry GlyphToGeometry(string glyph)
+    {
+        var typeface = new Typeface(
+            new System.Windows.Media.FontFamily("Segoe Fluent Icons"),
+            FontStyles.Normal,
+            FontWeights.Normal,
+            FontStretches.Normal);
+
+        var formatted = new FormattedText(
+            glyph,
+            CultureInfo.InvariantCulture,
+            System.Windows.FlowDirection.LeftToRight,
+            typeface,
+            16,
+            Brushes.White,
+            1.0);
+
+        var geometry = formatted.BuildGeometry(new Point(0, 0));
+        geometry.Freeze();
+        return geometry;
+    }
+
+    private void OnNetworkServiceChanged(object? sender, NetworkChangedEventArgs e)
+    {
+        Dispatcher.Invoke(() => UpdateNetworkIcon(e.IconState));
+    }
+
+    private void UpdateNetworkIcon(NetworkIconState state)
+    {
+        if (_networkIconGeometries is null) return;
+
+        if (_networkIconGeometries.TryGetValue(state, out var geometry))
+            WiFiIcon.IconData = geometry;
+    }
+
+    private void OnWiFiIconClicked(object? sender, EventArgs e)
+    {
+        if (_networkService is null) return;
+
+        if (_networkFlyout is not null)
+        {
+            _networkFlyout.Close();
+            _networkFlyout = null;
+            return;
+        }
+
+        _networkFlyout = new NetworkFlyout(_networkService);
+        _networkFlyout.Closed += (_, _) => _networkFlyout = null;
+
+        // Position below the Wi-Fi icon, converting physical pixels to DIPs
+        var iconScreenPos = WiFiIcon.PointToScreen(new Point(0, WiFiIcon.ActualHeight));
+        var dpi = GetDpiScale();
+        _networkFlyout.Left = iconScreenPos.X / dpi - 120 + WiFiIcon.ActualWidth / 2;
+        _networkFlyout.Top = iconScreenPos.Y / dpi + 4;
+
+        _networkFlyout.Show();
     }
 
     /// <summary>
@@ -1015,6 +1122,16 @@ public partial class TopMenuBar : AppBarWindow
             _bluetoothService = null;
         }
         BluetoothIcon.Clicked -= OnBluetoothIconClicked;
+
+        _networkFlyout?.Close();
+        _networkFlyout = null;
+
+        if (_networkService is not null)
+        {
+            _networkService.NetworkChanged -= OnNetworkServiceChanged;
+            _networkService = null;
+        }
+        WiFiIcon.Clicked -= OnWiFiIconClicked;
 
         TrayIconsControl.ItemsSource = null;
         MenuItemsControl.ItemsSource = null;

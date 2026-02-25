@@ -37,6 +37,16 @@ public sealed class TrayIconFilterService : IDisposable
         "Bluetooth",
     };
 
+    // Title substrings that identify network-related tray icons
+    private static readonly string[] NetworkSubstrings =
+    {
+        "Network",
+        "Wi-Fi",
+        "WiFi",
+        "Ethernet",
+        "Internet",
+    };
+
     public ICollectionView FilteredTrayIcons => _filteredView;
 
     public TrayIconFilterService(NotificationArea notificationArea)
@@ -77,6 +87,12 @@ public sealed class TrayIconFilterService : IDisposable
             }
 
             foreach (var substring in BluetoothSubstrings)
+            {
+                if (icon.Title.Contains(substring, StringComparison.OrdinalIgnoreCase))
+                    return false;
+            }
+
+            foreach (var substring in NetworkSubstrings)
             {
                 if (icon.Title.Contains(substring, StringComparison.OrdinalIgnoreCase))
                     return false;

@@ -82,83 +82,53 @@
         </PathGeometry.Figures>
     </PathGeometry>
 
-    <!-- Bluetooth On: classic Bluetooth runic "B" shape (16x16 viewport) -->
-    <PathGeometry x:Key="BluetoothOnIcon">
-        <PathGeometry.Figures>
-            <!-- Bluetooth rune: vertical line with two arrow chevrons -->
-            <PathFigure StartPoint="8,1" IsClosed="False" IsFilled="False">
-                <LineSegment Point="8,15" />
-            </PathFigure>
-            <!-- Upper-right chevron -->
-            <PathFigure StartPoint="5,4.5" IsClosed="False" IsFilled="False">
-                <LineSegment Point="11,8" />
-                <LineSegment Point="5,11.5" />
-            </PathFigure>
-            <!-- Upper arrow tip -->
-            <PathFigure StartPoint="8,1" IsClosed="False" IsFilled="False">
-                <LineSegment Point="11,4" />
-                <LineSegment Point="8,7" />
-            </PathFigure>
-            <!-- Lower arrow tip -->
-            <PathFigure StartPoint="8,9" IsClosed="False" IsFilled="False">
-                <LineSegment Point="11,12" />
-                <LineSegment Point="8,15" />
-            </PathFigure>
-        </PathGeometry.Figures>
-    </PathGeometry>
+    <!-- Bluetooth On: based on bluetooth.svg (24x24 viewBox, Stretch="Uniform" scales it) -->
+    <Geometry x:Key="BluetoothOnIcon">M7,17 L17,7 L12,2 L12,22 L17,17 L7,7</Geometry>
 
-    <!-- Bluetooth Connected: rune + connection dots on either side -->
+    <!-- Bluetooth Connected: bluetooth.svg path + connection dots -->
     <PathGeometry x:Key="BluetoothConnectedIcon">
         <PathGeometry.Figures>
-            <!-- Bluetooth rune -->
-            <PathFigure StartPoint="8,1" IsClosed="False" IsFilled="False">
-                <LineSegment Point="8,15" />
+            <!-- Bluetooth rune from SVG -->
+            <PathFigure StartPoint="7,17" IsClosed="False" IsFilled="False">
+                <LineSegment Point="17,7" />
+                <LineSegment Point="12,2" />
             </PathFigure>
-            <PathFigure StartPoint="5,4.5" IsClosed="False" IsFilled="False">
-                <LineSegment Point="11,8" />
-                <LineSegment Point="5,11.5" />
+            <PathFigure StartPoint="12,22" IsClosed="False" IsFilled="False">
+                <LineSegment Point="17,17" />
+                <LineSegment Point="7,7" />
             </PathFigure>
-            <PathFigure StartPoint="8,1" IsClosed="False" IsFilled="False">
-                <LineSegment Point="11,4" />
-                <LineSegment Point="8,7" />
-            </PathFigure>
-            <PathFigure StartPoint="8,9" IsClosed="False" IsFilled="False">
-                <LineSegment Point="11,12" />
-                <LineSegment Point="8,15" />
+            <PathFigure StartPoint="12,2" IsClosed="False" IsFilled="False">
+                <LineSegment Point="12,22" />
             </PathFigure>
             <!-- Left connection dot -->
-            <PathFigure StartPoint="2.5,8" IsClosed="True" IsFilled="True">
-                <ArcSegment Point="2.5,8.01" Size="1.2,1.2" SweepDirection="Clockwise" IsLargeArc="True" />
+            <PathFigure StartPoint="3,12" IsClosed="True" IsFilled="True">
+                <ArcSegment Point="3,12.01" Size="1.5,1.5" SweepDirection="Clockwise" IsLargeArc="True" />
             </PathFigure>
             <!-- Right connection dot -->
-            <PathFigure StartPoint="13.5,8" IsClosed="True" IsFilled="True">
-                <ArcSegment Point="13.5,8.01" Size="1.2,1.2" SweepDirection="Clockwise" IsLargeArc="True" />
+            <PathFigure StartPoint="21,12" IsClosed="True" IsFilled="True">
+                <ArcSegment Point="21,12.01" Size="1.5,1.5" SweepDirection="Clockwise" IsLargeArc="True" />
             </PathFigure>
         </PathGeometry.Figures>
     </PathGeometry>
 
-    <!-- Bluetooth Off: rune + diagonal slash -->
+    <!-- Bluetooth Off: bluetooth.svg path + diagonal slash -->
     <PathGeometry x:Key="BluetoothOffIcon">
         <PathGeometry.Figures>
-            <!-- Bluetooth rune -->
-            <PathFigure StartPoint="8,1" IsClosed="False" IsFilled="False">
-                <LineSegment Point="8,15" />
+            <!-- Bluetooth rune from SVG -->
+            <PathFigure StartPoint="7,17" IsClosed="False" IsFilled="False">
+                <LineSegment Point="17,7" />
+                <LineSegment Point="12,2" />
             </PathFigure>
-            <PathFigure StartPoint="5,4.5" IsClosed="False" IsFilled="False">
-                <LineSegment Point="11,8" />
-                <LineSegment Point="5,11.5" />
+            <PathFigure StartPoint="12,22" IsClosed="False" IsFilled="False">
+                <LineSegment Point="17,17" />
+                <LineSegment Point="7,7" />
             </PathFigure>
-            <PathFigure StartPoint="8,1" IsClosed="False" IsFilled="False">
-                <LineSegment Point="11,4" />
-                <LineSegment Point="8,7" />
-            </PathFigure>
-            <PathFigure StartPoint="8,9" IsClosed="False" IsFilled="False">
-                <LineSegment Point="11,12" />
-                <LineSegment Point="8,15" />
+            <PathFigure StartPoint="12,2" IsClosed="False" IsFilled="False">
+                <LineSegment Point="12,22" />
             </PathFigure>
             <!-- Diagonal slash -->
-            <PathFigure StartPoint="3,3" IsClosed="False" IsFilled="False">
-                <LineSegment Point="13,13" />
+            <PathFigure StartPoint="4,4" IsClosed="False" IsFilled="False">
+                <LineSegment Point="20,20" />
             </PathFigure>
         </PathGeometry.Figures>
     </PathGeometry>

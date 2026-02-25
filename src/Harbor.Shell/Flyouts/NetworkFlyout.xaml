@@ -1,0 +1,169 @@
+<Window x:Class="Harbor.Shell.Flyouts.NetworkFlyout"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Wi-Fi"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        ShowInTaskbar="False"
+        Topmost="True"
+        Background="Transparent"
+        SizeToContent="WidthAndHeight"
+        ResizeMode="NoResize">
+
+    <Border Background="{DynamicResource FlyoutBackground}"
+            BorderBrush="{DynamicResource FlyoutBorderBrush}"
+            BorderThickness="1"
+            CornerRadius="16"
+            Padding="16"
+            Margin="4"
+            MinWidth="280">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="16" Opacity="0.3" ShadowDepth="4" Direction="270" />
+        </Border.Effect>
+
+        <StackPanel>
+            <!-- Header -->
+            <TextBlock x:Name="HeaderText"
+                       Text="Wi-Fi"
+                       FontFamily="Segoe UI Variable"
+                       FontSize="14"
+                       FontWeight="SemiBold"
+                       Foreground="{DynamicResource FlyoutHeaderForeground}"
+                       Margin="4,0,0,12" />
+
+            <!-- Connection status (shown for Ethernet or Wi-Fi) -->
+            <TextBlock x:Name="ConnectionStatusText"
+                       FontFamily="Segoe UI Variable"
+                       FontSize="13"
+                       Foreground="{DynamicResource FlyoutHeaderForeground}"
+                       Margin="4,0,0,4" />
+
+            <!-- SSID / network name -->
+            <TextBlock x:Name="NetworkNameText"
+                       FontFamily="Segoe UI Variable"
+                       FontSize="11"
+                       Foreground="{DynamicResource FlyoutSecondaryText}"
+                       Margin="4,0,0,8" />
+
+            <!-- Separator -->
+            <Border Height="1"
+                    Background="{DynamicResource FlyoutBorderBrush}"
+                    Margin="0,0,0,8" />
+
+            <!-- Networks label -->
+            <TextBlock x:Name="NetworksLabel"
+                       Text="Other Networks"
+                       FontFamily="Segoe UI Variable"
+                       FontSize="11"
+                       Foreground="{DynamicResource FlyoutSecondaryText}"
+                       Margin="4,0,0,6" />
+
+            <!-- Available networks list -->
+            <ItemsControl x:Name="NetworkList"
+                          MaxHeight="200">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border CornerRadius="8"
+                                Padding="8,6"
+                                Margin="0,1"
+                                Background="Transparent"
+                                Cursor="Hand"
+                                MouseEnter="NetworkRow_MouseEnter"
+                                MouseLeave="NetworkRow_MouseLeave"
+                                MouseLeftButtonUp="NetworkRow_Click">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Grid.Column="0" Orientation="Horizontal">
+                                    <!-- Checkmark for connected network -->
+                                    <TextBlock Text="✓"
+                                               FontFamily="Segoe UI Variable"
+                                               FontSize="13"
+                                               Foreground="{DynamicResource FlyoutCheckmarkBrush}"
+                                               VerticalAlignment="Center"
+                                               Margin="0,0,6,0">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsConnected}" Value="False">
+                                                        <Setter Property="Visibility" Value="Hidden" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+
+                                    <TextBlock Text="{Binding Ssid}"
+                                               FontFamily="Segoe UI Variable"
+                                               FontSize="13"
+                                               Foreground="{DynamicResource FlyoutHeaderForeground}"
+                                               VerticalAlignment="Center"
+                                               TextTrimming="CharacterEllipsis"
+                                               MaxWidth="180" />
+                                </StackPanel>
+
+                                <!-- Lock icon for secured networks -->
+                                <TextBlock Grid.Column="1"
+                                           Text="🔒"
+                                           FontSize="10"
+                                           VerticalAlignment="Center"
+                                           Margin="6,0,0,0">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsSecured}" Value="False">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+
+                                <!-- Signal strength indicator -->
+                                <TextBlock Grid.Column="2"
+                                           FontFamily="Segoe UI Variable"
+                                           FontSize="11"
+                                           Foreground="{DynamicResource FlyoutSecondaryText}"
+                                           VerticalAlignment="Center"
+                                           Margin="6,0,0,0"
+                                           Text="{Binding SignalStrength}" />
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <!-- No networks message -->
+            <TextBlock x:Name="NoNetworksText"
+                       Text="No Networks Available"
+                       FontFamily="Segoe UI Variable"
+                       FontSize="12"
+                       Foreground="{DynamicResource FlyoutSecondaryText}"
+                       Margin="4,0,0,8"
+                       Visibility="Collapsed" />
+
+            <!-- Separator -->
+            <Border Height="1"
+                    Background="{DynamicResource FlyoutBorderBrush}"
+                    Margin="0,8,0,4" />
+
+            <!-- Network Settings link -->
+            <Border CornerRadius="8"
+                    Padding="8,6"
+                    Cursor="Hand"
+                    Background="Transparent"
+                    MouseLeftButtonUp="NetworkSettings_Click"
+                    MouseEnter="NetworkRow_MouseEnter"
+                    MouseLeave="NetworkRow_MouseLeave">
+                <TextBlock Text="Network Settings..."
+                           FontFamily="Segoe UI Variable"
+                           FontSize="13"
+                           Foreground="{DynamicResource FlyoutHeaderForeground}" />
+            </Border>
+        </StackPanel>
+    </Border>
+</Window>

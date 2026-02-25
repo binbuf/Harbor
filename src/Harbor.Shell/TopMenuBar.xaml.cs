@@ -383,38 +383,33 @@ public partial class TopMenuBar : AppBarWindow
     #region Dynamic Color
 
     /// <summary>
-    /// Applies dynamic menu bar text color based on wallpaper brightness.
-    /// When the setting is enabled, overrides theme text color with white or black
-    /// for optimal contrast against the actual wallpaper showing through the translucent bar.
+    /// Applies menu bar text color based on the MenuBarTextColor setting:
+    /// "white" = forced white text, "black" = forced black text,
+    /// "auto" = wallpaper-brightness-based dynamic color.
     /// </summary>
     private void ApplyDynamicColor()
     {
         if (_shellSettings is null) return;
 
-        if (_shellSettings.DynamicMenuBarColor && _brightnessService is not null)
-        {
-            // Override text color based on wallpaper brightness
-            var textColor = _dynamicColorOverrideIsLight ? Colors.Black : Colors.White;
-            var inactiveAlpha = _dynamicColorOverrideIsLight ? (byte)128 : (byte)128;
-            var inactiveColor = Color.FromArgb(inactiveAlpha, textColor.R, textColor.G, textColor.B);
+        var mode = _shellSettings.MenuBarTextColor;
 
+        if (mode == "auto" && _brightnessService is not null)
+        {
+            // Auto mode: pick color based on wallpaper brightness
+            var textColor = _dynamicColorOverrideIsLight ? Colors.Black : Colors.White;
             var textBrush = new SolidColorBrush(textColor);
-            var inactiveBrush = new SolidColorBrush(inactiveColor);
             textBrush.Freeze();
-            inactiveBrush.Freeze();
 
             AppNameText.Foreground = textBrush;
             ClockText.Foreground = textBrush;
 
-            // Update hover/pressed colors to match
             _hoverColor = _dynamicColorOverrideIsLight ? LightHoverColor : DarkHoverColor;
             _pressedColor = _dynamicColorOverrideIsLight ? LightPressedColor : DarkPressedColor;
 
-            // Tint the acrylic with the wallpaper's dominant color when translucency is also enabled
-            if (_shellSettings.MenuBarTranslucency)
+            // Tint the acrylic with the wallpaper's dominant color when translucency is enabled
+            if (_shellSettings.MenuBarOpacity < 1.0)
             {
                 var wallColor = _brightnessService.DominantColor;
-                // Build AABBGGRR tint at ~60% opacity for the acrylic composition
                 uint acrylicTint = ((uint)0x99 << 24)
                     | ((uint)wallColor.B << 16)
                     | ((uint)wallColor.G << 8)
@@ -425,17 +420,27 @@ public partial class TopMenuBar : AppBarWindow
                     CompositionInterop.EnableAcrylic(new HWND(hwnd), acrylicTint);
             }
 
-            Trace.WriteLine($"[Harbor] TopMenuBar: Dynamic color applied (isLight={_dynamicColorOverrideIsLight})");
+            Trace.WriteLine($"[Harbor] TopMenuBar: Auto color applied (isLight={_dynamicColorOverrideIsLight})");
         }
         else
         {
-            // Use theme-based colors (DynamicResource handles this automatically)
-            AppNameText.SetResourceReference(System.Windows.Controls.TextBlock.ForegroundProperty, "MenuBarTextBrush");
-            ClockText.SetResourceReference(System.Windows.Controls.TextBlock.ForegroundProperty, "MenuBarTextBrush");
+            // White or Black explicit mode
+            var isBlack = mode == "black";
+            var textColor = isBlack ? Colors.Black : Colors.White;
+            var textBrush = new SolidColorBrush(textColor);
+            textBrush.Freeze();
+
+            AppNameText.Foreground = textBrush;
+            ClockText.Foreground = textBrush;
+
+            _hoverColor = isBlack ? LightHoverColor : DarkHoverColor;
+            _pressedColor = isBlack ? LightPressedColor : DarkPressedColor;
 
             // Restore standard acrylic tint if translucency is on
-            if (_shellSettings.MenuBarTranslucency)
+            if (_shellSettings.MenuBarOpacity < 1.0)
                 ApplyThemedAcrylic(ThemeService.ReadThemeFromRegistry());
+
+            Trace.WriteLine($"[Harbor] TopMenuBar: Explicit color applied (mode={mode})");
         }
     }
 
@@ -475,9 +480,24 @@ public partial class TopMenuBar : AppBarWindow
     /// </summary>
     private void ApplyTranslucency(AppTheme theme)
     {
-        if (_shellSettings?.MenuBarTranslucency == true)
+        var opacity = _shellSettings?.MenuBarOpacity ?? 0.8;
+
+        if (opacity < 1.0)
         {
-            ApplyThemedAcrylic(theme);
+            // Build acrylic color with alpha derived from opacity setting
+            var alpha = (byte)(opacity * 255);
+            var baseColor = theme == AppTheme.Light ? LightAcrylicColor : DarkAcrylicColor;
+            // Replace alpha byte (top 8 bits) with the slider value
+            var acrylicColor = (baseColor & 0x00FFFFFF) | ((uint)alpha << 24);
+
+            var hwnd = new WindowInteropHelper(this).Handle;
+            if (hwnd != IntPtr.Zero)
+                CompositionInterop.EnableAcrylic(new HWND(hwnd), acrylicColor);
+
+            // Update hover/pressed colors for the theme
+            _hoverColor = theme == AppTheme.Light ? LightHoverColor : DarkHoverColor;
+            _pressedColor = theme == AppTheme.Light ? LightPressedColor : DarkPressedColor;
+
             // Let the DWM acrylic show through — don't paint over it
             BackgroundBorder.Background = Brushes.Transparent;
             BackgroundBorder.BorderBrush = Brushes.Transparent;

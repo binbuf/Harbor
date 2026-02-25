@@ -73,7 +73,7 @@ public partial class Dock : Window, IRetreatable
     public const double MagnificationMaxScale = 1.5;
     public const double MagnificationEffectRadius = 3.0;
     public const double MagnificationIconPitch = 80.0; // 52 + 28 margin
-    public const double DockContainerVerticalPadding = 16.0; // top + bottom padding + border for container height calc
+    public const double DockContainerVerticalPadding = 22.0; // top(12) + bottom(8) + border for container height calc
     public static readonly Duration MagnificationHeightAnimDuration = new(TimeSpan.FromMilliseconds(80));
 
     // Easing functions matching the spec cubic-bezier curves

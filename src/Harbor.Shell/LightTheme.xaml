@@ -4,8 +4,8 @@
     <!-- Top Menu Bar -->
     <SolidColorBrush x:Key="MenuBarBackground" Color="#CCF6F6F6" />
     <SolidColorBrush x:Key="MenuBarBorderBrush" Color="#D1D1D1" />
-    <SolidColorBrush x:Key="MenuBarTextBrush" Color="#000000" />
-    <SolidColorBrush x:Key="MenuBarInactiveTextBrush" Color="#80000000" />
+    <SolidColorBrush x:Key="MenuBarTextBrush" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="MenuBarInactiveTextBrush" Color="#80FFFFFF" />
 
     <!-- Dock -->
     <SolidColorBrush x:Key="DockBackground" Color="#D8E1E1E1" />

@@ -49,7 +49,12 @@
                                Foreground="{DynamicResource MenuBarTextBrush}"
                                FontFamily="Segoe UI Variable"
                                FontSize="13"
-                               FontWeight="Regular" />
+                               FontWeight="Regular">
+                        <TextBlock.Effect>
+
+                            <DropShadowEffect BlurRadius="2" ShadowDepth="1" Opacity="0.3" Color="Black" />
+                        </TextBlock.Effect>
+                    </TextBlock>
                 </Border>
 
                 <!-- Control Center chevron (visual placeholder) -->
@@ -60,7 +65,11 @@
                            Foreground="{DynamicResource MenuBarTextBrush}"
                            FontFamily="Segoe UI Variable"
                            FontSize="13"
-                           FontWeight="Regular" />
+                           FontWeight="Regular">
+                    <TextBlock.Effect>
+                        <DropShadowEffect BlurRadius="2" ShadowDepth="1" Opacity="0.3" Color="Black" />
+                    </TextBlock.Effect>
+                </TextBlock>
 
                 <!-- System indicator icons (custom vector controls) -->
                 <StackPanel DockPanel.Dock="Right"
@@ -96,6 +105,9 @@
                                 <Image Source="{Binding Icon}"
                                        Width="18" Height="18"
                                        RenderOptions.BitmapScalingMode="HighQuality">
+                                    <Image.Effect>
+                                        <DropShadowEffect BlurRadius="2" ShadowDepth="1" Opacity="0.3" Color="Black" />
+                                    </Image.Effect>
                                     <Image.Style>
                                         <Style TargetType="Image">
                                             <!-- Monochrome conversion applied dynamically in code-behind -->
@@ -135,7 +147,11 @@
                                    FontFamily="Segoe UI Variable"
                                    FontSize="13"
                                    FontWeight="SemiBold"
-                                   Text="Harbor" />
+                                   Text="Harbor">
+                        <TextBlock.Effect>
+                            <DropShadowEffect BlurRadius="2" ShadowDepth="1" Opacity="0.3" Color="Black" />
+                        </TextBlock.Effect>
+                    </TextBlock>
                     </Border>
 
                     <!-- Dynamic global menu items -->
@@ -163,7 +179,11 @@
                                                FontFamily="Segoe UI Variable"
                                                FontSize="13"
                                                FontWeight="Regular"
-                                               Text="{Binding Name}" />
+                                               Text="{Binding Name}">
+                                        <TextBlock.Effect>
+                                            <DropShadowEffect BlurRadius="2" ShadowDepth="1" Opacity="0.3" Color="Black" />
+                                        </TextBlock.Effect>
+                                    </TextBlock>
                                 </Border>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>

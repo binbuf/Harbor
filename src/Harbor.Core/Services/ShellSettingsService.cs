@@ -20,9 +20,10 @@ public class ShellSettings
     public bool ShowAppMenuItems { get; set; } = true;
 
     /// <summary>
-    /// Enable acrylic blur on the menu bar (vs solid background).
+    /// Menu bar opacity (0.0 = fully transparent acrylic, 1.0 = fully opaque solid).
+    /// Default 0.8 enables acrylic blur at 80% opacity.
     /// </summary>
-    public bool MenuBarTranslucency { get; set; } = true;
+    public double MenuBarOpacity { get; set; } = 0.8;
 
     /// <summary>
     /// Show day of week in the menu bar clock.
@@ -70,10 +71,9 @@ public class ShellSettings
     public bool MonochromeTrayIcons { get; set; } = true;
 
     /// <summary>
-    /// Dynamically adapt menu bar text color based on wallpaper brightness.
-    /// When disabled, text follows the current theme (white for dark, black for light).
+    /// Menu bar text/icon color mode: "white", "black", or "auto" (wallpaper-brightness-based).
     /// </summary>
-    public bool DynamicMenuBarColor { get; set; } = true;
+    public string MenuBarTextColor { get; set; } = "white";
 
     /// <summary>
     /// Filter out utilities, documentation, and uninstallers from the Apps launcher.
@@ -142,15 +142,16 @@ public class ShellSettingsService : IDisposable
         }
     }
 
-    public bool MenuBarTranslucency
+    public double MenuBarOpacity
     {
-        get { lock (_lock) return _settings.MenuBarTranslucency; }
+        get { lock (_lock) return _settings.MenuBarOpacity; }
         set
         {
+            var clamped = Math.Clamp(value, 0.0, 1.0);
             lock (_lock)
             {
-                if (_settings.MenuBarTranslucency == value) return;
-                _settings.MenuBarTranslucency = value;
+                if (Math.Abs(_settings.MenuBarOpacity - clamped) < 0.001) return;
+                _settings.MenuBarOpacity = clamped;
             }
             Save();
             SettingsChanged?.Invoke(this, EventArgs.Empty);
@@ -292,15 +293,15 @@ public class ShellSettingsService : IDisposable
         }
     }
 
-    public bool DynamicMenuBarColor
+    public string MenuBarTextColor
     {
-        get { lock (_lock) return _settings.DynamicMenuBarColor; }
+        get { lock (_lock) return _settings.MenuBarTextColor; }
         set
         {
             lock (_lock)
             {
-                if (_settings.DynamicMenuBarColor == value) return;
-                _settings.DynamicMenuBarColor = value;
+                if (_settings.MenuBarTextColor == value) return;
+                _settings.MenuBarTextColor = value;
             }
             Save();
             SettingsChanged?.Invoke(this, EventArgs.Empty);
@@ -368,7 +369,7 @@ public class ShellSettingsService : IDisposable
                 {
                     ReplaceExplorer = _settings.ReplaceExplorer,
                     ShowAppMenuItems = _settings.ShowAppMenuItems,
-                    MenuBarTranslucency = _settings.MenuBarTranslucency,
+                    MenuBarOpacity = _settings.MenuBarOpacity,
                     ShowDayOfWeek = _settings.ShowDayOfWeek,
                     Use24HourClock = _settings.Use24HourClock,
                     ShowSeconds = _settings.ShowSeconds,
@@ -378,7 +379,7 @@ public class ShellSettingsService : IDisposable
                     ShowDesktopIcons = _settings.ShowDesktopIcons,
                     AutoHideMenuBar = _settings.AutoHideMenuBar,
                     MonochromeTrayIcons = _settings.MonochromeTrayIcons,
-                    DynamicMenuBarColor = _settings.DynamicMenuBarColor,
+                    MenuBarTextColor = _settings.MenuBarTextColor,
                     FilterAppsFolder = _settings.FilterAppsFolder,
                 };
             }

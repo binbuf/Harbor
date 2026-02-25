@@ -378,48 +378,42 @@
                             </Grid>
                         </Border>
 
-                        <!-- Menu bar translucency -->
+                        <!-- Menu bar opacity -->
+                        <Border Background="{DynamicResource SettingsCardBackground}" CornerRadius="8" Padding="16,12" Margin="0,0,0,8">
+                            <StackPanel>
+                                <TextBlock x:Name="MenuBarOpacityLabel"
+                                           Text="Menu bar opacity: 80%"
+                                           Foreground="{DynamicResource SettingsTextBrush}"
+                                           FontFamily="Segoe UI Variable" FontSize="13"
+                                           Margin="0,0,0,8" />
+                                <Slider x:Name="MenuBarOpacitySlider"
+                                        Minimum="0" Maximum="100"
+                                        Width="300" HorizontalAlignment="Left"
+                                        IsSnapToTickEnabled="True" TickFrequency="1"
+                                        ValueChanged="MenuBarOpacitySlider_ValueChanged" />
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Menu bar text color -->
                         <Border Background="{DynamicResource SettingsCardBackground}" CornerRadius="8" Padding="16,12" Margin="0,0,0,8">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Text="Menu bar translucency"
+                                <TextBlock Text="Menu bar text color"
                                            Foreground="{DynamicResource SettingsTextBrush}"
                                            FontFamily="Segoe UI Variable" FontSize="13"
                                            VerticalAlignment="Center" />
-                                <CheckBox x:Name="MenuBarTranslucencyToggle"
+                                <ComboBox x:Name="MenuBarTextColorCombo"
                                           Grid.Column="1"
-                                          Style="{StaticResource ToggleSwitchStyle}"
+                                          Width="160"
                                           VerticalAlignment="Center"
-                                          Checked="MenuBarTranslucencyToggle_Changed"
-                                          Unchecked="MenuBarTranslucencyToggle_Changed" />
-                            </Grid>
-                        </Border>
-
-                        <!-- Dynamic color -->
-                        <Border Background="{DynamicResource SettingsCardBackground}" CornerRadius="8" Padding="16,12" Margin="0,0,0,8">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                    <TextBlock Text="Dynamic color"
-                                               Foreground="{DynamicResource SettingsTextBrush}"
-                                               FontFamily="Segoe UI Variable" FontSize="13" />
-                                    <TextBlock Text="Adapt text color based on wallpaper brightness"
-                                               Foreground="{DynamicResource SettingsSecondaryTextBrush}"
-                                               FontFamily="Segoe UI Variable" FontSize="11"
-                                               Margin="0,2,0,0" />
-                                </StackPanel>
-                                <CheckBox x:Name="DynamicMenuBarColorToggle"
-                                          Grid.Column="1"
-                                          Style="{StaticResource ToggleSwitchStyle}"
-                                          VerticalAlignment="Center"
-                                          Checked="DynamicMenuBarColorToggle_Changed"
-                                          Unchecked="DynamicMenuBarColorToggle_Changed" />
+                                          SelectionChanged="MenuBarTextColorCombo_SelectionChanged">
+                                    <ComboBoxItem Content="White" />
+                                    <ComboBoxItem Content="Black" />
+                                    <ComboBoxItem Content="Auto (Dynamic)" />
+                                </ComboBox>
                             </Grid>
                         </Border>
 

@@ -1,13 +1,19 @@
 using System.Globalization;
 using System.Windows;
+using System.Windows.Interop;
 using System.Windows.Media;
+using Harbor.Core.Interop;
 using Harbor.Shell.Flyouts;
+using Windows.Win32.Foundation;
 
 namespace Harbor.Shell;
 
 public partial class CalendarFlyout : Window
 {
     private FlyoutMouseHook? _mouseHook;
+
+    // Dark frosted glass tint: #1E1E1E at ~70% opacity (AABBGGRR)
+    private const uint AcrylicTintColor = 0xB01E1E1E;
 
     public CalendarFlyout()
     {
@@ -18,6 +24,25 @@ public partial class CalendarFlyout : Window
 
         Loaded += (_, _) => _mouseHook = new FlyoutMouseHook(this, Close);
         ContentRendered += OnContentRendered;
+    }
+
+    protected override void OnSourceInitialized(EventArgs e)
+    {
+        base.OnSourceInitialized(e);
+        ApplyAcrylic();
+    }
+
+    private void ApplyAcrylic()
+    {
+        var hwnd = new WindowInteropHelper(this).Handle;
+        if (hwnd == IntPtr.Zero) return;
+
+        var result = CompositionInterop.EnableAcrylic(new HWND(hwnd), AcrylicTintColor);
+        if (result)
+        {
+            // Let the DWM acrylic blur show through
+            FlyoutBorder.Background = Brushes.Transparent;
+        }
     }
 
     private void OnContentRendered(object? sender, EventArgs e)

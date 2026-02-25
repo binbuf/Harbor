@@ -71,8 +71,14 @@ public partial class SettingsWindow : Window
         // Menu Bar
         ShowAppMenuItemsToggle.IsChecked = _shellSettings.ShowAppMenuItems;
         AutoHideMenuBarToggle.IsChecked = _shellSettings.AutoHideMenuBar;
-        MenuBarTranslucencyToggle.IsChecked = _shellSettings.MenuBarTranslucency;
-        DynamicMenuBarColorToggle.IsChecked = _shellSettings.DynamicMenuBarColor;
+        MenuBarOpacitySlider.Value = _shellSettings.MenuBarOpacity * 100;
+        MenuBarOpacityLabel.Text = $"Menu bar opacity: {(int)(_shellSettings.MenuBarOpacity * 100)}%";
+        MenuBarTextColorCombo.SelectedIndex = _shellSettings.MenuBarTextColor switch
+        {
+            "black" => 1,
+            "auto" => 2,
+            _ => 0, // white
+        };
         MonochromeTrayIconsToggle.IsChecked = _shellSettings.MonochromeTrayIcons;
         ShowDayOfWeekToggle.IsChecked = _shellSettings.ShowDayOfWeek;
         Use24HourClockToggle.IsChecked = _shellSettings.Use24HourClock;
@@ -187,16 +193,24 @@ public partial class SettingsWindow : Window
         _shellSettings.AutoHideMenuBar = AutoHideMenuBarToggle.IsChecked == true;
     }
 
-    private void MenuBarTranslucencyToggle_Changed(object sender, RoutedEventArgs e)
+    private void MenuBarOpacitySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
         if (_loading) return;
-        _shellSettings.MenuBarTranslucency = MenuBarTranslucencyToggle.IsChecked == true;
+        var pct = (int)MenuBarOpacitySlider.Value;
+        _shellSettings.MenuBarOpacity = pct / 100.0;
+        if (MenuBarOpacityLabel is not null)
+            MenuBarOpacityLabel.Text = $"Menu bar opacity: {pct}%";
     }
 
-    private void DynamicMenuBarColorToggle_Changed(object sender, RoutedEventArgs e)
+    private void MenuBarTextColorCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (_loading) return;
-        _shellSettings.DynamicMenuBarColor = DynamicMenuBarColorToggle.IsChecked == true;
+        _shellSettings.MenuBarTextColor = MenuBarTextColorCombo.SelectedIndex switch
+        {
+            1 => "black",
+            2 => "auto",
+            _ => "white",
+        };
     }
 
     private void MonochromeTrayIconsToggle_Changed(object sender, RoutedEventArgs e)

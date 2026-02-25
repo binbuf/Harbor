@@ -90,7 +90,7 @@
                 BorderBrush="{DynamicResource DockBorderBrush}"
                 BorderThickness="1"
                 Margin="0,0,0,7"
-                Padding="8,6,8,4"
+                Padding="8,12,8,8"
                 ClipToBounds="False"
                 RenderTransformOrigin="0.5,1"
                 MouseEnter="DockContainer_MouseEnter"

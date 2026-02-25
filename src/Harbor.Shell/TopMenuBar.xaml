@@ -107,7 +107,7 @@
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
                             <Border Width="18" Height="18"
-                                    Margin="4,0"
+                                    Margin="5,0"
                                     VerticalAlignment="Center"
                                     Cursor="Hand"
                                     ToolTip="{Binding Title}"

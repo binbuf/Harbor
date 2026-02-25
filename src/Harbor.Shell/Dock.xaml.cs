@@ -47,17 +47,17 @@ public partial class Dock : Window, IRetreatable
     private int _dragTargetIndex;
 
     // Animation constants (match Design.md Section 5B / 5D)
-    public const double IconDefaultSize = 102.0;
-    public const double IconHoverSize = 119.0;
-    public const double IconPressedSize = 94.0;
-    public const double HoverScaleFactor = IconHoverSize / IconDefaultSize;   // 1.167
-    public const double PressedScaleFactor = IconPressedSize / IconDefaultSize; // 0.921
+    public const double IconDefaultSize = 52.0;
+    public const double IconHoverSize = 61.0;
+    public const double IconPressedSize = 48.0;
+    public const double HoverScaleFactor = IconHoverSize / IconDefaultSize;   // 1.173
+    public const double PressedScaleFactor = IconPressedSize / IconDefaultSize; // 0.923
 
     public static readonly Duration HoverScaleDuration = new(TimeSpan.FromMilliseconds(150));
     public static readonly Duration PressScaleDownDuration = new(TimeSpan.FromMilliseconds(80));
     public static readonly Duration PressScaleUpDuration = new(TimeSpan.FromMilliseconds(100));
 
-    public const double BounceTranslation = -25.0; // 25 DIP upward (negative Y)
+    public const double BounceTranslation = -13.0; // 13 DIP upward (negative Y)
     public const int BounceCount = 3;
     public static readonly Duration SingleBounceDuration = new(TimeSpan.FromMilliseconds(300));
     public static readonly Duration TotalBounceDuration = new(TimeSpan.FromMilliseconds(900));
@@ -66,13 +66,15 @@ public partial class Dock : Window, IRetreatable
     public static readonly Duration HideAnimationDuration = new(TimeSpan.FromMilliseconds(200));
 
     // Dock layout constants
-    public const double DockWindowHeight = 200.0;   // AppBar window height (includes magnification headroom)
-    public const double DockVisibleHeight = 166.0;  // Visible pill height for slide animations
+    public const double DockWindowHeight = 120.0;   // AppBar window height (includes magnification headroom)
+    public const double DockVisibleHeight = 83.0;   // Visible pill height for slide animations
 
     // Magnification constants
     public const double MagnificationMaxScale = 1.5;
     public const double MagnificationEffectRadius = 3.0;
-    public const double MagnificationIconPitch = 134.0; // 102 + 32 margin
+    public const double MagnificationIconPitch = 80.0; // 52 + 28 margin
+    public const double DockContainerVerticalPadding = 16.0; // top + bottom padding + border for container height calc
+    public static readonly Duration MagnificationHeightAnimDuration = new(TimeSpan.FromMilliseconds(80));
 
     // Easing functions matching the spec cubic-bezier curves
     private static readonly IEasingFunction EaseOut = new QuadraticEase { EasingMode = EasingMode.EaseOut };
@@ -526,10 +528,12 @@ public partial class Dock : Window, IRetreatable
             MagnificationEffectRadius,
             MagnificationIconPitch);
 
+        double maxScale = 1.0;
         for (int i = 0; i < elements.Count; i++)
         {
             var element = elements[i];
             var scale = scales[i];
+            if (scale > maxScale) maxScale = scale;
 
             var scaleTransform = FindScaleTransform(element);
             var translateTransform = FindTranslateTransform(element);
@@ -550,12 +554,32 @@ public partial class Dock : Window, IRetreatable
                 translateTransform.Y = offset;
             }
         }
+
+        // Expand the dock container to ~80% of the magnified height so icons poke above
+        // the pill (matching macOS). The container is bottom-anchored so it grows upward.
+        var fullMagnifiedHeight = IconDefaultSize * maxScale + DockContainerVerticalPadding;
+        var baseHeight = IconDefaultSize + DockContainerVerticalPadding;
+        var targetHeight = baseHeight + (fullMagnifiedHeight - baseHeight) * 0.8;
+
+        // Use explicit From value since Height may be Auto (NaN) which DoubleAnimation can't interpolate from.
+        var currentHeight = DockContainer.ActualHeight;
+        if (double.IsNaN(currentHeight) || currentHeight == 0)
+            currentHeight = baseHeight;
+        var heightAnim = new DoubleAnimation(currentHeight, targetHeight, MagnificationHeightAnimDuration)
+        {
+            EasingFunction = EaseOut,
+        };
+        DockContainer.BeginAnimation(FrameworkElement.HeightProperty, heightAnim);
     }
 
     private void ResetMagnification()
     {
         ResetItemsControlScales(PinnedIconsControl);
         ResetItemsControlScales(RunningIconsControl);
+
+        // Reset container height to auto
+        DockContainer.BeginAnimation(FrameworkElement.HeightProperty, null);
+        DockContainer.ClearValue(FrameworkElement.HeightProperty);
     }
 
     /// <summary>
@@ -584,6 +608,19 @@ public partial class Dock : Window, IRetreatable
 
         AnimateItemsControlElements(PinnedIconsControl, AnimateElement);
         AnimateItemsControlElements(RunningIconsControl, AnimateElement);
+
+        // Animate the container height back to its base size, then clear to Auto
+        var baseHeight = IconDefaultSize + DockContainerVerticalPadding;
+        var currentHeight = DockContainer.ActualHeight;
+        if (double.IsNaN(currentHeight) || currentHeight == 0)
+            currentHeight = baseHeight;
+        var heightAnim = new DoubleAnimation(currentHeight, baseHeight, duration) { EasingFunction = EaseOut };
+        heightAnim.Completed += (_, _) =>
+        {
+            DockContainer.BeginAnimation(FrameworkElement.HeightProperty, null);
+            DockContainer.ClearValue(FrameworkElement.HeightProperty);
+        };
+        DockContainer.BeginAnimation(FrameworkElement.HeightProperty, heightAnim);
     }
 
     private static void CollectIconElements(ItemsControl itemsControl, List<double> centers, List<FrameworkElement> elements, UIElement referencePanel)

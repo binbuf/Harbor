@@ -8,15 +8,15 @@ public class DockAnimationTests
     [Fact]
     public void HoverScale_IsCorrectRatio()
     {
-        // 119/102 ≈ 1.167
-        Assert.Equal(119.0 / 102.0, Dock.HoverScaleFactor, precision: 3);
+        // 61/52 ≈ 1.173
+        Assert.Equal(61.0 / 52.0, Dock.HoverScaleFactor, precision: 3);
     }
 
     [Fact]
     public void PressedScale_IsCorrectRatio()
     {
-        // 94/102 ≈ 0.922
-        Assert.Equal(94.0 / 102.0, Dock.PressedScaleFactor, precision: 3);
+        // 48/52 ≈ 0.923
+        Assert.Equal(48.0 / 52.0, Dock.PressedScaleFactor, precision: 3);
     }
 
     [Fact]
@@ -38,10 +38,10 @@ public class DockAnimationTests
     }
 
     [Fact]
-    public void BounceTranslation_Is25DipUpward()
+    public void BounceTranslation_Is13DipUpward()
     {
         // Negative Y means upward in WPF coordinate system
-        Assert.Equal(-25.0, Dock.BounceTranslation);
+        Assert.Equal(-13.0, Dock.BounceTranslation);
     }
 
     [Fact]
@@ -83,20 +83,20 @@ public class DockAnimationTests
     }
 
     [Fact]
-    public void IconDefaultSize_Is102Dip()
+    public void IconDefaultSize_Is52Dip()
     {
-        Assert.Equal(102.0, Dock.IconDefaultSize);
+        Assert.Equal(52.0, Dock.IconDefaultSize);
     }
 
     [Fact]
-    public void IconHoverSize_Is119Dip()
+    public void IconHoverSize_Is61Dip()
     {
-        Assert.Equal(119.0, Dock.IconHoverSize);
+        Assert.Equal(61.0, Dock.IconHoverSize);
     }
 
     [Fact]
-    public void IconPressedSize_Is94Dip()
+    public void IconPressedSize_Is48Dip()
     {
-        Assert.Equal(94.0, Dock.IconPressedSize);
+        Assert.Equal(48.0, Dock.IconPressedSize);
     }
 }

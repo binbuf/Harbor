@@ -36,8 +36,8 @@
 
         <!-- Shared icon DataTemplate used by both pinned and running ItemsControls -->
         <DataTemplate x:Key="DockIconTemplate">
-            <Grid Width="102" Height="114"
-                  Margin="16,0"
+            <Grid Width="52" Height="58"
+                  Margin="14,0"
                   Cursor="Hand"
                   RenderTransformOrigin="0.5,1.0"
                   MouseLeftButtonDown="DockIcon_MouseLeftButtonDown"
@@ -58,11 +58,11 @@
                 </Grid.RenderTransform>
                 <!-- Application icon -->
                 <Image Source="{Binding Icon}"
-                       Width="102" Height="102"
+                       Width="52" Height="52"
                        VerticalAlignment="Top"
                        RenderOptions.BitmapScalingMode="HighQuality" />
                 <!-- Active indicator dot (visible only when running) -->
-                <Ellipse Width="6" Height="6"
+                <Ellipse Width="4" Height="4"
                          Fill="{DynamicResource DockActiveDotBrush}"
                          HorizontalAlignment="Center"
                          VerticalAlignment="Bottom"
@@ -72,7 +72,7 @@
         </DataTemplate>
     </Window.Resources>
 
-    <Grid x:Name="DockRoot" Height="200" VerticalAlignment="Bottom">
+    <Grid x:Name="DockRoot" Height="120" VerticalAlignment="Bottom">
         <!-- Auto-hide trigger zone: 6px tall, invisible, at bottom edge -->
         <Border x:Name="AutoHideTriggerZone"
                 Height="6"
@@ -85,12 +85,12 @@
         <Border x:Name="DockContainer"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Bottom"
-                CornerRadius="16"
+                CornerRadius="22"
                 Background="{DynamicResource DockBackground}"
                 BorderBrush="{DynamicResource DockBorderBrush}"
                 BorderThickness="1"
-                Margin="0,0,0,13"
-                Padding="16,12,16,8"
+                Margin="0,0,0,7"
+                Padding="8,6,8,4"
                 ClipToBounds="False"
                 RenderTransformOrigin="0.5,1"
                 MouseEnter="DockContainer_MouseEnter"
@@ -108,17 +108,17 @@
                               ItemTemplate="{StaticResource DockIconTemplate}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
-                            <StackPanel Orientation="Horizontal" />
+                            <StackPanel Orientation="Horizontal" ClipToBounds="False" />
                         </ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
                 </ItemsControl>
 
                 <!-- Separator: 1px vertical line between pinned and running sections -->
                 <Border x:Name="DockSeparator"
-                        Width="2"
-                        Height="60"
+                        Width="1"
+                        Height="30"
                         VerticalAlignment="Center"
-                        Margin="30,0"
+                        Margin="15,0"
                         Background="{DynamicResource DockSeparatorBrush}"
                         Visibility="Collapsed" />
 
@@ -129,23 +129,23 @@
                               ItemTemplate="{StaticResource DockIconTemplate}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
-                            <StackPanel Orientation="Horizontal" />
+                            <StackPanel Orientation="Horizontal" ClipToBounds="False" />
                         </ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
                 </ItemsControl>
 
                 <!-- Trash separator -->
                 <Border x:Name="TrashSeparator"
-                        Width="2"
-                        Height="60"
+                        Width="1"
+                        Height="30"
                         VerticalAlignment="Center"
-                        Margin="30,0"
+                        Margin="15,0"
                         Background="{DynamicResource DockSeparatorBrush}" />
 
                 <!-- Trash / Recycle Bin -->
                 <Grid x:Name="TrashIcon"
-                      Width="102" Height="114"
-                      Margin="16,0"
+                      Width="52" Height="58"
+                      Margin="14,0"
                       Cursor="Hand"
                       RenderTransformOrigin="0.5,1.0"
                       MouseLeftButtonUp="TrashIcon_Click"
@@ -164,7 +164,7 @@
                     </Grid.ToolTip>
                     <ToolTipService.InitialShowDelay>500</ToolTipService.InitialShowDelay>
                     <Image x:Name="TrashIconImage"
-                           Width="102" Height="102"
+                           Width="52" Height="52"
                            VerticalAlignment="Top"
                            RenderOptions.BitmapScalingMode="HighQuality" />
                 </Grid>

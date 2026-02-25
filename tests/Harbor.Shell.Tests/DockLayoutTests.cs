@@ -2,15 +2,15 @@ namespace Harbor.Shell.Tests;
 
 public class DockLayoutTests
 {
-    private const double IconSize = 102.0;
-    private const double IconHorizontalMargin = 16.0; // 16px each side (32px between icons)
-    private const double DockPadding = 16.0; // Horizontal padding on container
+    private const double IconSize = 52.0;
+    private const double IconHorizontalMargin = 8.0; // 8px each side (16px between icons)
+    private const double DockPadding = 8.0; // Horizontal padding on container
     private const double BorderThickness = 1.0;
 
     /// <summary>
     /// Calculates the expected Dock container width for a given number of icons.
-    /// Each icon is 102 DIP wide with 16px margin on each side.
-    /// Container has 16px horizontal padding on each side + 1px border on each side.
+    /// Each icon is 52 DIP wide with 8px margin on each side.
+    /// Container has 8px horizontal padding on each side + 1px border on each side.
     /// </summary>
     public static double CalculateDockContentWidth(int iconCount)
     {
@@ -27,22 +27,22 @@ public class DockLayoutTests
     [Fact]
     public void DockContentWidth_OneIcon_IncludesIconAndMargins()
     {
-        // 1 * (102 + 32) = 134
-        Assert.Equal(134, CalculateDockContentWidth(1));
+        // 1 * (52 + 16) = 68
+        Assert.Equal(68, CalculateDockContentWidth(1));
     }
 
     [Fact]
     public void DockContentWidth_FiveIcons_CalculatesCorrectly()
     {
-        // 5 * (102 + 32) = 670
-        Assert.Equal(670, CalculateDockContentWidth(5));
+        // 5 * (52 + 16) = 340
+        Assert.Equal(340, CalculateDockContentWidth(5));
     }
 
     [Fact]
     public void DockContentWidth_TenIcons_CalculatesCorrectly()
     {
-        // 10 * (102 + 32) = 1340
-        Assert.Equal(1340, CalculateDockContentWidth(10));
+        // 10 * (52 + 16) = 680
+        Assert.Equal(680, CalculateDockContentWidth(10));
     }
 
     [Theory]
@@ -54,17 +54,17 @@ public class DockLayoutTests
     }
 
     [Fact]
-    public void IconSize_Is102Dip()
+    public void IconSize_Is52Dip()
     {
-        Assert.Equal(102.0, IconSize);
+        Assert.Equal(52.0, IconSize);
     }
 
     [Fact]
-    public void ConsecutiveIcons_Have134DipSpacing()
+    public void ConsecutiveIcons_Have68DipSpacing()
     {
-        // Each icon occupies 102 + 16 + 16 = 134 DIP
+        // Each icon occupies 52 + 8 + 8 = 68 DIP
         double width1 = CalculateDockContentWidth(1);
         double width2 = CalculateDockContentWidth(2);
-        Assert.Equal(134, width2 - width1);
+        Assert.Equal(68, width2 - width1);
     }
 }

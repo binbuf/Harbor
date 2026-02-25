@@ -23,7 +23,7 @@ public enum DockAutoHideMode
 /// </summary>
 public class DockSettings
 {
-    public int IconSize { get; set; } = 102;
+    public int IconSize { get; set; } = 52;
     public bool FullWidthDock { get; set; } = false;
     public DockAutoHideMode AutoHideMode { get; set; } = DockAutoHideMode.Never;
     public bool MagnificationEnabled { get; set; } = false;

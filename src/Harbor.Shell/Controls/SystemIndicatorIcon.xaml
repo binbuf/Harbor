@@ -16,10 +16,14 @@
         <Path x:Name="IconPath"
               Width="16" Height="16"
               Stretch="Uniform"
-              Fill="{DynamicResource MenuBarTextBrush}"
+              Fill="White"
               StrokeThickness="0.8"
-              Stroke="{DynamicResource MenuBarTextBrush}"
+              Stroke="White"
               HorizontalAlignment="Center"
-              VerticalAlignment="Center" />
+              VerticalAlignment="Center">
+            <Path.Effect>
+                <DropShadowEffect BlurRadius="2" ShadowDepth="0.5" Opacity="0.4" Direction="270" Color="Black" />
+            </Path.Effect>
+        </Path>
     </Border>
 </UserControl>

@@ -196,10 +196,11 @@ public partial class TopMenuBar : AppBarWindow
         _volumeFlyout = new VolumeFlyout(_volumeService);
         _volumeFlyout.Closed += (_, _) => _volumeFlyout = null;
 
-        // Position below the volume icon
+        // Position below the volume icon, converting physical pixels to DIPs
         var iconScreenPos = VolumeIcon.PointToScreen(new Point(0, VolumeIcon.ActualHeight));
-        _volumeFlyout.Left = iconScreenPos.X - 120 + VolumeIcon.ActualWidth / 2;
-        _volumeFlyout.Top = iconScreenPos.Y + 4;
+        var dpi = GetDpiScale();
+        _volumeFlyout.Left = iconScreenPos.X / dpi - 120 + VolumeIcon.ActualWidth / 2;
+        _volumeFlyout.Top = iconScreenPos.Y / dpi + 4;
 
         _volumeFlyout.Show();
     }
@@ -654,10 +655,11 @@ public partial class TopMenuBar : AppBarWindow
         _calendarFlyout = new CalendarFlyout();
         _calendarFlyout.Closed += (_, _) => _calendarFlyout = null;
 
-        // Position below the clock
+        // Position below the clock, converting physical pixels to DIPs
         var clockScreenPos = ClockContainer.PointToScreen(new Point(0, ClockContainer.ActualHeight));
-        _calendarFlyout.Left = clockScreenPos.X - 200 + ClockContainer.ActualWidth;
-        _calendarFlyout.Top = clockScreenPos.Y + 4;
+        var dpi = GetDpiScale();
+        _calendarFlyout.Left = clockScreenPos.X / dpi - 200 + ClockContainer.ActualWidth;
+        _calendarFlyout.Top = clockScreenPos.Y / dpi + 4;
 
         _calendarFlyout.Show();
     }
@@ -846,6 +848,16 @@ public partial class TopMenuBar : AppBarWindow
     #endregion
 
     #region Helpers
+
+    /// <summary>
+    /// Returns the DPI scale factor for this window (physical pixels per DIP).
+    /// PointToScreen returns physical pixels; Window.Left/Top expect DIPs.
+    /// </summary>
+    private double GetDpiScale()
+    {
+        var source = PresentationSource.FromVisual(this);
+        return source?.CompositionTarget?.TransformToDevice.M11 ?? 1.0;
+    }
 
     private static T? FindVisualChild<T>(DependencyObject parent) where T : DependencyObject
     {

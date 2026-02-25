@@ -686,7 +686,7 @@ public partial class TopMenuBar : AppBarWindow
         // Position below the clock, converting physical pixels to DIPs
         var clockScreenPos = ClockContainer.PointToScreen(new Point(0, ClockContainer.ActualHeight));
         var dpi = GetDpiScale();
-        _calendarFlyout.Left = clockScreenPos.X / dpi - 200 + ClockContainer.ActualWidth;
+        _calendarFlyout.Left = clockScreenPos.X / dpi - 280 + ClockContainer.ActualWidth;
         _calendarFlyout.Top = clockScreenPos.Y / dpi + 4;
 
         _calendarFlyout.Show();

@@ -35,7 +35,14 @@
     <SolidColorBrush x:Key="FlyoutHeaderForeground" Color="#FFFFFF" />
     <SolidColorBrush x:Key="CalendarDayHoverBackground" Color="#2DFFFFFF" />
     <SolidColorBrush x:Key="CalendarSelectedBackground" Color="#0078D4" />
-    <SolidColorBrush x:Key="CalendarTodayBackground" Color="#333333" />
+    <SolidColorBrush x:Key="CalendarTodayBackground" Color="#0078D4" />
+    <SolidColorBrush x:Key="CalendarClockForeground" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="CalendarDateForeground" Color="#CCFFFFFF" />
+    <SolidColorBrush x:Key="CalendarDayHeaderForeground" Color="#80FFFFFF" />
+    <SolidColorBrush x:Key="CalendarDayInactiveForeground" Color="#4DFFFFFF" />
+    <SolidColorBrush x:Key="CalendarTodayForeground" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="CalendarSelectedBorderBrush" Color="#0078D4" />
+    <Color x:Key="CalendarRevealBorderColor">#33FFFFFF</Color>
 
     <!-- Settings Window -->
     <SolidColorBrush x:Key="SettingsBackground" Color="#FF1E1E1E" />

@@ -1,5 +1,6 @@
 // Window Management
 GetForegroundWindow
+SetForegroundWindow
 GetWindowRect
 GetClientRect
 SetWindowPos

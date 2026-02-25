@@ -794,6 +794,15 @@ public partial class TopMenuBar : AppBarWindow
 
         menu.PlacementTarget = (UIElement)sender;
         menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
+
+        // Call SetForegroundWindow on our HWND *before* opening the menu so the
+        // system treats the subsequent popup as belonging to the foreground app.
+        // This lets clicking outside properly dismiss the context menu even though
+        // our window has WS_EX_NOACTIVATE.
+        var hwnd = new WindowInteropHelper(this).Handle;
+        if (hwnd != IntPtr.Zero)
+            Windows.Win32.PInvoke.SetForegroundWindow(new HWND(hwnd));
+
         menu.IsOpen = true;
     }
 

@@ -664,10 +664,18 @@ public partial class Dock : Window, IRetreatable
             StopMagnificationTracking();
             AnimateResetMagnification();
 
-            // Mouse has truly left the dock zone — trigger auto-hide now that
-            // magnification tracking is stopped and won't suppress it.
+            // Only trigger auto-hide when the mouse moved upward out of the bottom region.
+            // If the mouse exited horizontally but is still near the bottom screen edge,
+            // keep the dock visible (consistent with DockContainer_MouseLeave behavior).
             if (_isAutoHideEnabled)
-                _autoHideService?.OnDockAreaLeave();
+            {
+                var bottomRegionTop = DockRoot.ActualHeight - AutoHideTriggerZone.ActualHeight
+                                      - DockContainer.Margin.Bottom;
+                if (pos.Y < bottomRegionTop)
+                    _autoHideService?.OnDockAreaLeave();
+                else
+                    StartBottomEdgeTimer();
+            }
 
             return;
         }

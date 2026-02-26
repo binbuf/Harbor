@@ -17,6 +17,7 @@ public sealed class DockItemManager : IDisposable
 {
     private readonly DockPinningService _pinningService;
     private readonly IconExtractionService _iconService;
+    private SynchronizationContext? _syncContext;
     private Tasks? _tasks;
     private bool _disposed;
 
@@ -46,9 +47,11 @@ public sealed class DockItemManager : IDisposable
 
     /// <summary>
     /// Binds to ManagedShell's Tasks and starts tracking.
+    /// Must be called from the UI thread.
     /// </summary>
     public void Initialize(Tasks tasks)
     {
+        _syncContext = SynchronizationContext.Current;
         _tasks = tasks;
 
         if (_tasks.GroupedWindows is INotifyCollectionChanged notifyCollection)
@@ -142,12 +145,26 @@ public sealed class DockItemManager : IDisposable
 
     private void OnPinsChanged(object? sender, EventArgs e)
     {
-        Rebuild();
+        PostRebuild();
     }
 
     private void OnGroupedWindowsChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
     {
-        Rebuild();
+        PostRebuild();
+    }
+
+    /// <summary>
+    /// Ensures Rebuild() runs on the UI thread. ManagedShell may fire
+    /// GroupedWindows.CollectionChanged from a background thread; modifying
+    /// ObservableCollections bound to WPF controls off the UI thread would
+    /// either throw or silently corrupt state.
+    /// </summary>
+    private void PostRebuild()
+    {
+        if (_syncContext is not null)
+            _syncContext.Post(_ => Rebuild(), null);
+        else
+            Rebuild();
     }
 
     public void Dispose()

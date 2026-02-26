@@ -84,6 +84,16 @@ public static class DockContextMenuService
     }
 
     /// <summary>
+    /// Returns true if the executable path identifies a protected dock item
+    /// that cannot be removed (e.g. Windows File Manager, Apps Drawer).
+    /// </summary>
+    public static bool IsProtectedDockItem(string executablePath)
+    {
+        return string.Equals(executablePath, @"C:\Windows\explorer.exe", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(executablePath, IconExtractionService.AppsLauncherSentinel, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
     /// Gets the appropriate menu items based on the pinned/running state.
     /// When multiple windows are provided, window list items are prepended at the top.
     /// </summary>
@@ -107,6 +117,10 @@ public static class DockContextMenuService
         // Update "Open at Login" checked state
         SetOpenAtLoginState(items, isOpenAtLogin);
 
+        // Disable removal options for protected dock items
+        if (IsProtectedDockItem(executablePath))
+            DisableRemovalOptions(items);
+
         // Prepend window list items when there are multiple windows
         if (windows is not null && windows.Count > 1)
         {
@@ -117,6 +131,31 @@ public static class DockContextMenuService
         }
 
         return items;
+    }
+
+    /// <summary>
+    /// Disables "Remove from Dock" and "Keep in Dock" menu items for protected dock items.
+    /// </summary>
+    private static void DisableRemovalOptions(List<DockMenuItem> items)
+    {
+        for (int i = 0; i < items.Count; i++)
+        {
+            if (items[i].Action == DockMenuAction.RemoveFromDock)
+            {
+                items[i] = items[i] with { IsEnabled = false };
+            }
+
+            if (items[i].Children is not null)
+            {
+                for (int j = 0; j < items[i].Children!.Count; j++)
+                {
+                    if (items[i].Children![j].Action == DockMenuAction.KeepInDock)
+                    {
+                        items[i].Children![j] = items[i].Children![j] with { IsEnabled = false };
+                    }
+                }
+            }
+        }
     }
 
     private static void SetOpenAtLoginState(List<DockMenuItem> items, bool isOpenAtLogin)
@@ -152,6 +191,7 @@ public record DockMenuItem(
     bool IsSubmenuHeader = false,
     bool IsSeparator = false,
     bool IsChecked = false,
+    bool IsEnabled = true,
     List<DockMenuItem>? Children = null,
     IntPtr WindowHandle = default)
 {

@@ -286,4 +286,74 @@ public class DockContextMenuServiceTests
     }
 
     #endregion
+
+    #region Protected Dock Item Tests
+
+    [Fact]
+    public void IsProtectedDockItem_ExplorerExe_ReturnsTrue()
+    {
+        Assert.True(DockContextMenuService.IsProtectedDockItem(@"C:\Windows\explorer.exe"));
+    }
+
+    [Fact]
+    public void IsProtectedDockItem_ExplorerExe_CaseInsensitive()
+    {
+        Assert.True(DockContextMenuService.IsProtectedDockItem(@"C:\WINDOWS\EXPLORER.EXE"));
+    }
+
+    [Fact]
+    public void IsProtectedDockItem_AppsLauncher_ReturnsTrue()
+    {
+        Assert.True(DockContextMenuService.IsProtectedDockItem(IconExtractionService.AppsLauncherSentinel));
+    }
+
+    [Fact]
+    public void IsProtectedDockItem_RegularApp_ReturnsFalse()
+    {
+        Assert.False(DockContextMenuService.IsProtectedDockItem(TestExe));
+    }
+
+    [Fact]
+    public void GetMenuItems_ProtectedItem_RemoveFromDockDisabled()
+    {
+        var items = DockContextMenuService.GetMenuItems(
+            @"C:\Windows\explorer.exe", "Finder", isPinned: true, isRunning: false);
+
+        var removeItem = items.First(i => i.Action == DockMenuAction.RemoveFromDock);
+        Assert.False(removeItem.IsEnabled);
+    }
+
+    [Fact]
+    public void GetMenuItems_ProtectedItem_KeepInDockDisabled()
+    {
+        var items = DockContextMenuService.GetMenuItems(
+            @"C:\Windows\explorer.exe", "Finder", isPinned: true, isRunning: false);
+
+        var options = items.First(i => i.IsSubmenuHeader);
+        var keepInDock = options.Children!.First(c => c.Action == DockMenuAction.KeepInDock);
+        Assert.False(keepInDock.IsEnabled);
+    }
+
+    [Fact]
+    public void GetMenuItems_ProtectedItem_Running_KeepInDockDisabled()
+    {
+        var items = DockContextMenuService.GetMenuItems(
+            @"C:\Windows\explorer.exe", "Finder", isPinned: true, isRunning: true);
+
+        var options = items.First(i => i.IsSubmenuHeader);
+        var keepInDock = options.Children!.First(c => c.Action == DockMenuAction.KeepInDock);
+        Assert.False(keepInDock.IsEnabled);
+    }
+
+    [Fact]
+    public void GetMenuItems_RegularApp_RemoveFromDockEnabled()
+    {
+        var items = DockContextMenuService.GetMenuItems(
+            TestExe, TestName, isPinned: true, isRunning: false);
+
+        var removeItem = items.First(i => i.Action == DockMenuAction.RemoveFromDock);
+        Assert.True(removeItem.IsEnabled);
+    }
+
+    #endregion
 }

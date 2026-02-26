@@ -857,8 +857,9 @@ public partial class Dock : Window, IRetreatable
                     var childMenuItem = new MenuItem
                     {
                         Header = child.Label,
-                        IsCheckable = true,
+                        IsCheckable = child.IsEnabled,
                         IsChecked = child.IsChecked,
+                        IsEnabled = child.IsEnabled,
                     };
                     var childAction = child.Action;
                     childMenuItem.Click += (_, _) => HandleMenuAction(childAction, dockItem);
@@ -868,7 +869,7 @@ public partial class Dock : Window, IRetreatable
                 continue;
             }
 
-            var menuItem = new MenuItem { Header = item.Label };
+            var menuItem = new MenuItem { Header = item.Label, IsEnabled = item.IsEnabled };
             var action = item.Action;
             var windowHandle = item.WindowHandle;
             menuItem.Click += (_, _) => HandleMenuAction(action, dockItem, windowHandle);

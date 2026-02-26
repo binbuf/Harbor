@@ -39,6 +39,7 @@ public partial class Dock : Window, IRetreatable
 
     // Active context menu tracking
     private ContextMenu? _activeContextMenu;
+    private ContextMenuMouseHook? _contextMenuMouseHook;
 
     // Drag reorder state
     private Point _dragStartPoint;
@@ -835,6 +836,15 @@ public partial class Dock : Window, IRetreatable
         contextMenu.Closed += OnContextMenuClosed;
 
         contextMenu.IsOpen = true;
+
+        // Install a low-level mouse hook to dismiss the menu on clicks outside.
+        // WPF's built-in dismissal doesn't work because the dock has WS_EX_NOACTIVATE.
+        _contextMenuMouseHook?.Dispose();
+        _contextMenuMouseHook = new ContextMenuMouseHook(contextMenu, () =>
+        {
+            if (_activeContextMenu is { IsOpen: true })
+                _activeContextMenu.IsOpen = false;
+        });
     }
 
     private ContextMenu BuildContextMenu(List<DockMenuItem> items, DockItem dockItem)
@@ -1146,6 +1156,13 @@ public partial class Dock : Window, IRetreatable
 
         menu.IsOpen = true;
         e.Handled = true;
+
+        _contextMenuMouseHook?.Dispose();
+        _contextMenuMouseHook = new ContextMenuMouseHook(menu, () =>
+        {
+            if (_activeContextMenu is { IsOpen: true })
+                _activeContextMenu.IsOpen = false;
+        });
     }
 
     private void TrashIcon_MouseEnter(object sender, MouseEventArgs e)
@@ -1166,6 +1183,8 @@ public partial class Dock : Window, IRetreatable
         if (sender is ContextMenu menu)
             menu.Closed -= OnContextMenuClosed;
 
+        _contextMenuMouseHook?.Dispose();
+        _contextMenuMouseHook = null;
         _activeContextMenu = null;
         _autoHideService?.ResumeHide();
 

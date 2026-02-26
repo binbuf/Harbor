@@ -37,6 +37,9 @@ public partial class Dock : Window, IRetreatable
     // Apps launcher
     private AppsLauncherWindow? _appsLauncher;
 
+    // Active context menu tracking
+    private ContextMenu? _activeContextMenu;
+
     // Drag reorder state
     private Point _dragStartPoint;
     private DockItem? _dragItem;
@@ -45,6 +48,7 @@ public partial class Dock : Window, IRetreatable
     private System.Windows.Controls.Primitives.Popup? _dragGhost;
     private int _dragFromIndex;
     private int _dragTargetIndex;
+    private bool _dragSourceWasPinned;
 
     // Animation constants (match Design.md Section 5B / 5D)
     public const double IconDefaultSize = 52.0;
@@ -85,6 +89,15 @@ public partial class Dock : Window, IRetreatable
     public Dock()
     {
         InitializeComponent();
+    }
+
+    protected override void OnDeactivated(EventArgs e)
+    {
+        base.OnDeactivated(e);
+
+        // Close any open context menu when the dock window loses focus
+        if (_activeContextMenu is { IsOpen: true })
+            _activeContextMenu.IsOpen = false;
     }
 
     /// <summary>
@@ -816,6 +829,11 @@ public partial class Dock : Window, IRetreatable
         var contextMenu = BuildContextMenu(menuItems, dockItem);
         contextMenu.PlacementTarget = element;
         contextMenu.Placement = System.Windows.Controls.Primitives.PlacementMode.Top;
+
+        _autoHideService?.SuppressHide();
+        _activeContextMenu = contextMenu;
+        contextMenu.Closed += OnContextMenuClosed;
+
         contextMenu.IsOpen = true;
     }
 
@@ -1120,6 +1138,11 @@ public partial class Dock : Window, IRetreatable
 
         menu.PlacementTarget = (UIElement)sender;
         menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Top;
+
+        _autoHideService?.SuppressHide();
+        _activeContextMenu = menu;
+        menu.Closed += OnContextMenuClosed;
+
         menu.IsOpen = true;
         e.Handled = true;
     }
@@ -1135,7 +1158,35 @@ public partial class Dock : Window, IRetreatable
 
     #endregion
 
+    #region Context Menu Lifecycle
+
+    private void OnContextMenuClosed(object sender, RoutedEventArgs e)
+    {
+        if (sender is ContextMenu menu)
+            menu.Closed -= OnContextMenuClosed;
+
+        _activeContextMenu = null;
+        _autoHideService?.ResumeHide();
+
+        // If mouse is no longer over the dock, trigger hide
+        if (_isAutoHideEnabled)
+        {
+            var pos = Mouse.GetPosition(DockContainer);
+            var isOverDock = pos.X >= 0 && pos.X <= DockContainer.ActualWidth
+                          && pos.Y >= 0 && pos.Y <= DockContainer.ActualHeight;
+            if (!isOverDock)
+                _autoHideService?.OnDockAreaLeave();
+        }
+    }
+
+    #endregion
+
     #region Drag Reorder
+
+    // Gap animation duration for icons sliding apart
+    private static readonly Duration DragGapDuration = new(TimeSpan.FromMilliseconds(200));
+    private const double DragGapWidth = 80.0; // full icon slot width for the gap
+    private int _dragPrevTargetIndex = -1; // track to avoid redundant gap animations
 
     private void DockIcon_MouseMove(object sender, MouseEventArgs e)
     {
@@ -1148,17 +1199,18 @@ public partial class Dock : Window, IRetreatable
         // Movement threshold — if moved more than 5px, start drag (cancel long-press)
         if (!_isDragging && Math.Abs(delta.X) > 5)
         {
-            // Only drag pinned items
-            if (_dragItem is not { IsPinned: true }) return;
+            if (_dragItem is null) return;
 
             CancelLongPress();
             _isDragging = true;
-            _dragFromIndex = GetPinnedIndex(_dragItem);
+            _dragSourceWasPinned = _dragItem.IsPinned;
+            _dragFromIndex = _dragSourceWasPinned ? GetPinnedIndex(_dragItem) : -1;
             _dragTargetIndex = _dragFromIndex;
+            _dragPrevTargetIndex = -1;
 
             Mouse.Capture(element);
 
-            // Create ghost popup
+            // Create ghost popup — icon follows cursor at full size
             _dragGhost = new System.Windows.Controls.Primitives.Popup
             {
                 AllowsTransparency = true,
@@ -1166,34 +1218,59 @@ public partial class Dock : Window, IRetreatable
                 Placement = System.Windows.Controls.Primitives.PlacementMode.Absolute,
                 Child = new Border
                 {
-                    Opacity = 0.7,
+                    Opacity = 0.85,
+                    Effect = new System.Windows.Media.Effects.DropShadowEffect
+                    {
+                        BlurRadius = 12,
+                        ShadowDepth = 4,
+                        Opacity = 0.4,
+                    },
                     Child = new Image
                     {
                         Source = _dragItem.Icon,
-                        Width = 48,
-                        Height = 48,
+                        Width = IconDefaultSize,
+                        Height = IconDefaultSize,
                     }
                 }
             };
 
-            element.Opacity = 0.3;
-            UpdateGhostPosition(element, e);
+            // Hide the original icon in place
+            element.Opacity = 0.0;
+
+            UpdateGhostPosition(e);
             _dragGhost.IsOpen = true;
         }
 
         if (_isDragging)
         {
-            UpdateGhostPosition(element, e);
+            UpdateGhostPosition(e);
             UpdateDragTarget(e);
         }
     }
 
-    private void UpdateGhostPosition(FrameworkElement element, MouseEventArgs e)
+    /// <summary>
+    /// Positions the ghost popup centered on the cursor using DIP screen coordinates.
+    /// </summary>
+    private void UpdateGhostPosition(MouseEventArgs e)
     {
         if (_dragGhost is null) return;
-        var screenPos = element.PointToScreen(e.GetPosition(element));
-        _dragGhost.HorizontalOffset = screenPos.X - 24;
-        _dragGhost.VerticalOffset = screenPos.Y - 24;
+
+        // Get cursor position in screen DIPs via the dock window
+        var cursorInWindow = e.GetPosition(this);
+        var screenPoint = PointToScreen(cursorInWindow);
+
+        // PointToScreen returns physical pixels — convert to DIPs for Popup.Absolute placement
+        var source = PresentationSource.FromVisual(this);
+        if (source?.CompositionTarget != null)
+        {
+            var dpiX = source.CompositionTarget.TransformToDevice.M11;
+            var dpiY = source.CompositionTarget.TransformToDevice.M22;
+            screenPoint.X /= dpiX;
+            screenPoint.Y /= dpiY;
+        }
+
+        _dragGhost.HorizontalOffset = screenPoint.X - IconDefaultSize / 2;
+        _dragGhost.VerticalOffset = screenPoint.Y - IconDefaultSize / 2;
     }
 
     private void UpdateDragTarget(MouseEventArgs e)
@@ -1201,9 +1278,92 @@ public partial class Dock : Window, IRetreatable
         if (_itemManager is null) return;
 
         var pos = e.GetPosition(PinnedIconsControl);
-        var itemWidth = 60.0; // 48 icon + 6+6 margin
-        var newIndex = Math.Clamp((int)(pos.X / itemWidth), 0, _itemManager.PinnedItems.Count - 1);
+        var itemWidth = MagnificationIconPitch; // 80px — actual icon slot width (52 + 14+14 margin)
+        var maxIndex = _dragSourceWasPinned
+            ? _itemManager.PinnedItems.Count - 1
+            : _itemManager.PinnedItems.Count;
+        var newIndex = Math.Clamp((int)((pos.X + itemWidth / 2) / itemWidth), 0, Math.Max(0, maxIndex));
         _dragTargetIndex = newIndex;
+
+        // Animate gap at the target position (macOS-style icons sliding apart)
+        if (_dragTargetIndex != _dragPrevTargetIndex)
+        {
+            _dragPrevTargetIndex = _dragTargetIndex;
+            AnimateDragGap();
+        }
+    }
+
+    /// <summary>
+    /// Animates pinned icons to slide apart at the drag target index, creating a visual gap.
+    /// </summary>
+    private void AnimateDragGap()
+    {
+        if (_itemManager is null) return;
+
+        for (int i = 0; i < _itemManager.PinnedItems.Count; i++)
+        {
+            var container = PinnedIconsControl.ItemContainerGenerator.ContainerFromIndex(i) as FrameworkElement;
+            if (container is null) continue;
+
+            var grid = FindVisualChild<Grid>(container);
+            if (grid is null) continue;
+
+            var translateTransform = FindTranslateTransform(grid);
+            if (translateTransform is null) continue;
+
+            double targetX = 0;
+
+            if (_dragSourceWasPinned)
+            {
+                // Dragging a pinned item — skip the dragged item, shift others to make gap
+                if (i == _dragFromIndex) continue;
+
+                if (_dragTargetIndex <= _dragFromIndex)
+                {
+                    // Moving left: items at [targetIndex, fromIndex) shift right
+                    if (i >= _dragTargetIndex && i < _dragFromIndex)
+                        targetX = DragGapWidth;
+                }
+                else
+                {
+                    // Moving right: items at (fromIndex, targetIndex] shift left
+                    if (i > _dragFromIndex && i <= _dragTargetIndex)
+                        targetX = -DragGapWidth;
+                }
+            }
+            else
+            {
+                // Dragging a running item into pinned area — shift items at and after target right
+                if (i >= _dragTargetIndex)
+                    targetX = DragGapWidth;
+            }
+
+            var anim = new DoubleAnimation(targetX, DragGapDuration) { EasingFunction = EaseOut };
+            translateTransform.BeginAnimation(TranslateTransform.XProperty, anim);
+        }
+    }
+
+    /// <summary>
+    /// Resets all gap animations on pinned icons back to zero offset.
+    /// </summary>
+    private void ResetDragGap()
+    {
+        if (_itemManager is null) return;
+
+        for (int i = 0; i < _itemManager.PinnedItems.Count; i++)
+        {
+            var container = PinnedIconsControl.ItemContainerGenerator.ContainerFromIndex(i) as FrameworkElement;
+            if (container is null) continue;
+
+            var grid = FindVisualChild<Grid>(container);
+            if (grid is null) continue;
+
+            var translateTransform = FindTranslateTransform(grid);
+            if (translateTransform is null) continue;
+
+            translateTransform.BeginAnimation(TranslateTransform.XProperty, null);
+            translateTransform.X = 0;
+        }
     }
 
     private void EndDrag()
@@ -1221,10 +1381,23 @@ public partial class Dock : Window, IRetreatable
             _dragGhost = null;
         }
 
-        // Perform reorder if moved
-        if (_dragFromIndex != _dragTargetIndex && _itemManager is not null)
+        // Reset gap animations before reorder so the collection change doesn't fight them
+        ResetDragGap();
+
+        // Perform reorder or pin
+        if (_itemManager is not null)
         {
-            _itemManager.PinningService.Reorder(_dragFromIndex, _dragTargetIndex);
+            if (_dragSourceWasPinned)
+            {
+                // Reorder within pinned items
+                if (_dragFromIndex != _dragTargetIndex)
+                    _itemManager.PinningService.Reorder(_dragFromIndex, _dragTargetIndex);
+            }
+            else if (_dragItem is not null)
+            {
+                // Pin the running item at the target position
+                _itemManager.PinningService.PinAt(_dragTargetIndex, _dragItem.ExecutablePath, _dragItem.DisplayName);
+            }
         }
 
         // Restore scale
@@ -1238,6 +1411,7 @@ public partial class Dock : Window, IRetreatable
         _isDragging = false;
         _dragItem = null;
         _dragElement = null;
+        _dragPrevTargetIndex = -1;
     }
 
     private int GetPinnedIndex(DockItem item)

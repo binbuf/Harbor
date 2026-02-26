@@ -35,6 +35,7 @@ public sealed class DockAutoHideService : IDisposable
     private AutoHideState _state = AutoHideState.Visible;
     private CancellationTokenSource? _delayCts;
     private bool _disposed;
+    private bool _suppressHide;
 
     /// <summary>Current state of the auto-hide system.</summary>
     public AutoHideState State => _state;
@@ -105,11 +106,31 @@ public sealed class DockAutoHideService : IDisposable
     }
 
     /// <summary>
+    /// Suppresses auto-hide behavior (e.g. while a context menu is open).
+    /// Cancels any pending hide delay.
+    /// </summary>
+    public void SuppressHide()
+    {
+        _suppressHide = true;
+        CancelPendingDelay();
+    }
+
+    /// <summary>
+    /// Resumes auto-hide behavior after suppression.
+    /// Does not automatically trigger hide — caller should check mouse position.
+    /// </summary>
+    public void ResumeHide()
+    {
+        _suppressHide = false;
+    }
+
+    /// <summary>
     /// Call when the cursor leaves the dock area entirely (neither trigger zone nor dock panel).
     /// </summary>
     public void OnDockAreaLeave()
     {
         if (_disposed) return;
+        if (_suppressHide) return;
 
         if (_state == AutoHideState.Visible)
         {

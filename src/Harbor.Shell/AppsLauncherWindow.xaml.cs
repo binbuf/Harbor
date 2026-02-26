@@ -41,6 +41,8 @@ public partial class AppsLauncherWindow : Window
         _appService.AppsChanged += OnAppsChanged;
         Deactivated += OnDeactivated;
         _foregroundService.PropertyChanged += OnForegroundChanged;
+        PreviewTextInput += OnPreviewTextInput;
+        PreviewKeyDown += OnPreviewKeyDown;
 
         // Initial populate
         RefreshFilteredApps();
@@ -130,11 +132,18 @@ public partial class AppsLauncherWindow : Window
         var fadeIn = new DoubleAnimation(0, 1, FadeInDuration) { EasingFunction = EaseOut };
         var scaleIn = new DoubleAnimation(0.95, 1.0, FadeInDuration) { EasingFunction = EaseOut };
 
+        // Focus search box immediately so keystrokes aren't lost during animation
+        SearchBox.Focus();
+        Keyboard.Focus(SearchBox);
+
         fadeIn.Completed += (_, _) =>
         {
-            // Focus search box after animation
-            SearchBox.Focus();
-            Keyboard.Focus(SearchBox);
+            // Re-focus in case focus was lost during animation
+            if (!SearchBox.IsKeyboardFocused)
+            {
+                SearchBox.Focus();
+                Keyboard.Focus(SearchBox);
+            }
         };
 
         BeginAnimation(OpacityProperty, fadeIn);
@@ -198,6 +207,26 @@ public partial class AppsLauncherWindow : Window
         {
             HideWithAnimation();
             e.Handled = true;
+        }
+    }
+
+    private void OnPreviewTextInput(object sender, TextCompositionEventArgs e)
+    {
+        if (!SearchBox.IsKeyboardFocused)
+        {
+            SearchBox.Focus();
+            Keyboard.Focus(SearchBox);
+        }
+    }
+
+    private void OnPreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (SearchBox.IsKeyboardFocused) return;
+
+        if (e.Key is Key.Back or Key.Delete)
+        {
+            SearchBox.Focus();
+            Keyboard.Focus(SearchBox);
         }
     }
 
@@ -267,6 +296,8 @@ public partial class AppsLauncherWindow : Window
     protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
     {
         Deactivated -= OnDeactivated;
+        PreviewTextInput -= OnPreviewTextInput;
+        PreviewKeyDown -= OnPreviewKeyDown;
         _foregroundService.PropertyChanged -= OnForegroundChanged;
         _appService.AppsChanged -= OnAppsChanged;
         base.OnClosing(e);

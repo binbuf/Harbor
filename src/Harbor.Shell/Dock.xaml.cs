@@ -712,26 +712,31 @@ public partial class Dock : Window, IRetreatable
             var image = FindVisualChild<Image>(element);
             var translateTransform = FindTranslateTransform(element);
 
-            // Grow the element's Width AND Height so layout expands the dock pill
-            // and the magnified image is fully contained (no bottom overflow).
+            // Only grow Width (layout) — pill expands horizontally but not vertically.
             element.BeginAnimation(FrameworkElement.WidthProperty, null);
-            element.BeginAnimation(FrameworkElement.HeightProperty, null);
             element.Width = scaledIconSize;
-            element.Height = scaledIconSize + 6; // image + indicator dot space
 
+            // Scale the Image visually via RenderTransform (no layout change, no height growth).
+            // Origin (0.5, 0) = top-center, so the image grows downward + sideways.
+            // The Grid's TranslateTransform pulls everything upward, keeping it within the pill.
             if (image is not null)
             {
-                image.BeginAnimation(FrameworkElement.WidthProperty, null);
-                image.BeginAnimation(FrameworkElement.HeightProperty, null);
-                image.Width = scaledIconSize;
-                image.Height = scaledIconSize;
+                image.RenderTransformOrigin = new Point(0.5, 0);
+                if (image.RenderTransform is ScaleTransform imgScale)
+                {
+                    imgScale.ScaleX = scale;
+                    imgScale.ScaleY = scale;
+                }
+                else
+                {
+                    image.RenderTransform = new ScaleTransform(scale, scale);
+                }
             }
 
             if (translateTransform is not null)
             {
                 translateTransform.BeginAnimation(TranslateTransform.YProperty, null);
-                // Compensate for Image growing downward (VerticalAlignment="Top") by shifting up,
-                // plus the pop-out effect for icons to rise above the dock pill
+                // Shift up to compensate for the visual growth downward + pop-out effect
                 var layoutOffset = -IconDefaultSize * (scale - 1);
                 var popOut = DockMagnificationCalculator.ComputeVerticalOffset(scale, IconDefaultSize);
                 translateTransform.Y = layoutOffset + popOut;
@@ -760,19 +765,17 @@ public partial class Dock : Window, IRetreatable
             var image = FindVisualChild<Image>(element);
             var translateTransform = FindTranslateTransform(element);
 
-            // Animate Width and Height back to defaults (layout-affecting)
+            // Animate Width back to default (layout-affecting, pill shrinks horizontally)
             var widthAnim = new DoubleAnimation(IconDefaultSize, duration) { EasingFunction = EaseOut };
             element.BeginAnimation(FrameworkElement.WidthProperty, widthAnim);
 
-            var heightAnim = new DoubleAnimation(58.0, duration) { EasingFunction = EaseOut };
-            element.BeginAnimation(FrameworkElement.HeightProperty, heightAnim);
-
-            if (image is not null)
+            // Animate image RenderTransform scale back to 1.0
+            if (image?.RenderTransform is ScaleTransform imgScale)
             {
-                image.BeginAnimation(FrameworkElement.WidthProperty,
-                    new DoubleAnimation(IconDefaultSize, duration) { EasingFunction = EaseOut });
-                image.BeginAnimation(FrameworkElement.HeightProperty,
-                    new DoubleAnimation(IconDefaultSize, duration) { EasingFunction = EaseOut });
+                imgScale.BeginAnimation(ScaleTransform.ScaleXProperty,
+                    new DoubleAnimation(1.0, duration) { EasingFunction = EaseOut });
+                imgScale.BeginAnimation(ScaleTransform.ScaleYProperty,
+                    new DoubleAnimation(1.0, duration) { EasingFunction = EaseOut });
             }
 
             if (translateTransform is not null)
@@ -884,19 +887,19 @@ public partial class Dock : Window, IRetreatable
 
     private static void ResetElementMagnification(FrameworkElement element)
     {
-        // Reset layout-affecting Width and Height
+        // Reset layout-affecting Width (Height is never changed during magnification)
         element.BeginAnimation(FrameworkElement.WidthProperty, null);
-        element.BeginAnimation(FrameworkElement.HeightProperty, null);
         element.Width = IconDefaultSize;
-        element.Height = 58.0; // 52 icon + 6 indicator dot space
 
+        // Reset image RenderTransform (visual-only scaling used by magnification)
         var image = FindVisualChild<Image>(element);
         if (image is not null)
         {
-            image.BeginAnimation(FrameworkElement.WidthProperty, null);
-            image.BeginAnimation(FrameworkElement.HeightProperty, null);
-            image.Width = IconDefaultSize;
-            image.Height = IconDefaultSize;
+            if (image.RenderTransform is ScaleTransform imgScale)
+            {
+                imgScale.ScaleX = 1.0;
+                imgScale.ScaleY = 1.0;
+            }
         }
 
         // Reset ScaleTransform (may have leftover state from hover/press animations)

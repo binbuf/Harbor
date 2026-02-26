@@ -75,22 +75,22 @@
                 <StackPanel DockPanel.Dock="Right"
                             Orientation="Horizontal"
                             VerticalAlignment="Center"
-                            Margin="0,0,4,0">
+                            Margin="0,0,6,0">
                     <controls:SystemIndicatorIcon x:Name="SafeRemoveIcon"
-                                                   Margin="2,0"
+                                                   Margin="3,0"
                                                    VerticalAlignment="Center"
                                                    Visibility="Collapsed" />
                     <controls:SystemIndicatorIcon x:Name="BluetoothIcon"
-                                                   Margin="2,0"
+                                                   Margin="3,0"
                                                    VerticalAlignment="Center" />
                     <controls:SystemIndicatorIcon x:Name="WiFiIcon"
-                                                   Margin="2,0"
+                                                   Margin="3,0"
                                                    VerticalAlignment="Center" />
                     <controls:SystemIndicatorIcon x:Name="BatteryIcon"
-                                                   Margin="2,0"
+                                                   Margin="3,0"
                                                    VerticalAlignment="Center" />
                     <controls:SystemIndicatorIcon x:Name="VolumeIcon"
-                                                   Margin="2,0"
+                                                   Margin="3,0"
                                                    VerticalAlignment="Center" />
                 </StackPanel>
 
@@ -98,7 +98,7 @@
                 <ItemsControl DockPanel.Dock="Right"
                               x:Name="TrayIconsControl"
                               VerticalAlignment="Center"
-                              Margin="0,0,8,0">
+                              Margin="0,0,6,0">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
                             <StackPanel Orientation="Horizontal" />
@@ -106,8 +106,8 @@
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <Border Width="18" Height="18"
-                                    Margin="5,0"
+                            <Border Width="22" Height="22"
+                                    Margin="3,0"
                                     VerticalAlignment="Center"
                                     Cursor="Hand"
                                     ToolTip="{Binding Title}"
@@ -116,7 +116,7 @@
                                     MouseEnter="TrayIcon_MouseEnter"
                                     MouseLeave="TrayIcon_MouseLeave">
                                 <Image Source="{Binding Icon}"
-                                       Width="18" Height="18"
+                                       Width="16" Height="16"
                                        RenderOptions.BitmapScalingMode="HighQuality">
                                     <Image.Effect>
                                         <DropShadowEffect BlurRadius="2" ShadowDepth="1" Opacity="0.3" Color="Black" />

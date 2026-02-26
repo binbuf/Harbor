@@ -501,6 +501,22 @@ public partial class Dock : Window, IRetreatable
 
     private void DockContainer_MouseLeave(object sender, MouseEventArgs e)
     {
+        // During magnification, layout changes (icon Width/Height) trigger synthetic
+        // MouseLeave events even though the mouse hasn't physically left the dock.
+        // Guard both auto-hide and magnification against these false leaves by checking
+        // whether the mouse is still in the dock zone.
+        if (_isMagnificationTracking)
+        {
+            var guardPos = e.GetPosition(DockRoot);
+            var dockZoneTop = DockRoot.ActualHeight - 120;
+            if (guardPos.X >= -20 && guardPos.X <= DockRoot.ActualWidth + 20 &&
+                guardPos.Y >= dockZoneTop && guardPos.Y <= DockRoot.ActualHeight + 10)
+            {
+                // Mouse is still in the dock zone — this is a synthetic leave, ignore it.
+                return;
+            }
+        }
+
         if (_isAutoHideEnabled)
         {
             // Keep dock visible while mouse is anywhere at the bottom screen edge
@@ -520,10 +536,6 @@ public partial class Dock : Window, IRetreatable
                 StartBottomEdgeTimer();
             }
         }
-
-        // Magnification reset is handled by the rendering-loop tracker
-        // (StopMagnificationTracking), not here — DockContainer_MouseLeave fires
-        // spuriously when layout changes during magnification.
     }
 
     private void StartBottomEdgeTimer()
@@ -700,11 +712,12 @@ public partial class Dock : Window, IRetreatable
             var image = FindVisualChild<Image>(element);
             var translateTransform = FindTranslateTransform(element);
 
-            // Use actual Width instead of ScaleTransform so layout expands the dock pill horizontally.
-            // Do NOT change element Height — it must stay constant so DockContainer's vertical
-            // bounds remain stable (prevents synthetic MouseLeave events from WPF layout).
+            // Grow the element's Width AND Height so layout expands the dock pill
+            // and the magnified image is fully contained (no bottom overflow).
             element.BeginAnimation(FrameworkElement.WidthProperty, null);
+            element.BeginAnimation(FrameworkElement.HeightProperty, null);
             element.Width = scaledIconSize;
+            element.Height = scaledIconSize + 6; // image + indicator dot space
 
             if (image is not null)
             {
@@ -747,9 +760,12 @@ public partial class Dock : Window, IRetreatable
             var image = FindVisualChild<Image>(element);
             var translateTransform = FindTranslateTransform(element);
 
-            // Animate Width back to default (layout-affecting)
+            // Animate Width and Height back to defaults (layout-affecting)
             var widthAnim = new DoubleAnimation(IconDefaultSize, duration) { EasingFunction = EaseOut };
             element.BeginAnimation(FrameworkElement.WidthProperty, widthAnim);
+
+            var heightAnim = new DoubleAnimation(58.0, duration) { EasingFunction = EaseOut };
+            element.BeginAnimation(FrameworkElement.HeightProperty, heightAnim);
 
             if (image is not null)
             {
@@ -868,9 +884,11 @@ public partial class Dock : Window, IRetreatable
 
     private static void ResetElementMagnification(FrameworkElement element)
     {
-        // Reset layout-affecting Width
+        // Reset layout-affecting Width and Height
         element.BeginAnimation(FrameworkElement.WidthProperty, null);
+        element.BeginAnimation(FrameworkElement.HeightProperty, null);
         element.Width = IconDefaultSize;
+        element.Height = 58.0; // 52 icon + 6 indicator dot space
 
         var image = FindVisualChild<Image>(element);
         if (image is not null)

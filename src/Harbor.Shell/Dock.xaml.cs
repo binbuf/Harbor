@@ -503,28 +503,29 @@ public partial class Dock : Window, IRetreatable
     {
         if (_isAutoHideEnabled)
         {
-            // Keep dock visible while mouse is anywhere at the bottom screen edge
-            // (trigger zone + container margin gap). Only hide when mouse moves above this region.
-            var pos = e.GetPosition(DockRoot);
-            var bottomRegionTop = DockRoot.ActualHeight - AutoHideTriggerZone.ActualHeight
-                                  - DockContainer.Margin.Bottom;
-            if (pos.Y < bottomRegionTop)
+            // When magnification tracking is active, layout changes from icon resizing generate
+            // synthetic MouseLeave events. Skip auto-hide logic here — OnMagnificationFrame
+            // polls the actual cursor position and will trigger hide when the mouse truly exits.
+            if (!_isMagnificationTracking)
             {
-                StopBottomEdgeTimer();
-                _autoHideService?.OnDockAreaLeave();
-            }
-            else
-            {
-                // Mouse exited DockContainer horizontally at the bottom edge.
-                // Start polling cursor position since transparent areas don't get mouse events.
-                StartBottomEdgeTimer();
+                // Keep dock visible while mouse is anywhere at the bottom screen edge
+                // (trigger zone + container margin gap). Only hide when mouse moves above this region.
+                var pos = e.GetPosition(DockRoot);
+                var bottomRegionTop = DockRoot.ActualHeight - AutoHideTriggerZone.ActualHeight
+                                      - DockContainer.Margin.Bottom;
+                if (pos.Y < bottomRegionTop)
+                {
+                    StopBottomEdgeTimer();
+                    _autoHideService?.OnDockAreaLeave();
+                }
+                else
+                {
+                    // Mouse exited DockContainer horizontally at the bottom edge.
+                    // Start polling cursor position since transparent areas don't get mouse events.
+                    StartBottomEdgeTimer();
+                }
             }
         }
-
-        // Magnification reset is handled by the rendering-loop tracker (OnMagnificationFrame).
-        // Synthetic MouseLeave events from layout changes during magnification may trigger
-        // auto-hide's OnDockAreaLeave, but the service's delay mechanism (300ms) handles
-        // brief leave/re-enter cycles — a synthetic MouseEnter follows quickly and cancels the hide.
     }
 
     private void StartBottomEdgeTimer()
@@ -662,6 +663,12 @@ public partial class Dock : Window, IRetreatable
         {
             StopMagnificationTracking();
             AnimateResetMagnification();
+
+            // Mouse has truly left the dock zone — trigger auto-hide now that
+            // magnification tracking is stopped and won't suppress it.
+            if (_isAutoHideEnabled)
+                _autoHideService?.OnDockAreaLeave();
+
             return;
         }
 

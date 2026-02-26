@@ -28,6 +28,15 @@ public sealed class ForegroundWindowService : INotifyPropertyChanged, IDisposabl
     private static Dictionary<string, string> ExeDisplayNameMap
         => s_exeDisplayNameMap ??= ShellAppEnumerator.BuildExeDisplayNameMap();
 
+    /// <summary>
+    /// Overrides for exe filenames whose shell/version-info names are wrong or unhelpful.
+    /// Keyed by lowercase exe filename (without path).
+    /// </summary>
+    private static readonly Dictionary<string, string> s_exeNameOverrides = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["explorer.exe"] = "Finder",
+    };
+
     private UnhookWinEventSafeHandle? _hook;
     private WINEVENTPROC? _callback; // prevent GC of the delegate
     private string _activeAppName = string.Empty;
@@ -111,6 +120,11 @@ public sealed class ForegroundWindowService : INotifyPropertyChanged, IDisposabl
 
         try
         {
+            // Desktop windows (Progman, WorkerW) → show "Finder" like macOS
+            var className = WindowInterop.GetClassName(hwnd);
+            if (className is "Progman" or "WorkerW")
+                return "Finder";
+
             WindowInterop.GetWindowThreadProcessId(hwnd, out var processId);
             if (processId == 0) return string.Empty;
 
@@ -138,6 +152,11 @@ public sealed class ForegroundWindowService : INotifyPropertyChanged, IDisposabl
     {
         if (string.IsNullOrEmpty(executablePath))
             return string.Empty;
+
+        // Check explicit overrides first (e.g. explorer.exe → "Finder")
+        var exeFileName = Path.GetFileName(executablePath);
+        if (s_exeNameOverrides.TryGetValue(exeFileName, out var overrideName))
+            return overrideName;
 
         // Primary: use the shell display name (same source as Start Menu / Alt+Tab)
         if (ExeDisplayNameMap.TryGetValue(executablePath, out var shellName))

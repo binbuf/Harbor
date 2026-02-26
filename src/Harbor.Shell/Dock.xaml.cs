@@ -501,22 +501,6 @@ public partial class Dock : Window, IRetreatable
 
     private void DockContainer_MouseLeave(object sender, MouseEventArgs e)
     {
-        // During magnification, layout changes (icon Width/Height) trigger synthetic
-        // MouseLeave events even though the mouse hasn't physically left the dock.
-        // Guard both auto-hide and magnification against these false leaves by checking
-        // whether the mouse is still in the dock zone.
-        if (_isMagnificationTracking)
-        {
-            var guardPos = e.GetPosition(DockRoot);
-            var dockZoneTop = DockRoot.ActualHeight - 120;
-            if (guardPos.X >= -20 && guardPos.X <= DockRoot.ActualWidth + 20 &&
-                guardPos.Y >= dockZoneTop && guardPos.Y <= DockRoot.ActualHeight + 10)
-            {
-                // Mouse is still in the dock zone — this is a synthetic leave, ignore it.
-                return;
-            }
-        }
-
         if (_isAutoHideEnabled)
         {
             // Keep dock visible while mouse is anywhere at the bottom screen edge
@@ -536,6 +520,11 @@ public partial class Dock : Window, IRetreatable
                 StartBottomEdgeTimer();
             }
         }
+
+        // Magnification reset is handled by the rendering-loop tracker (OnMagnificationFrame).
+        // Synthetic MouseLeave events from layout changes during magnification may trigger
+        // auto-hide's OnDockAreaLeave, but the service's delay mechanism (300ms) handles
+        // brief leave/re-enter cycles — a synthetic MouseEnter follows quickly and cancels the hide.
     }
 
     private void StartBottomEdgeTimer()
@@ -605,6 +594,10 @@ public partial class Dock : Window, IRetreatable
         StopBottomEdgeTimer();
         Dispatcher.Invoke(() =>
         {
+            // Stop magnification tracking and reset icon scales before hiding
+            StopMagnificationTracking();
+            ResetMagnification();
+
             var slideDown = new DoubleAnimation(0, DockVisibleHeight, HideAnimationDuration)
             {
                 EasingFunction = HideEasing,

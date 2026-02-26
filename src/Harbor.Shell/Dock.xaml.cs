@@ -25,6 +25,7 @@ public partial class Dock : Window, IRetreatable
     private DockSettingsService? _settingsService;
     private bool _isAutoHideEnabled;
     private bool _magnificationEnabled;
+    private bool _isMagnificationTracking;
 
     // Long-press detection for window picker
     private DispatcherTimer? _longPressTimer;
@@ -40,6 +41,10 @@ public partial class Dock : Window, IRetreatable
     // Active context menu tracking
     private ContextMenu? _activeContextMenu;
     private ContextMenuMouseHook? _contextMenuMouseHook;
+
+    // Auto-hide bottom-edge tracking: polls cursor position when mouse exits
+    // DockContainer horizontally at the bottom edge (transparent area = no WPF mouse events)
+    private DispatcherTimer? _bottomEdgeTimer;
 
     // Drag reorder state
     private Point _dragStartPoint;
@@ -166,7 +171,10 @@ public partial class Dock : Window, IRetreatable
         {
             _magnificationEnabled = _settingsService.MagnificationEnabled;
             if (!_magnificationEnabled)
+            {
+                StopMagnificationTracking();
                 ResetMagnification();
+            }
         });
     }
 
@@ -348,7 +356,10 @@ public partial class Dock : Window, IRetreatable
         var scaleTransform = FindScaleTransform(element);
         if (scaleTransform is null) return;
 
-        AnimateScale(scaleTransform, PressedScaleFactor, PressScaleDownDuration, EaseIn);
+        // Skip ScaleTransform press animation when magnification is active —
+        // magnification uses Width/Height and the two would compound (double-scaling)
+        if (!_magnificationEnabled)
+            AnimateScale(scaleTransform, PressedScaleFactor, PressScaleDownDuration, EaseIn);
 
         // Record drag start point
         _dragStartPoint = e.GetPosition(DockPanel);
@@ -392,11 +403,15 @@ public partial class Dock : Window, IRetreatable
         if (_longPressTriggered) return;
 
         // Animate scale back to default (or hover size if still hovering)
-        var scaleTransform = FindScaleTransform(element);
-        if (scaleTransform is not null)
+        // Skip when magnification is active — it controls sizing via Width/Height
+        if (!_magnificationEnabled)
         {
-            var targetScale = element.IsMouseOver ? HoverScaleFactor : 1.0;
-            AnimateScale(scaleTransform, targetScale, PressScaleUpDuration, EaseOut);
+            var scaleTransform = FindScaleTransform(element);
+            if (scaleTransform is not null)
+            {
+                var targetScale = element.IsMouseOver ? HoverScaleFactor : 1.0;
+                AnimateScale(scaleTransform, targetScale, PressScaleUpDuration, EaseOut);
+            }
         }
 
         if (element.DataContext is not DockItem dockItem)
@@ -466,36 +481,96 @@ public partial class Dock : Window, IRetreatable
     {
         if (!_isAutoHideEnabled) return;
 
-        // If the mouse left the trigger zone but didn't enter the DockContainer,
-        // start hiding. Check if the mouse moved upward into the dock area —
-        // if so, DockContainer_MouseEnter will handle it.
-        var pos = e.GetPosition(DockContainer);
-        bool enteredDockContainer = pos.X >= 0 && pos.X <= DockContainer.ActualWidth
-                                 && pos.Y >= 0 && pos.Y <= DockContainer.ActualHeight;
-        if (!enteredDockContainer)
-            _autoHideService?.OnDockAreaLeave();
+        // If the mouse is still in the bottom region (trigger zone + container margin gap),
+        // don't trigger hide — wait for DockContainer_MouseEnter or DockRoot_MouseMove to decide.
+        var pos = e.GetPosition(DockRoot);
+        var bottomRegionTop = DockRoot.ActualHeight - AutoHideTriggerZone.ActualHeight
+                              - DockContainer.Margin.Bottom;
+        if (pos.Y >= bottomRegionTop)
+            return;
+
+        _autoHideService?.OnDockAreaLeave();
     }
 
     private void DockContainer_MouseEnter(object sender, MouseEventArgs e)
     {
+        StopBottomEdgeTimer();
         _autoHideService?.OnDockAreaEnter();
+        StartMagnificationTracking();
     }
 
     private void DockContainer_MouseLeave(object sender, MouseEventArgs e)
     {
         if (_isAutoHideEnabled)
         {
-            // If the mouse moved into the trigger zone area (bottom of screen),
-            // don't start hiding — the dock should stay visible while the cursor
-            // is near the screen edge to prevent a show/hide bounce loop.
+            // Keep dock visible while mouse is anywhere at the bottom screen edge
+            // (trigger zone + container margin gap). Only hide when mouse moves above this region.
             var pos = e.GetPosition(DockRoot);
-            var triggerTop = DockRoot.ActualHeight - AutoHideTriggerZone.ActualHeight;
-            if (pos.Y < triggerTop)
+            var bottomRegionTop = DockRoot.ActualHeight - AutoHideTriggerZone.ActualHeight
+                                  - DockContainer.Margin.Bottom;
+            if (pos.Y < bottomRegionTop)
+            {
+                StopBottomEdgeTimer();
                 _autoHideService?.OnDockAreaLeave();
+            }
+            else
+            {
+                // Mouse exited DockContainer horizontally at the bottom edge.
+                // Start polling cursor position since transparent areas don't get mouse events.
+                StartBottomEdgeTimer();
+            }
         }
 
-        if (_magnificationEnabled && !_isDragging)
-            AnimateResetMagnification();
+        // Magnification reset is handled by the rendering-loop tracker
+        // (StopMagnificationTracking), not here — DockContainer_MouseLeave fires
+        // spuriously when layout changes during magnification.
+    }
+
+    private void StartBottomEdgeTimer()
+    {
+        if (_bottomEdgeTimer is not null) return;
+        _bottomEdgeTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
+        _bottomEdgeTimer.Tick += BottomEdgeTimer_Tick;
+        _bottomEdgeTimer.Start();
+    }
+
+    private void StopBottomEdgeTimer()
+    {
+        if (_bottomEdgeTimer is null) return;
+        _bottomEdgeTimer.Stop();
+        _bottomEdgeTimer.Tick -= BottomEdgeTimer_Tick;
+        _bottomEdgeTimer = null;
+    }
+
+    private void BottomEdgeTimer_Tick(object? sender, EventArgs e)
+    {
+        // If dock is no longer visible/hiding, or mouse re-entered DockContainer, stop polling
+        var state = _autoHideService?.State;
+        if (state != DockAutoHideService.AutoHideState.Visible &&
+            state != DockAutoHideService.AutoHideState.Hiding)
+        {
+            StopBottomEdgeTimer();
+            return;
+        }
+
+        // Check if mouse is inside DockContainer — if so, it's handled by container events
+        var containerPos = Mouse.GetPosition(DockContainer);
+        if (containerPos.X >= 0 && containerPos.X <= DockContainer.ActualWidth
+            && containerPos.Y >= 0 && containerPos.Y <= DockContainer.ActualHeight)
+        {
+            StopBottomEdgeTimer();
+            return;
+        }
+
+        // Check if mouse moved above the bottom safe region
+        var pos = Mouse.GetPosition(DockRoot);
+        var bottomRegionTop = DockRoot.ActualHeight - AutoHideTriggerZone.ActualHeight
+                              - DockContainer.Margin.Bottom;
+        if (pos.Y < bottomRegionTop)
+        {
+            StopBottomEdgeTimer();
+            _autoHideService?.OnDockAreaLeave();
+        }
     }
 
     private void OnAutoHideShowRequested()
@@ -515,6 +590,7 @@ public partial class Dock : Window, IRetreatable
 
     private void OnAutoHideHideRequested()
     {
+        StopBottomEdgeTimer();
         Dispatcher.Invoke(() =>
         {
             var slideDown = new DoubleAnimation(0, DockVisibleHeight, HideAnimationDuration)
@@ -536,68 +612,118 @@ public partial class Dock : Window, IRetreatable
     #region Magnification
 
     /// <summary>
-    /// Handles mouse movement over the dock container when magnification is enabled.
+    /// Handles mouse movement over the dock container (non-magnification uses, e.g. drag).
+    /// Magnification is driven by CompositionTarget.Rendering to avoid layout-triggered
+    /// false MouseLeave events.
     /// </summary>
     private void DockContainer_MouseMove(object sender, MouseEventArgs e)
     {
-        if (!_magnificationEnabled || _isDragging) return;
+        // Magnification is handled by the rendering loop (OnMagnificationFrame),
+        // not by this MouseMove handler.
+    }
 
-        var mousePos = e.GetPosition(DockPanel);
-        ApplyMagnification(mousePos.X);
+    private void StartMagnificationTracking()
+    {
+        if (!_magnificationEnabled || _isMagnificationTracking) return;
+        _isMagnificationTracking = true;
+        CompositionTarget.Rendering += OnMagnificationFrame;
+    }
+
+    private void StopMagnificationTracking()
+    {
+        if (!_isMagnificationTracking) return;
+        _isMagnificationTracking = false;
+        CompositionTarget.Rendering -= OnMagnificationFrame;
+    }
+
+    private void OnMagnificationFrame(object? sender, EventArgs e)
+    {
+        if (!_magnificationEnabled || _isDragging)
+        {
+            StopMagnificationTracking();
+            AnimateResetMagnification();
+            return;
+        }
+
+        // Poll cursor position relative to DockRoot (stable bounds — never changes during magnification)
+        var pos = Mouse.GetPosition(DockRoot);
+
+        // Check if mouse has left the dock zone.
+        // DockRoot is 160px tall; the dock pill occupies the lower ~90px.
+        // Use a generous upper bound to account for magnified icons popping upward.
+        var dockZoneTop = DockRoot.ActualHeight - 120;
+        if (pos.X < -20 || pos.X > DockRoot.ActualWidth + 20 ||
+            pos.Y < dockZoneTop || pos.Y > DockRoot.ActualHeight + 10)
+        {
+            StopMagnificationTracking();
+            AnimateResetMagnification();
+            return;
+        }
+
+        var panelPos = Mouse.GetPosition(DockPanel);
+        ApplyMagnification(panelPos.X);
     }
 
     private void ApplyMagnification(double mouseX)
     {
-        // Collect all icon centers from pinned and running items, plus trash
-        var centers = new List<double>();
+        // Collect icon elements (no TranslatePoint — we compute rest centers from indices)
         var elements = new List<FrameworkElement>();
-
-        CollectIconElements(PinnedIconsControl, centers, elements, DockPanel);
-        CollectIconElements(RunningIconsControl, centers, elements, DockPanel);
-
-        // Add trash icon
-        var trashPoint = TrashIcon.TranslatePoint(new Point(TrashIcon.ActualWidth / 2, 0), DockPanel);
-        centers.Add(trashPoint.X);
+        CollectIconElementsOnly(PinnedIconsControl, elements);
+        CollectIconElementsOnly(RunningIconsControl, elements);
         elements.Add(TrashIcon);
 
-        if (centers.Count == 0) return;
+        if (elements.Count == 0) return;
+
+        // Compute rest centers relative to DockPanel (starting from 0)
+        var (centers, restPanelWidth) = ComputeRestCenters(elements.Count);
+
+        // Correct mouseX for container re-centering shift.
+        // DockContainer is HorizontalAlignment="Center", so when icons magnify and DockPanel
+        // grows wider, the container shifts left by (growth / 2). The mouse position relative
+        // to DockPanel increases by the same amount. Subtracting growth/2 maps back to
+        // rest-space, giving a stable coordinate immune to magnification feedback.
+        var growth = DockPanel.ActualWidth - restPanelWidth;
+        var mouseRestX = mouseX - growth / 2.0;
 
         var scales = DockMagnificationCalculator.ComputeScales(
-            mouseX,
-            centers.ToArray(),
+            mouseRestX,
+            centers,
             MagnificationMaxScale,
             MagnificationEffectRadius,
             MagnificationIconPitch);
 
-        double maxScale = 1.0;
         for (int i = 0; i < elements.Count; i++)
         {
             var element = elements[i];
             var scale = scales[i];
-            if (scale > maxScale) maxScale = scale;
-
-            var scaleTransform = FindScaleTransform(element);
+            var scaledIconSize = IconDefaultSize * scale;
+            var image = FindVisualChild<Image>(element);
             var translateTransform = FindTranslateTransform(element);
 
-            if (scaleTransform is not null)
+            // Use actual Width instead of ScaleTransform so layout expands the dock pill horizontally.
+            // Do NOT change element Height — it must stay constant so DockContainer's vertical
+            // bounds remain stable (prevents synthetic MouseLeave events from WPF layout).
+            element.BeginAnimation(FrameworkElement.WidthProperty, null);
+            element.Width = scaledIconSize;
+
+            if (image is not null)
             {
-                // Clear animation clocks before setting local values (WPF animation precedence fix)
-                scaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, null);
-                scaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, null);
-                scaleTransform.ScaleX = scale;
-                scaleTransform.ScaleY = scale;
+                image.BeginAnimation(FrameworkElement.WidthProperty, null);
+                image.BeginAnimation(FrameworkElement.HeightProperty, null);
+                image.Width = scaledIconSize;
+                image.Height = scaledIconSize;
             }
 
             if (translateTransform is not null)
             {
                 translateTransform.BeginAnimation(TranslateTransform.YProperty, null);
-                var offset = DockMagnificationCalculator.ComputeVerticalOffset(scale, IconDefaultSize);
-                translateTransform.Y = offset;
+                // Compensate for Image growing downward (VerticalAlignment="Top") by shifting up,
+                // plus the pop-out effect for icons to rise above the dock pill
+                var layoutOffset = -IconDefaultSize * (scale - 1);
+                var popOut = DockMagnificationCalculator.ComputeVerticalOffset(scale, IconDefaultSize);
+                translateTransform.Y = layoutOffset + popOut;
             }
         }
-
-        // Dock container height stays fixed — icons poke above the pill via
-        // ClipToBounds="False" and bottom-anchored RenderTransformOrigin, matching real macOS.
     }
 
     private void ResetMagnification()
@@ -605,7 +731,8 @@ public partial class Dock : Window, IRetreatable
         ResetItemsControlScales(PinnedIconsControl);
         ResetItemsControlScales(RunningIconsControl);
 
-        // Container height is fixed — nothing to reset.
+        // Reset trash icon
+        ResetElementMagnification(TrashIcon);
     }
 
     /// <summary>
@@ -617,12 +744,19 @@ public partial class Dock : Window, IRetreatable
 
         void AnimateElement(FrameworkElement element)
         {
-            var scaleTransform = FindScaleTransform(element);
+            var image = FindVisualChild<Image>(element);
             var translateTransform = FindTranslateTransform(element);
 
-            if (scaleTransform is not null)
+            // Animate Width back to default (layout-affecting)
+            var widthAnim = new DoubleAnimation(IconDefaultSize, duration) { EasingFunction = EaseOut };
+            element.BeginAnimation(FrameworkElement.WidthProperty, widthAnim);
+
+            if (image is not null)
             {
-                AnimateScale(scaleTransform, 1.0, duration, EaseOut);
+                image.BeginAnimation(FrameworkElement.WidthProperty,
+                    new DoubleAnimation(IconDefaultSize, duration) { EasingFunction = EaseOut });
+                image.BeginAnimation(FrameworkElement.HeightProperty,
+                    new DoubleAnimation(IconDefaultSize, duration) { EasingFunction = EaseOut });
             }
 
             if (translateTransform is not null)
@@ -635,24 +769,76 @@ public partial class Dock : Window, IRetreatable
         AnimateItemsControlElements(PinnedIconsControl, AnimateElement);
         AnimateItemsControlElements(RunningIconsControl, AnimateElement);
 
-        // Container height is fixed — icons shrink back within the pill naturally.
+        // Also animate trash icon back
+        AnimateElement(TrashIcon);
     }
 
-    private static void CollectIconElements(ItemsControl itemsControl, List<double> centers, List<FrameworkElement> elements, UIElement referencePanel)
+    private static void CollectIconElementsOnly(ItemsControl itemsControl, List<FrameworkElement> elements)
     {
         for (int i = 0; i < itemsControl.Items.Count; i++)
         {
             var container = itemsControl.ItemContainerGenerator.ContainerFromIndex(i) as FrameworkElement;
             if (container is null) continue;
 
-            // Find the Grid inside the DataTemplate
             var grid = FindVisualChild<Grid>(container);
-            if (grid is null) continue;
-
-            var centerPoint = grid.TranslatePoint(new Point(grid.ActualWidth / 2, 0), referencePanel);
-            centers.Add(centerPoint.X);
-            elements.Add(grid);
+            if (grid is not null)
+                elements.Add(grid);
         }
+    }
+
+    /// <summary>
+    /// Computes rest-state center X positions for all dock icons relative to DockPanel.
+    /// Uses pure math based on item count and separator visibility — no TranslatePoint,
+    /// so magnification-induced layout shifts cannot feed back into the calculation.
+    /// Also returns the rest-state width of DockPanel content for growth correction.
+    /// </summary>
+    private (double[] centers, double restPanelWidth) ComputeRestCenters(int totalIconCount)
+    {
+        // Count icons per section
+        var pinnedCount = PinnedIconsControl.Items.Count;
+        var runningCount = RunningIconsControl.Items.Count;
+        const int trashCount = 1;
+
+        // Separator widths (1px border + 15px margin each side = 31px each, when visible)
+        var dockSepWidth = DockSeparator.Visibility == Visibility.Visible ? 31.0 : 0.0;
+        const double trashSepWidth = 31.0; // TrashSeparator is always visible
+
+        // Total content width at rest inside DockPanel
+        var iconSlots = pinnedCount + runningCount + trashCount;
+        var restPanelWidth = iconSlots * MagnificationIconPitch + dockSepWidth + trashSepWidth;
+
+        // Centers are relative to DockPanel's content origin (0,0)
+        var centers = new double[totalIconCount];
+        var offset = 0.0;
+        var idx = 0;
+
+        // Pinned icons
+        for (int i = 0; i < pinnedCount && idx < totalIconCount; i++, idx++)
+        {
+            centers[idx] = offset + MagnificationIconPitch / 2.0;
+            offset += MagnificationIconPitch;
+        }
+
+        // Dock separator
+        offset += dockSepWidth;
+
+        // Running icons
+        for (int i = 0; i < runningCount && idx < totalIconCount; i++, idx++)
+        {
+            centers[idx] = offset + MagnificationIconPitch / 2.0;
+            offset += MagnificationIconPitch;
+        }
+
+        // Trash separator
+        offset += trashSepWidth;
+
+        // Trash icon
+        if (idx < totalIconCount)
+        {
+            centers[idx] = offset + MagnificationIconPitch / 2.0;
+        }
+
+        return (centers, restPanelWidth);
     }
 
     private static void AnimateItemsControlElements(ItemsControl itemsControl, Action<FrameworkElement> animate)
@@ -676,22 +862,40 @@ public partial class Dock : Window, IRetreatable
             var grid = FindVisualChild<Grid>(container);
             if (grid is null) continue;
 
-            var scaleTransform = FindScaleTransform(grid);
-            var translateTransform = FindTranslateTransform(grid);
+            ResetElementMagnification(grid);
+        }
+    }
 
-            if (scaleTransform is not null)
-            {
-                scaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, null);
-                scaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, null);
-                scaleTransform.ScaleX = 1.0;
-                scaleTransform.ScaleY = 1.0;
-            }
+    private static void ResetElementMagnification(FrameworkElement element)
+    {
+        // Reset layout-affecting Width
+        element.BeginAnimation(FrameworkElement.WidthProperty, null);
+        element.Width = IconDefaultSize;
 
-            if (translateTransform is not null)
-            {
-                translateTransform.BeginAnimation(TranslateTransform.YProperty, null);
-                translateTransform.Y = 0;
-            }
+        var image = FindVisualChild<Image>(element);
+        if (image is not null)
+        {
+            image.BeginAnimation(FrameworkElement.WidthProperty, null);
+            image.BeginAnimation(FrameworkElement.HeightProperty, null);
+            image.Width = IconDefaultSize;
+            image.Height = IconDefaultSize;
+        }
+
+        // Reset ScaleTransform (may have leftover state from hover/press animations)
+        var scaleTransform = FindScaleTransform(element);
+        if (scaleTransform is not null)
+        {
+            scaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+            scaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+            scaleTransform.ScaleX = 1.0;
+            scaleTransform.ScaleY = 1.0;
+        }
+
+        var translateTransform = FindTranslateTransform(element);
+        if (translateTransform is not null)
+        {
+            translateTransform.BeginAnimation(TranslateTransform.YProperty, null);
+            translateTransform.Y = 0;
         }
     }
 
@@ -1481,6 +1685,8 @@ public partial class Dock : Window, IRetreatable
         }
 
         _iconService.ClearCache();
+
+        StopMagnificationTracking();
 
         base.OnClosing(e);
     }

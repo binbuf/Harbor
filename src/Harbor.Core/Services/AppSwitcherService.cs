@@ -20,6 +20,7 @@ public sealed class AppSwitcherService : IDisposable
     private readonly Tasks _tasks;
     private readonly IconExtractionService _iconService;
     private bool _isActive;
+    private bool _enabled;
     private List<AppEntry> _apps = [];
     private int _selectedIndex;
     private bool _disposed;
@@ -28,17 +29,54 @@ public sealed class AppSwitcherService : IDisposable
     public event Action<int>? SelectionChanged;
     public event Action? HideRequested;
 
-    public AppSwitcherService(LowLevelKeyboardHookService keyboard, Tasks tasks, IconExtractionService iconService)
+    public AppSwitcherService(LowLevelKeyboardHookService keyboard, Tasks tasks, IconExtractionService iconService, bool enabled = true)
     {
         _keyboard = keyboard;
         _tasks = tasks;
         _iconService = iconService;
 
+        if (enabled)
+            RegisterHooks();
+    }
+
+    /// <summary>
+    /// Enables or disables the custom app switcher at runtime.
+    /// When disabled, ALT+TAB passes through to the default Windows handler.
+    /// </summary>
+    public void SetEnabled(bool enabled)
+    {
+        if (_disposed || _enabled == enabled) return;
+
+        if (enabled)
+            RegisterHooks();
+        else
+            UnregisterHooks();
+    }
+
+    private void RegisterHooks()
+    {
         _keyboard.Register(VK_TAB, ModifierKeys.Alt, OnAltTab);
         _keyboard.Register(VK_TAB, ModifierKeys.Alt | ModifierKeys.Shift, OnAltShiftTab);
         _keyboard.RawKeyEvent += OnRawKeyEvent;
-
+        _enabled = true;
         Trace.WriteLine("[Harbor] AppSwitcherService: Registered ALT+TAB handler.");
+    }
+
+    private void UnregisterHooks()
+    {
+        // If switching was active, cancel it
+        if (_isActive)
+        {
+            _isActive = false;
+            HideRequested?.Invoke();
+            _apps.Clear();
+        }
+
+        _keyboard.Unregister(VK_TAB, ModifierKeys.Alt);
+        _keyboard.Unregister(VK_TAB, ModifierKeys.Alt | ModifierKeys.Shift);
+        _keyboard.RawKeyEvent -= OnRawKeyEvent;
+        _enabled = false;
+        Trace.WriteLine("[Harbor] AppSwitcherService: Unregistered ALT+TAB handler.");
     }
 
     private bool OnAltTab(bool isKeyDown)
@@ -153,9 +191,8 @@ public sealed class AppSwitcherService : IDisposable
     {
         if (_disposed) return;
         _disposed = true;
-        _keyboard.Unregister(VK_TAB, ModifierKeys.Alt);
-        _keyboard.Unregister(VK_TAB, ModifierKeys.Alt | ModifierKeys.Shift);
-        _keyboard.RawKeyEvent -= OnRawKeyEvent;
+        if (_enabled)
+            UnregisterHooks();
     }
 
     public class AppEntry

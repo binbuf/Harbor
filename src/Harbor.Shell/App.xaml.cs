@@ -204,7 +204,8 @@ public partial class App : Application
 
         // Create app switcher with overlay
         var iconService = new IconExtractionService();
-        _appSwitcherService = new AppSwitcherService(_lowLevelKeyboardHook, _shellServices.Tasks, iconService);
+        _appSwitcherService = new AppSwitcherService(_lowLevelKeyboardHook, _shellServices.Tasks, iconService,
+            enabled: _shellSettingsService.UseCustomAppSwitcher);
         _appSwitcherOverlay = new AppSwitcherOverlay();
 
         _appSwitcherService.ShowRequested += (apps, index) =>
@@ -324,6 +325,9 @@ public partial class App : Application
                     Trace.WriteLine("[Harbor] App: Desktop background shown (ShowDesktopIcons=false).");
                 }
             }
+
+            // Toggle custom app switcher on/off
+            _appSwitcherService?.SetEnabled(_shellSettingsService.UseCustomAppSwitcher);
 
             // Apply Recycle Bin visibility change (works regardless of ReplaceExplorer)
             _desktopIconService?.SetRecycleBinHidden(_shellSettingsService.HideRecycleBin);

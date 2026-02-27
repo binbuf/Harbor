@@ -146,6 +146,31 @@
                                           Unchecked="ReplaceExplorerToggle_Changed" />
                             </Grid>
                         </Border>
+                        <!-- Custom app switcher -->
+                        <Border Background="{DynamicResource SettingsCardBackground}" CornerRadius="8" Padding="16,12" Margin="0,0,0,8">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                    <TextBlock Text="Custom app switcher"
+                                               Foreground="{DynamicResource SettingsTextBrush}"
+                                               FontFamily="Segoe UI Variable" FontSize="13" />
+                                    <TextBlock Text="Use Harbor's app switcher instead of the default Windows ALT+TAB"
+                                               Foreground="{DynamicResource SettingsSecondaryTextBrush}"
+                                               FontFamily="Segoe UI Variable" FontSize="11"
+                                               Margin="0,2,0,0" />
+                                </StackPanel>
+                                <CheckBox x:Name="UseCustomAppSwitcherToggle"
+                                          Grid.Column="1"
+                                          Style="{StaticResource ToggleSwitchStyle}"
+                                          VerticalAlignment="Center"
+                                          Checked="UseCustomAppSwitcherToggle_Changed"
+                                          Unchecked="UseCustomAppSwitcherToggle_Changed" />
+                            </Grid>
+                        </Border>
+
                         <!-- Filter app list -->
                         <Border Background="{DynamicResource SettingsCardBackground}" CornerRadius="8" Padding="16,12" Margin="0,0,0,8">
                             <Grid>

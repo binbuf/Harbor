@@ -84,6 +84,11 @@ public class ShellSettings
     /// Hide the Recycle Bin desktop icon.
     /// </summary>
     public bool HideRecycleBin { get; set; } = true;
+
+    /// <summary>
+    /// Use Harbor's custom app switcher instead of the default Windows ALT+TAB.
+    /// </summary>
+    public bool UseCustomAppSwitcher { get; set; } = true;
 }
 
 /// <summary>
@@ -343,6 +348,21 @@ public class ShellSettingsService : IDisposable
         }
     }
 
+    public bool UseCustomAppSwitcher
+    {
+        get { lock (_lock) return _settings.UseCustomAppSwitcher; }
+        set
+        {
+            lock (_lock)
+            {
+                if (_settings.UseCustomAppSwitcher == value) return;
+                _settings.UseCustomAppSwitcher = value;
+            }
+            Save();
+            SettingsChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
     /// <summary>
     /// Raised when any setting changes.
     /// </summary>
@@ -402,6 +422,7 @@ public class ShellSettingsService : IDisposable
                     MenuBarTextColor = _settings.MenuBarTextColor,
                     FilterAppsFolder = _settings.FilterAppsFolder,
                     HideRecycleBin = _settings.HideRecycleBin,
+                    UseCustomAppSwitcher = _settings.UseCustomAppSwitcher,
                 };
             }
 

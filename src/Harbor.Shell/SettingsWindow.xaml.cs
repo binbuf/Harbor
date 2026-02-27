@@ -50,6 +50,7 @@ public partial class SettingsWindow : Window
 
         // General
         ReplaceExplorerToggle.IsChecked = _shellSettings.ReplaceExplorer;
+        UseCustomAppSwitcherToggle.IsChecked = _shellSettings.UseCustomAppSwitcher;
         FilterAppsFolderToggle.IsChecked = _shellSettings.FilterAppsFolder;
 
         // Appearance
@@ -118,6 +119,12 @@ public partial class SettingsWindow : Window
     {
         if (_loading) return;
         _shellSettings.ReplaceExplorer = ReplaceExplorerToggle.IsChecked == true;
+    }
+
+    private void UseCustomAppSwitcherToggle_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_loading) return;
+        _shellSettings.UseCustomAppSwitcher = UseCustomAppSwitcherToggle.IsChecked == true;
     }
 
     private void FilterAppsFolderToggle_Changed(object sender, RoutedEventArgs e)

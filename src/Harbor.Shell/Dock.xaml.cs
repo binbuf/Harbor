@@ -45,7 +45,10 @@ public partial class Dock : Window, IRetreatable
 
     // Launch bounce tracking: executable paths currently bouncing (survives item recreation during Rebuild)
     private readonly HashSet<string> _launchingPaths = new(StringComparer.OrdinalIgnoreCase);
-    private bool _launchCheckPending;
+    private bool _postRebuildPending;
+
+    // Tracks which exe paths were running after the previous rebuild, so we can detect newly opened apps
+    private readonly HashSet<string> _previousRunningPaths = new(StringComparer.OrdinalIgnoreCase);
 
     // Auto-hide bottom-edge tracking: polls cursor position when mouse exits
     // DockContainer horizontally at the bottom edge (transparent area = no WPF mouse events)
@@ -194,6 +197,17 @@ public partial class Dock : Window, IRetreatable
         PinnedIconsControl.ItemsSource = _itemManager.PinnedItems;
         RunningIconsControl.ItemsSource = _itemManager.RunningItems;
 
+        // Seed the running paths snapshot so apps already running at startup don't get entrance animations
+        foreach (var item in _itemManager.PinnedItems)
+        {
+            if (item.IsRunning)
+                _previousRunningPaths.Add(item.ExecutablePath);
+        }
+        foreach (var item in _itemManager.RunningItems)
+        {
+            _previousRunningPaths.Add(item.ExecutablePath);
+        }
+
         _itemManager.PinnedItems.CollectionChanged += OnItemsChanged;
         _itemManager.RunningItems.CollectionChanged += OnItemsChanged;
 
@@ -308,51 +322,46 @@ public partial class Dock : Window, IRetreatable
     {
         UpdateSeparatorVisibility();
 
-        // After Rebuild() recreates items, check if any launching apps are now running
-        // or need their bounce animation restarted on the new elements.
-        if (_launchingPaths.Count > 0 && !_launchCheckPending)
+        // After Rebuild() recreates items, check for launching apps and newly appeared icons.
+        // Deferred to DispatcherPriority.Loaded so ItemContainerGenerator has created containers.
+        if (!_postRebuildPending)
         {
-            _launchCheckPending = true;
+            _postRebuildPending = true;
             Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, () =>
             {
-                _launchCheckPending = false;
-                CheckLaunchingApps();
+                _postRebuildPending = false;
+                PostRebuildAnimations();
             });
         }
     }
 
     /// <summary>
-    /// After items are rebuilt, checks each launching app:
-    /// - If now running → stop tracking (bounce stops because old element was replaced)
-    /// - If still not running → restart bounce animation on the new element
+    /// Runs after Rebuild() recreates dock items. Handles:
+    /// 1. Launching apps: continue bounce or stop if now running.
+    /// 2. Newly appeared running icons: pop-in + bounce animation.
     /// </summary>
-    private void CheckLaunchingApps()
+    private void PostRebuildAnimations()
     {
-        if (_itemManager is null || _launchingPaths.Count == 0) return;
+        if (_itemManager is null) return;
 
+        // --- 1. Handle launching apps (dock-initiated launches) ---
         var resolved = new List<string>();
-
         foreach (var path in _launchingPaths)
         {
-            // Find the current DockItem for this path (may be in pinned or running)
             var dockItem = FindDockItemByPath(path);
-
             if (dockItem is null)
             {
-                // Item no longer exists (unpinned while launching?) — stop tracking
                 resolved.Add(path);
                 continue;
             }
 
             if (dockItem.IsRunning)
             {
-                // App has launched — stop bouncing
                 dockItem.IsLaunching = false;
                 resolved.Add(path);
             }
             else
             {
-                // App still launching — restart bounce on the new element
                 dockItem.IsLaunching = true;
                 var grid = FindGridForDockItem(PinnedIconsControl, dockItem)
                         ?? FindGridForDockItem(RunningIconsControl, dockItem);
@@ -364,9 +373,52 @@ public partial class Dock : Window, IRetreatable
                 }
             }
         }
-
         foreach (var path in resolved)
             _launchingPaths.Remove(path);
+
+        // --- 2. Detect newly appeared running apps and animate them ---
+        var currentRunningPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var item in _itemManager.PinnedItems)
+        {
+            if (item.IsRunning)
+                currentRunningPaths.Add(item.ExecutablePath);
+        }
+        foreach (var item in _itemManager.RunningItems)
+        {
+            currentRunningPaths.Add(item.ExecutablePath);
+        }
+
+        foreach (var path in currentRunningPaths)
+        {
+            // Skip if already bouncing from a dock-initiated launch
+            if (_launchingPaths.Contains(path)) continue;
+            // Skip if it was already running before this rebuild
+            if (_previousRunningPaths.Contains(path)) continue;
+
+            // This app just appeared as running — animate it
+            var dockItem = FindDockItemByPath(path);
+            if (dockItem is null) continue;
+
+            var itemsControl = dockItem.IsPinned ? PinnedIconsControl : RunningIconsControl;
+            var grid = FindGridForDockItem(itemsControl, dockItem);
+            if (grid is null) continue;
+
+            if (!dockItem.IsPinned)
+            {
+                // Unpinned app just appeared in the dock — pop-in scale animation
+                ApplyPopInAnimation(grid);
+            }
+
+            // Bounce to indicate the app just became active
+            var bounceTransform = FindBounceTransform(grid);
+            if (bounceTransform is not null)
+                ApplyFiniteBounceAnimation(bounceTransform);
+        }
+
+        _previousRunningPaths.Clear();
+        foreach (var path in currentRunningPaths)
+            _previousRunningPaths.Add(path);
     }
 
     private DockItem? FindDockItemByPath(string executablePath)
@@ -608,6 +660,54 @@ public partial class Dock : Window, IRetreatable
                 bounceTransform.Y = 0;
             }
         }
+    }
+
+    /// <summary>
+    /// Applies a finite bounce animation (3 bounces) for newly appeared running apps.
+    /// Unlike the launch bounce (infinite), this plays once and stops.
+    /// </summary>
+    private static void ApplyFiniteBounceAnimation(TranslateTransform bounceTransform)
+    {
+        const int bounceCount = 3;
+        var totalDuration = TimeSpan.FromMilliseconds(bounceCount * 300);
+
+        var animation = new DoubleAnimationUsingKeyFrames
+        {
+            Duration = new Duration(totalDuration),
+        };
+
+        for (int i = 0; i < bounceCount; i++)
+        {
+            var baseTime = TimeSpan.FromMilliseconds(i * 300);
+            animation.KeyFrames.Add(new EasingDoubleKeyFrame(
+                BounceTranslation,
+                KeyTime.FromTimeSpan(baseTime + TimeSpan.FromMilliseconds(150)),
+                EaseOut));
+            animation.KeyFrames.Add(new EasingDoubleKeyFrame(
+                0,
+                KeyTime.FromTimeSpan(baseTime + TimeSpan.FromMilliseconds(300)),
+                EaseIn));
+        }
+
+        bounceTransform.BeginAnimation(TranslateTransform.YProperty, animation);
+    }
+
+    /// <summary>
+    /// Pop-in animation for unpinned apps appearing in the dock for the first time.
+    /// Scales from 0 → 1 with a slight overshoot.
+    /// </summary>
+    private static void ApplyPopInAnimation(FrameworkElement element)
+    {
+        var scaleTransform = FindScaleTransform(element);
+        if (scaleTransform is null) return;
+
+        var duration = new Duration(TimeSpan.FromMilliseconds(300));
+        var easing = new BackEase { EasingMode = EasingMode.EaseOut, Amplitude = 0.3 };
+
+        var animX = new DoubleAnimation(0, 1.0, duration) { EasingFunction = easing };
+        var animY = new DoubleAnimation(0, 1.0, duration) { EasingFunction = easing };
+        scaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, animX);
+        scaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, animY);
     }
 
     #endregion

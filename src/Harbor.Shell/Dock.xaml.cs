@@ -87,7 +87,7 @@ public partial class Dock : Window, IRetreatable
     public const double DockVisibleHeight = 83.0;   // Visible pill height for slide animations
 
     // Magnification constants
-    public const double MagnificationMaxScale = 1.4;
+    public const double MagnificationMaxScale = 1.25;
     public const double MagnificationEffectRadius = 2.1;
     public const double MagnificationIconPitch = 80.0; // 52 + 28 margin
     public const double DockContainerVerticalPadding = 22.0; // top(12) + bottom(8) + border for container height calc

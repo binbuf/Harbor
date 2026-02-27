@@ -37,7 +37,7 @@
         <!-- Shared icon DataTemplate used by both pinned and running ItemsControls -->
         <DataTemplate x:Key="DockIconTemplate">
             <Grid Width="52" Height="58"
-                  Margin="14,0"
+                  Margin="12.0,0"
                   RenderTransformOrigin="0.5,1.0"
                   MouseLeftButtonDown="DockIcon_MouseLeftButtonDown"
                   MouseLeftButtonUp="DockIcon_MouseLeftButtonUp"
@@ -160,7 +160,7 @@
                 <!-- Trash / Recycle Bin -->
                 <Grid x:Name="TrashIcon"
                       Width="52" Height="58"
-                      Margin="14,0"
+                      Margin="12.0,0"
                       RenderTransformOrigin="0.5,1.0"
                       MouseLeftButtonUp="TrashIcon_Click"
                       MouseRightButtonUp="TrashIcon_RightClick"

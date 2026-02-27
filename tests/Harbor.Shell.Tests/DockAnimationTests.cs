@@ -45,29 +45,15 @@ public class DockAnimationTests
     }
 
     [Fact]
-    public void BounceCount_Is3()
-    {
-        Assert.Equal(3, Dock.BounceCount);
-    }
-
-    [Fact]
     public void SingleBounceDuration_Is300ms()
     {
         Assert.Equal(TimeSpan.FromMilliseconds(300), Dock.SingleBounceDuration.TimeSpan);
     }
 
     [Fact]
-    public void TotalBounceDuration_Is900ms()
+    public void LaunchBounceTimeout_Is15Seconds()
     {
-        Assert.Equal(TimeSpan.FromMilliseconds(900), Dock.TotalBounceDuration.TimeSpan);
-    }
-
-    [Fact]
-    public void TotalBounceDuration_EqualsBounceCountTimesSingleBounce()
-    {
-        Assert.Equal(
-            Dock.BounceCount * Dock.SingleBounceDuration.TimeSpan.TotalMilliseconds,
-            Dock.TotalBounceDuration.TimeSpan.TotalMilliseconds);
+        Assert.Equal(TimeSpan.FromSeconds(15), Dock.LaunchBounceTimeout);
     }
 
     [Fact]

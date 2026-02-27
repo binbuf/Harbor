@@ -43,6 +43,10 @@ public partial class Dock : Window, IRetreatable
     private ContextMenu? _activeContextMenu;
     private ContextMenuMouseHook? _contextMenuMouseHook;
 
+    // Launch bounce tracking: executable paths currently bouncing (survives item recreation during Rebuild)
+    private readonly HashSet<string> _launchingPaths = new(StringComparer.OrdinalIgnoreCase);
+    private bool _launchCheckPending;
+
     // Auto-hide bottom-edge tracking: polls cursor position when mouse exits
     // DockContainer horizontally at the bottom edge (transparent area = no WPF mouse events)
     private DispatcherTimer? _bottomEdgeTimer;
@@ -69,9 +73,8 @@ public partial class Dock : Window, IRetreatable
     public static readonly Duration PressScaleUpDuration = new(TimeSpan.FromMilliseconds(100));
 
     public const double BounceTranslation = -13.0; // 13 DIP upward (negative Y)
-    public const int BounceCount = 3;
     public static readonly Duration SingleBounceDuration = new(TimeSpan.FromMilliseconds(300));
-    public static readonly Duration TotalBounceDuration = new(TimeSpan.FromMilliseconds(900));
+    public static readonly TimeSpan LaunchBounceTimeout = TimeSpan.FromSeconds(15); // safety timeout
 
     public static readonly Duration ShowAnimationDuration = new(TimeSpan.FromMilliseconds(400));
     public static readonly Duration HideAnimationDuration = new(TimeSpan.FromMilliseconds(350));
@@ -304,6 +307,95 @@ public partial class Dock : Window, IRetreatable
     private void OnItemsChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
         UpdateSeparatorVisibility();
+
+        // After Rebuild() recreates items, check if any launching apps are now running
+        // or need their bounce animation restarted on the new elements.
+        if (_launchingPaths.Count > 0 && !_launchCheckPending)
+        {
+            _launchCheckPending = true;
+            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, () =>
+            {
+                _launchCheckPending = false;
+                CheckLaunchingApps();
+            });
+        }
+    }
+
+    /// <summary>
+    /// After items are rebuilt, checks each launching app:
+    /// - If now running → stop tracking (bounce stops because old element was replaced)
+    /// - If still not running → restart bounce animation on the new element
+    /// </summary>
+    private void CheckLaunchingApps()
+    {
+        if (_itemManager is null || _launchingPaths.Count == 0) return;
+
+        var resolved = new List<string>();
+
+        foreach (var path in _launchingPaths)
+        {
+            // Find the current DockItem for this path (may be in pinned or running)
+            var dockItem = FindDockItemByPath(path);
+
+            if (dockItem is null)
+            {
+                // Item no longer exists (unpinned while launching?) — stop tracking
+                resolved.Add(path);
+                continue;
+            }
+
+            if (dockItem.IsRunning)
+            {
+                // App has launched — stop bouncing
+                dockItem.IsLaunching = false;
+                resolved.Add(path);
+            }
+            else
+            {
+                // App still launching — restart bounce on the new element
+                dockItem.IsLaunching = true;
+                var grid = FindGridForDockItem(PinnedIconsControl, dockItem)
+                        ?? FindGridForDockItem(RunningIconsControl, dockItem);
+                if (grid is not null)
+                {
+                    var bounceTransform = FindBounceTransform(grid);
+                    if (bounceTransform is not null)
+                        ApplyBounceAnimation(bounceTransform);
+                }
+            }
+        }
+
+        foreach (var path in resolved)
+            _launchingPaths.Remove(path);
+    }
+
+    private DockItem? FindDockItemByPath(string executablePath)
+    {
+        if (_itemManager is null) return null;
+
+        foreach (var item in _itemManager.PinnedItems)
+        {
+            if (string.Equals(item.ExecutablePath, executablePath, StringComparison.OrdinalIgnoreCase))
+                return item;
+        }
+        foreach (var item in _itemManager.RunningItems)
+        {
+            if (string.Equals(item.ExecutablePath, executablePath, StringComparison.OrdinalIgnoreCase))
+                return item;
+        }
+        return null;
+    }
+
+    private static FrameworkElement? FindGridForDockItem(ItemsControl itemsControl, DockItem target)
+    {
+        for (int i = 0; i < itemsControl.Items.Count; i++)
+        {
+            if (!ReferenceEquals(itemsControl.Items[i], target)) continue;
+            var container = itemsControl.ItemContainerGenerator.ContainerFromIndex(i) as FrameworkElement;
+            if (container is null) return null;
+            return FindVisualChild<Grid>(container);
+        }
+        return null;
     }
 
     private void UpdateSeparatorVisibility()
@@ -440,32 +532,82 @@ public partial class Dock : Window, IRetreatable
 
     private void StartBounceAnimation(FrameworkElement element, DockItem dockItem)
     {
-        var translateTransform = FindTranslateTransform(element);
+        var translateTransform = FindBounceTransform(element);
         if (translateTransform is null) return;
 
         dockItem.IsLaunching = true;
+        _launchingPaths.Add(dockItem.ExecutablePath);
 
+        ApplyBounceAnimation(translateTransform);
+
+        // Safety timeout: stop bouncing if the app never reports as running
+        var exePath = dockItem.ExecutablePath;
+        var timer = new DispatcherTimer { Interval = LaunchBounceTimeout };
+        timer.Tick += (_, _) =>
+        {
+            timer.Stop();
+            StopLaunchBounce(exePath);
+        };
+        timer.Start();
+    }
+
+    /// <summary>
+    /// Applies a forever-repeating single-bounce animation to a TranslateTransform.
+    /// </summary>
+    private static void ApplyBounceAnimation(TranslateTransform translateTransform)
+    {
         var animation = new DoubleAnimationUsingKeyFrames
         {
-            Duration = TotalBounceDuration,
+            Duration = SingleBounceDuration,
+            RepeatBehavior = RepeatBehavior.Forever,
         };
 
-        // 3 bounces: each 300ms (150ms up ease-out, 150ms down ease-in)
-        for (int i = 0; i < BounceCount; i++)
-        {
-            var baseTime = TimeSpan.FromMilliseconds(i * 300);
-            animation.KeyFrames.Add(new EasingDoubleKeyFrame(
-                BounceTranslation,
-                KeyTime.FromTimeSpan(baseTime + TimeSpan.FromMilliseconds(150)),
-                EaseOut));
-            animation.KeyFrames.Add(new EasingDoubleKeyFrame(
-                0,
-                KeyTime.FromTimeSpan(baseTime + TimeSpan.FromMilliseconds(300)),
-                EaseIn));
-        }
+        // Single bounce cycle: 150ms up ease-out, 150ms down ease-in
+        animation.KeyFrames.Add(new EasingDoubleKeyFrame(
+            BounceTranslation,
+            KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(150)),
+            EaseOut));
+        animation.KeyFrames.Add(new EasingDoubleKeyFrame(
+            0,
+            KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(300)),
+            EaseIn));
 
-        animation.Completed += (_, _) => dockItem.IsLaunching = false;
         translateTransform.BeginAnimation(TranslateTransform.YProperty, animation);
+    }
+
+    /// <summary>
+    /// Stops the launch bounce for the given executable path and clears the animation
+    /// on whatever element currently represents that app.
+    /// </summary>
+    private void StopLaunchBounce(string executablePath)
+    {
+        if (!_launchingPaths.Remove(executablePath)) return;
+
+        ClearBounceOnItemsControl(PinnedIconsControl, executablePath);
+        ClearBounceOnItemsControl(RunningIconsControl, executablePath);
+    }
+
+    private void ClearBounceOnItemsControl(ItemsControl itemsControl, string executablePath)
+    {
+        for (int i = 0; i < itemsControl.Items.Count; i++)
+        {
+            if (itemsControl.Items[i] is not DockItem item) continue;
+            if (!string.Equals(item.ExecutablePath, executablePath, StringComparison.OrdinalIgnoreCase)) continue;
+
+            item.IsLaunching = false;
+
+            var container = itemsControl.ItemContainerGenerator.ContainerFromIndex(i) as FrameworkElement;
+            if (container is null) continue;
+            var grid = FindVisualChild<Grid>(container);
+            if (grid is null) continue;
+
+            var bounceTransform = FindBounceTransform(grid);
+            if (bounceTransform is not null)
+            {
+                bounceTransform.BeginAnimation(TranslateTransform.YProperty, null);
+                bounceTransform.Y = 0;
+            }
+        }
     }
 
     #endregion
@@ -1334,6 +1476,22 @@ public partial class Dock : Window, IRetreatable
             }
         }
         return element.RenderTransform as TranslateTransform;
+    }
+
+    /// <summary>
+    /// Finds the second TranslateTransform in the TransformGroup (the bounce transform),
+    /// which is independent of the magnification/layout transform.
+    /// </summary>
+    private static TranslateTransform? FindBounceTransform(FrameworkElement element)
+    {
+        if (element.RenderTransform is not TransformGroup group) return null;
+        int count = 0;
+        foreach (var transform in group.Children)
+        {
+            if (transform is TranslateTransform tt && ++count == 2)
+                return tt;
+        }
+        return null;
     }
 
     private static void AnimateScale(ScaleTransform transform, double targetScale, Duration duration, IEasingFunction easing)

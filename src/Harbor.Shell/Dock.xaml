@@ -53,6 +53,7 @@
                     <TransformGroup>
                         <ScaleTransform x:Name="IconScale" ScaleX="1" ScaleY="1" />
                         <TranslateTransform x:Name="IconTranslate" Y="0" />
+                        <TranslateTransform x:Name="BounceTranslate" Y="0" />
                     </TransformGroup>
                 </Grid.RenderTransform>
                 <!-- Application icon -->

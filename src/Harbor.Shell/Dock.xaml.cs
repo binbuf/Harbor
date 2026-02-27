@@ -8,6 +8,7 @@ using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Shapes;
 using System.Windows.Threading;
 using Harbor.Core.Interop;
 using Harbor.Core.Services;
@@ -748,6 +749,21 @@ public partial class Dock : Window, IRetreatable
                 var layoutOffset = -IconDefaultSize * (scale - 1);
                 var popOut = DockMagnificationCalculator.ComputeVerticalOffset(scale, IconDefaultSize);
                 translateTransform.Y = layoutOffset + popOut;
+
+                // Counter-translate the running indicator dot so it stays at the dock bottom
+                // instead of moving upward with the magnified icon.
+                var dot = FindVisualChild<Ellipse>(element);
+                if (dot is not null)
+                {
+                    if (dot.RenderTransform is TranslateTransform dotTranslate)
+                    {
+                        dotTranslate.Y = -translateTransform.Y;
+                    }
+                    else
+                    {
+                        dot.RenderTransform = new TranslateTransform(0, -translateTransform.Y);
+                    }
+                }
             }
         }
     }
@@ -790,6 +806,14 @@ public partial class Dock : Window, IRetreatable
             {
                 var anim = new DoubleAnimation(0, duration) { EasingFunction = EaseOut };
                 translateTransform.BeginAnimation(TranslateTransform.YProperty, anim);
+            }
+
+            // Animate running indicator dot back to original position
+            var dot = FindVisualChild<Ellipse>(element);
+            if (dot?.RenderTransform is TranslateTransform dotTranslate)
+            {
+                dotTranslate.BeginAnimation(TranslateTransform.YProperty,
+                    new DoubleAnimation(0, duration) { EasingFunction = EaseOut });
             }
         }
 
@@ -925,6 +949,14 @@ public partial class Dock : Window, IRetreatable
         {
             translateTransform.BeginAnimation(TranslateTransform.YProperty, null);
             translateTransform.Y = 0;
+        }
+
+        // Reset running indicator dot transform
+        var dot = FindVisualChild<Ellipse>(element);
+        if (dot?.RenderTransform is TranslateTransform dotTranslate)
+        {
+            dotTranslate.BeginAnimation(TranslateTransform.YProperty, null);
+            dotTranslate.Y = 0;
         }
     }
 

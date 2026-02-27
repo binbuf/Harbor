@@ -42,6 +42,7 @@ public partial class Dock : Window, IRetreatable
     // Active context menu tracking
     private ContextMenu? _activeContextMenu;
     private ContextMenuMouseHook? _contextMenuMouseHook;
+    private FrameworkElement? _contextMenuOwnerElement;
 
     // Launch bounce tracking: executable paths currently bouncing (survives item recreation during Rebuild)
     private readonly HashSet<string> _launchingPaths = new(StringComparer.OrdinalIgnoreCase);
@@ -506,6 +507,8 @@ public partial class Dock : Window, IRetreatable
         if (!_magnificationEnabled)
             AnimateScale(scaleTransform, PressedScaleFactor, PressScaleDownDuration, EaseIn);
 
+        SetIconDark(element, true);
+
         // Record drag start point
         _dragStartPoint = e.GetPosition(DockPanel);
         _dragElement = element;
@@ -540,12 +543,16 @@ public partial class Dock : Window, IRetreatable
         // Handle drag end
         if (_isDragging)
         {
+            SetIconDark(element, false);
             EndDrag();
             return;
         }
 
-        // If long-press was triggered, don't do normal click
+        // If long-press was triggered, don't do normal click — overlay stays dark
+        // until the context menu closes (handled in OnContextMenuClosed)
         if (_longPressTriggered) return;
+
+        SetIconDark(element, false);
 
         // Animate scale back to default (or hover size if still hovering)
         // Skip when magnification is active — it controls sizing via Width/Height
@@ -1296,6 +1303,12 @@ public partial class Dock : Window, IRetreatable
 
     #region Context Menu
 
+    private void DockIcon_MouseRightButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is FrameworkElement element)
+            SetIconDark(element, true);
+    }
+
     /// <summary>
     /// Handles right-click on a dock icon — shows context menu.
     /// </summary>
@@ -1340,6 +1353,7 @@ public partial class Dock : Window, IRetreatable
 
         _autoHideService?.SuppressHide();
         _activeContextMenu = contextMenu;
+        _contextMenuOwnerElement = element;
         contextMenu.Closed += OnContextMenuClosed;
 
         contextMenu.IsOpen = true;
@@ -1602,6 +1616,25 @@ public partial class Dock : Window, IRetreatable
         transform.BeginAnimation(ScaleTransform.ScaleYProperty, animY);
     }
 
+    private static System.Windows.Shapes.Rectangle? FindDarkOverlay(FrameworkElement element)
+    {
+        if (element is System.Windows.Controls.Panel panel)
+            foreach (UIElement child in panel.Children)
+                if (child is System.Windows.Shapes.Rectangle rect)
+                    return rect;
+        return null;
+    }
+
+    private static void SetIconDark(FrameworkElement element, bool dark)
+    {
+        var overlay = FindDarkOverlay(element);
+        if (overlay is null) return;
+        var anim = new DoubleAnimation(
+            dark ? 0.35 : 0.0,
+            new Duration(TimeSpan.FromMilliseconds(dark ? 40 : 120)));
+        overlay.BeginAnimation(UIElement.OpacityProperty, anim);
+    }
+
     #endregion
 
     #region Long-Press Window Picker
@@ -1709,6 +1742,13 @@ public partial class Dock : Window, IRetreatable
         _contextMenuMouseHook?.Dispose();
         _contextMenuMouseHook = null;
         _activeContextMenu = null;
+
+        if (_contextMenuOwnerElement is not null)
+        {
+            SetIconDark(_contextMenuOwnerElement, false);
+            _contextMenuOwnerElement = null;
+        }
+
         _autoHideService?.ResumeHide();
 
         // If mouse is no longer over the dock, trigger hide

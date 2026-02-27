@@ -41,6 +41,7 @@
                   RenderTransformOrigin="0.5,1.0"
                   MouseLeftButtonDown="DockIcon_MouseLeftButtonDown"
                   MouseLeftButtonUp="DockIcon_MouseLeftButtonUp"
+                  MouseRightButtonDown="DockIcon_MouseRightButtonDown"
                   MouseRightButtonUp="DockIcon_MouseRightButtonUp"
                   MouseEnter="DockIcon_MouseEnter"
                   MouseLeave="DockIcon_MouseLeave">
@@ -61,6 +62,13 @@
                        Width="52" Height="52"
                        VerticalAlignment="Top"
                        RenderOptions.BitmapScalingMode="HighQuality" />
+                <!-- Press / context-menu darkening overlay -->
+                <Rectangle Width="52" Height="52"
+                           VerticalAlignment="Top"
+                           RadiusX="12" RadiusY="12"
+                           Fill="Black"
+                           Opacity="0"
+                           IsHitTestVisible="False" />
                 <!-- Active indicator dot (visible only when running) -->
                 <Ellipse Width="4" Height="4"
                          Fill="{DynamicResource DockActiveDotBrush}"

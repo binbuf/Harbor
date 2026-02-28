@@ -1616,12 +1616,12 @@ public partial class Dock : Window, IRetreatable
         transform.BeginAnimation(ScaleTransform.ScaleYProperty, animY);
     }
 
-    private static System.Windows.Shapes.Rectangle? FindDarkOverlay(FrameworkElement element)
+    private static UIElement? FindDarkOverlay(FrameworkElement element)
     {
         if (element is System.Windows.Controls.Panel panel)
             foreach (UIElement child in panel.Children)
-                if (child is System.Windows.Shapes.Rectangle rect)
-                    return rect;
+                if (child is FrameworkElement fe && fe.Tag is "DarkOverlay")
+                    return fe;
         return null;
     }
 
@@ -1630,7 +1630,7 @@ public partial class Dock : Window, IRetreatable
         var overlay = FindDarkOverlay(element);
         if (overlay is null) return;
         var anim = new DoubleAnimation(
-            dark ? 0.35 : 0.0,
+            dark ? 0.4 : 0.0,
             new Duration(TimeSpan.FromMilliseconds(dark ? 40 : 120)));
         overlay.BeginAnimation(UIElement.OpacityProperty, anim);
     }

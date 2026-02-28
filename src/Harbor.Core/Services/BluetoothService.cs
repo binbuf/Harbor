@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using Windows.Devices.Bluetooth;
 using Windows.Devices.Enumeration;
 using Windows.Devices.Radios;
@@ -44,12 +45,19 @@ public sealed class BluetoothService : IDisposable
     private DeviceWatcher? _deviceWatcher;
     private readonly object _lock = new();
     private readonly Dictionary<string, BluetoothDeviceInfo> _connectedDevices = new();
+
+    // In-memory list of up to 3 recently-disconnected audio devices, shown in the
+    // flyout to enable quick reconnect — matches macOS Bluetooth menu behavior.
+    private readonly List<BluetoothDeviceInfo> _recentAudioDevices = new();
+    private const int MaxRecentDevices = 3;
+
     private bool _disposed;
 
     public bool IsAvailable { get; private set; }
     public bool IsEnabled { get; private set; }
     public int ConnectedDeviceCount { get; private set; }
     public BluetoothIconState IconState { get; private set; }
+
     public IReadOnlyList<BluetoothDeviceInfo> ConnectedDevices
     {
         get
@@ -57,6 +65,22 @@ public sealed class BluetoothService : IDisposable
             lock (_lock)
             {
                 return _connectedDevices.Values.ToList();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Audio devices that were recently connected but are currently disconnected.
+    /// Populated when a connected audio device disconnects; cleared when it reconnects.
+    /// Resets when the app restarts (in-memory only).
+    /// </summary>
+    public IReadOnlyList<BluetoothDeviceInfo> RecentAudioDevices
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _recentAudioDevices.ToList();
             }
         }
     }
@@ -144,6 +168,10 @@ public sealed class BluetoothService : IDisposable
         {
             _connectedDevices[device.Id] = info;
             ConnectedDeviceCount = _connectedDevices.Count;
+
+            // If this device was in the recent list, remove it — it's connected now
+            _recentAudioDevices.RemoveAll(d => d.Id == device.Id);
+
             UpdateIconState();
         }
 
@@ -156,7 +184,32 @@ public sealed class BluetoothService : IDisposable
     {
         lock (_lock)
         {
-            _connectedDevices.Remove(device.Id);
+            if (_connectedDevices.TryGetValue(device.Id, out var removedDevice))
+            {
+                _connectedDevices.Remove(device.Id);
+
+                // Track audio devices in the recent list for quick-reconnect
+                if (removedDevice.Category == BluetoothDeviceCategory.Audio)
+                {
+                    // Remove any existing entry for this device (avoid duplicates)
+                    _recentAudioDevices.RemoveAll(d => d.Id == removedDevice.Id);
+
+                    // Add to front of the list (most recent first)
+                    _recentAudioDevices.Insert(0, new BluetoothDeviceInfo
+                    {
+                        Id = removedDevice.Id,
+                        Name = removedDevice.Name,
+                        Category = removedDevice.Category,
+                        IsConnected = false,
+                        BatteryPercent = null,
+                    });
+
+                    // Trim to max
+                    if (_recentAudioDevices.Count > MaxRecentDevices)
+                        _recentAudioDevices.RemoveAt(_recentAudioDevices.Count - 1);
+                }
+            }
+
             ConnectedDeviceCount = _connectedDevices.Count;
             UpdateIconState();
         }
@@ -180,6 +233,23 @@ public sealed class BluetoothService : IDisposable
                 if (!isConnected)
                 {
                     _connectedDevices.Remove(device.Id);
+
+                    // Track audio devices in the recent list
+                    if (existing.Category == BluetoothDeviceCategory.Audio)
+                    {
+                        _recentAudioDevices.RemoveAll(d => d.Id == existing.Id);
+                        _recentAudioDevices.Insert(0, new BluetoothDeviceInfo
+                        {
+                            Id = existing.Id,
+                            Name = existing.Name,
+                            Category = existing.Category,
+                            IsConnected = false,
+                            BatteryPercent = null,
+                        });
+
+                        if (_recentAudioDevices.Count > MaxRecentDevices)
+                            _recentAudioDevices.RemoveAt(_recentAudioDevices.Count - 1);
+                    }
                 }
 
                 ConnectedDeviceCount = _connectedDevices.Count;
@@ -266,6 +336,135 @@ public sealed class BluetoothService : IDisposable
         }
     }
 
+    /// <summary>
+    /// Attempts to connect a previously-paired Bluetooth audio device by enabling
+    /// its A2DP Sink service via Win32 BluetoothSetServiceState.
+    /// </summary>
+    public async Task<bool> ConnectDeviceAsync(BluetoothDeviceInfo device)
+    {
+        Trace.WriteLine($"[Harbor] BluetoothService: Attempting to connect {device.Name}...");
+        return await SetDeviceServiceStateAsync(device.Id, enable: true);
+    }
+
+    /// <summary>
+    /// Disconnects a currently-connected Bluetooth audio device by disabling
+    /// its A2DP Sink service via Win32 BluetoothSetServiceState.
+    /// </summary>
+    public async Task<bool> DisconnectDeviceAsync(BluetoothDeviceInfo device)
+    {
+        Trace.WriteLine($"[Harbor] BluetoothService: Attempting to disconnect {device.Name}...");
+        return await SetDeviceServiceStateAsync(device.Id, enable: false);
+    }
+
+    private static async Task<bool> SetDeviceServiceStateAsync(string deviceId, bool enable)
+    {
+        // Resolve Bluetooth address via WinRT (DeviceInformation ID → BluetoothDevice)
+        ulong bluetoothAddress;
+        try
+        {
+            using var device = await BluetoothDevice.FromIdAsync(deviceId);
+            if (device is null)
+            {
+                Trace.WriteLine($"[Harbor] BluetoothService: Could not resolve device {deviceId}");
+                return false;
+            }
+            bluetoothAddress = device.BluetoothAddress;
+        }
+        catch (Exception ex)
+        {
+            Trace.WriteLine($"[Harbor] BluetoothService: Failed to resolve device {deviceId}: {ex.Message}");
+            return false;
+        }
+
+        // Run the Win32 Bluetooth API calls on a thread-pool thread
+        return await Task.Run(() => SetServiceStateWin32(bluetoothAddress, enable));
+    }
+
+    private static bool SetServiceStateWin32(ulong bluetoothAddress, bool enable)
+    {
+        var serviceGuid = BluetoothNative.A2dpSinkService;
+        uint flags = enable ? BluetoothNative.BLUETOOTH_SERVICE_ENABLE
+                            : BluetoothNative.BLUETOOTH_SERVICE_DISABLE;
+
+        // Open the first available Bluetooth radio
+        var radioParams = new BluetoothNative.BLUETOOTH_FIND_RADIO_PARAMS
+        {
+            dwSize = (uint)Marshal.SizeOf<BluetoothNative.BLUETOOTH_FIND_RADIO_PARAMS>()
+        };
+
+        var radioFind = BluetoothNative.BluetoothFindFirstRadio(ref radioParams, out var radioHandle);
+        if (radioFind == IntPtr.Zero)
+        {
+            Trace.WriteLine("[Harbor] BluetoothService: BluetoothFindFirstRadio failed.");
+            return false;
+        }
+
+        try
+        {
+            var searchParams = new BluetoothNative.BLUETOOTH_DEVICE_SEARCH_PARAMS
+            {
+                dwSize = (uint)Marshal.SizeOf<BluetoothNative.BLUETOOTH_DEVICE_SEARCH_PARAMS>(),
+                fReturnAuthenticated = 1,
+                fReturnRemembered = 1,
+                fReturnUnknown = 0,
+                fReturnConnected = 1,
+                fIssueInquiry = 0,
+                cTimeoutMultiplier = 0,
+                hRadio = radioHandle,
+            };
+
+            var deviceInfo = new BluetoothNative.BLUETOOTH_DEVICE_INFO
+            {
+                dwSize = (uint)Marshal.SizeOf<BluetoothNative.BLUETOOTH_DEVICE_INFO>(),
+                szName = string.Empty,
+            };
+
+            var deviceFind = BluetoothNative.BluetoothFindFirstDevice(ref searchParams, ref deviceInfo);
+            if (deviceFind == IntPtr.Zero)
+            {
+                Trace.WriteLine("[Harbor] BluetoothService: BluetoothFindFirstDevice found no devices.");
+                return false;
+            }
+
+            try
+            {
+                do
+                {
+                    if (deviceInfo.Address.ullLong == bluetoothAddress)
+                    {
+                        var result = BluetoothNative.BluetoothSetServiceState(
+                            radioHandle, ref deviceInfo, ref serviceGuid, flags);
+
+                        if (result == 0)
+                        {
+                            Trace.WriteLine($"[Harbor] BluetoothService: Service state set ({(enable ? "connect" : "disconnect")}) for {deviceInfo.szName}");
+                            return true;
+                        }
+
+                        Trace.WriteLine($"[Harbor] BluetoothService: BluetoothSetServiceState failed with error {result} for {deviceInfo.szName}");
+                        return false;
+                    }
+
+                    // Reset szName before next call to avoid stale data
+                    deviceInfo.szName = string.Empty;
+                }
+                while (BluetoothNative.BluetoothFindNextDevice(deviceFind, ref deviceInfo));
+            }
+            finally
+            {
+                BluetoothNative.BluetoothFindDeviceClose(deviceFind);
+            }
+        }
+        finally
+        {
+            BluetoothNative.BluetoothFindRadioClose(radioFind);
+            BluetoothNative.CloseHandle(radioHandle);
+        }
+
+        Trace.WriteLine($"[Harbor] BluetoothService: Device with address {bluetoothAddress:X12} not found in radio device list.");
+        return false;
+    }
+
     private void RaiseBluetoothChanged()
     {
         BluetoothChanged?.Invoke(this, new BluetoothChangedEventArgs
@@ -310,6 +509,7 @@ public sealed class BluetoothService : IDisposable
         lock (_lock)
         {
             _connectedDevices.Clear();
+            _recentAudioDevices.Clear();
         }
 
         Trace.WriteLine("[Harbor] BluetoothService: Disposed.");

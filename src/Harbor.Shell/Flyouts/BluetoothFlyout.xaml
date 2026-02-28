@@ -61,15 +61,15 @@
                     Background="{DynamicResource FlyoutBorderBrush}"
                     Margin="0,0,0,8" />
 
-            <!-- Devices label -->
+            <!-- Devices label — "My Devices" when BT is on -->
             <TextBlock x:Name="DevicesLabel"
-                       Text="Devices"
+                       Text="My Devices"
                        FontFamily="Segoe UI Variable"
                        FontSize="11"
                        Foreground="{DynamicResource FlyoutSecondaryText}"
                        Margin="4,0,0,6" />
 
-            <!-- No devices message -->
+            <!-- No devices message — shown when BT on but no connected or recent devices -->
             <TextBlock x:Name="NoDevicesText"
                        Text="No Devices Connected"
                        FontFamily="Segoe UI Variable"
@@ -78,41 +78,34 @@
                        Margin="4,0,0,8"
                        Visibility="Collapsed" />
 
-            <!-- Connected devices list -->
-            <ItemsControl x:Name="DeviceList">
+            <!-- Connected devices — click to disconnect -->
+            <ItemsControl x:Name="ConnectedDeviceList">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
                         <Border CornerRadius="8"
                                 Padding="8,6"
                                 Margin="0,1"
                                 Background="Transparent"
+                                Cursor="Hand"
                                 MouseEnter="DeviceRow_MouseEnter"
-                                MouseLeave="DeviceRow_MouseLeave">
+                                MouseLeave="DeviceRow_MouseLeave"
+                                MouseLeftButtonUp="ConnectedDevice_Click">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
 
-                                <StackPanel Grid.Column="0" Orientation="Vertical">
-                                    <TextBlock Text="{Binding Name}"
-                                               FontFamily="Segoe UI Variable"
-                                               FontSize="13"
-                                               Foreground="{DynamicResource FlyoutHeaderForeground}"
-                                               TextTrimming="CharacterEllipsis" />
-                                    <TextBlock FontFamily="Segoe UI Variable"
-                                               FontSize="11"
-                                               Foreground="{DynamicResource FlyoutSecondaryText}">
-                                        <TextBlock.Text>
-                                            <MultiBinding StringFormat="{}{0}">
-                                                <Binding Path="Category" />
-                                            </MultiBinding>
-                                        </TextBlock.Text>
-                                    </TextBlock>
-                                </StackPanel>
+                                <TextBlock Grid.Column="0"
+                                           Text="{Binding Name}"
+                                           FontFamily="Segoe UI Variable"
+                                           FontSize="13"
+                                           Foreground="{DynamicResource FlyoutHeaderForeground}"
+                                           TextTrimming="CharacterEllipsis"
+                                           VerticalAlignment="Center" />
 
                                 <TextBlock Grid.Column="1"
-                                           Text="Connected"
+                                           Text="{Binding StatusText}"
                                            FontFamily="Segoe UI Variable"
                                            FontSize="11"
                                            Foreground="{DynamicResource FlyoutSecondaryText}"
@@ -120,8 +113,9 @@
                                            Margin="8,0,0,0">
                                     <TextBlock.Style>
                                         <Style TargetType="TextBlock">
+                                            <Setter Property="Visibility" Value="Visible" />
                                             <Style.Triggers>
-                                                <DataTrigger Binding="{Binding IsConnected}" Value="False">
+                                                <DataTrigger Binding="{Binding ShowStatus}" Value="False">
                                                     <Setter Property="Visibility" Value="Collapsed" />
                                                 </DataTrigger>
                                             </Style.Triggers>
@@ -133,6 +127,67 @@
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
+
+            <!-- Recent audio devices section — only shown when there are recent devices -->
+            <StackPanel x:Name="RecentSection" Visibility="Collapsed">
+                <!-- Thin separator between connected and recent -->
+                <Border Height="1"
+                        Background="{DynamicResource FlyoutBorderBrush}"
+                        Margin="0,4,0,4"
+                        Opacity="0.5" />
+
+                <!-- Recently disconnected audio devices — dimmed; click to connect -->
+                <ItemsControl x:Name="RecentDeviceList">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border CornerRadius="8"
+                                    Padding="8,6"
+                                    Margin="0,1"
+                                    Background="Transparent"
+                                    Opacity="0.6"
+                                    Cursor="Hand"
+                                    MouseEnter="DeviceRow_MouseEnter"
+                                    MouseLeave="DeviceRow_MouseLeave"
+                                    MouseLeftButtonUp="RecentDevice_Click">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <TextBlock Grid.Column="0"
+                                               Text="{Binding Name}"
+                                               FontFamily="Segoe UI Variable"
+                                               FontSize="13"
+                                               Foreground="{DynamicResource FlyoutHeaderForeground}"
+                                               TextTrimming="CharacterEllipsis"
+                                               VerticalAlignment="Center" />
+
+                                    <!-- "Connecting..." shown while connection is pending -->
+                                    <TextBlock Grid.Column="1"
+                                               Text="{Binding StatusText}"
+                                               FontFamily="Segoe UI Variable"
+                                               FontSize="11"
+                                               Foreground="{DynamicResource FlyoutSecondaryText}"
+                                               VerticalAlignment="Center"
+                                               Margin="8,0,0,0">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding ShowStatus}" Value="True">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
 
             <!-- Separator -->
             <Border Height="1"

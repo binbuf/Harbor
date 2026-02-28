@@ -57,8 +57,10 @@ internal static class AudioComInterop
     // EDataFlow: eAll = 2 (enumerates render + capture endpoints)
     internal const int DataFlowAll = 2;
 
-    // DEVICE_STATE: active (0x1) | unplugged (0x2) — includes BT devices not currently connected
-    internal const uint DeviceStateActiveUnplugged = 0x00000003;
+    // DEVICE_STATE_ACTIVE (0x1) | DEVICE_STATE_NOTPRESENT (0x4) | DEVICE_STATE_UNPLUGGED (0x8).
+    // Note: 0x2 = DISABLED (not UNPLUGGED). Paired-but-disconnected BT devices appear as UNPLUGGED
+    // or NOTPRESENT depending on the driver, so both flags are required for reconnect to work.
+    internal const uint DeviceStateActiveUnplugged = 0x0000000D;
 
     internal const uint StgmRead = 0;
     internal const uint ClsctxAll = 0x17;

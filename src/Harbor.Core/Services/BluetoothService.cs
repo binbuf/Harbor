@@ -59,11 +59,13 @@ public sealed class BluetoothService : IDisposable
     private readonly Dictionary<string, BluetoothDeviceInfo> _nearbyDevices = new();
     private const int MaxRecentDevices = 3;
 
-    // Additional properties to request for accurate CoD-based categorization
+    // Properties requested from the device watcher.
+    // NOTE: Do NOT add "System.Devices.Aep.Bluetooth.ClassOfDevice" here — it is not
+    // a valid AEP property for the BluetoothDevice selector and causes the watcher to
+    // silently stop returning devices. Category is resolved via BluetoothDevice.FromIdAsync.
     private static readonly string[] _deviceProperties =
     [
         "System.Devices.Aep.IsConnected",
-        "System.Devices.Aep.Bluetooth.ClassOfDevice",
     ];
 
     private static readonly string _recentDevicesFilePath = Path.Combine(
@@ -139,9 +141,17 @@ public sealed class BluetoothService : IDisposable
             IsEnabled = _bluetoothRadio.State == RadioState.On;
             _bluetoothRadio.StateChanged += OnRadioStateChanged;
 
+            // Fire immediately so the icon appears in the menu bar right away.
+            // LoadRecentDevicesAsync calls DeviceInformation.FindAllAsync which can
+            // take several seconds — we must not block the icon on it.
+            UpdateIconState();
+            RaiseBluetoothChanged();
+
             await LoadRecentDevicesAsync();
 
             StartDeviceWatcher();
+
+            // Fire again in case a connected device was found during enumeration
             UpdateIconState();
             RaiseBluetoothChanged();
         }
@@ -157,39 +167,41 @@ public sealed class BluetoothService : IDisposable
     // ─── Categorization ───────────────────────────────────────────────────────
 
     /// <summary>
-    /// Categorizes a device using the Bluetooth Class of Device (CoD) bits first,
-    /// falling back to name-based heuristics. CoD is reliable for devices whose
-    /// names give no hint of category (e.g. "WH-1000XM5", "QC45").
+    /// Resolves device category using <see cref="BluetoothDevice.FromIdAsync"/> to read
+    /// the strongly-typed <see cref="BluetoothClassOfDevice.MajorClass"/>. This is the
+    /// only reliable way to identify audio devices whose names give no hint (e.g.
+    /// "WH-1000XM5", "QC45"). Falls back to name-based heuristics if the WinRT call fails.
     /// </summary>
-    private static BluetoothDeviceCategory CategorizeDevice(DeviceInformation device)
+    private static async Task<BluetoothDeviceCategory> GetCategoryAsync(string deviceId, string? deviceName)
     {
-        if (device.Properties.TryGetValue("System.Devices.Aep.Bluetooth.ClassOfDevice", out var codObj)
-            && codObj is uint cod && cod != 0)
+        try
         {
-            // Bits 8–12 = major device class
-            var majorClass = (cod >> 8) & 0x1F;
-            switch (majorClass)
+            using var btDevice = await BluetoothDevice.FromIdAsync(deviceId);
+            if (btDevice is not null)
             {
-                case 0x04: return BluetoothDeviceCategory.Audio;   // Audio/Video (headphones, speakers)
-                case 0x02: return BluetoothDeviceCategory.Phone;   // Phone
-                case 0x05: return CategorizePeripheral(cod);       // HID (keyboard, mouse)
-                default: break;
+                return btDevice.ClassOfDevice.MajorClass switch
+                {
+                    BluetoothMajorClass.AudioVideo => BluetoothDeviceCategory.Audio,
+                    BluetoothMajorClass.Phone      => BluetoothDeviceCategory.Phone,
+                    BluetoothMajorClass.Peripheral => CategorizePeripheralByName(deviceName),
+                    _                              => CategorizeByName(deviceName),
+                };
             }
         }
+        catch (Exception ex)
+        {
+            Trace.WriteLine($"[Harbor] BluetoothService: CoD lookup failed for {deviceId}: {ex.Message}");
+        }
 
-        return CategorizeByName(device.Name);
+        return CategorizeByName(deviceName);
     }
 
-    private static BluetoothDeviceCategory CategorizePeripheral(uint cod)
+    private static BluetoothDeviceCategory CategorizePeripheralByName(string? name)
     {
-        // Bits 6–7 of CoD encode keyboard/pointing subtype for Peripheral class
-        return ((cod >> 6) & 0x03) switch
-        {
-            0x01 => BluetoothDeviceCategory.Keyboard,
-            0x02 => BluetoothDeviceCategory.Mouse,
-            0x03 => BluetoothDeviceCategory.Keyboard, // combo: keyboard takes precedence
-            _ => BluetoothDeviceCategory.Other,
-        };
+        var n = name?.ToLowerInvariant() ?? "";
+        if (n.Contains("mouse") || n.Contains("trackpad")) return BluetoothDeviceCategory.Mouse;
+        if (n.Contains("keyboard") || n.Contains("keychron")) return BluetoothDeviceCategory.Keyboard;
+        return BluetoothDeviceCategory.Other;
     }
 
     private static BluetoothDeviceCategory CategorizeByName(string? name)
@@ -241,33 +253,35 @@ public sealed class BluetoothService : IDisposable
             }
 
             // 2. Enumerate ALL paired BT devices — source of truth for what can appear.
-            //    Request CoD so categorization works without relying solely on names.
+            //    No extra properties: CoD is resolved per-device via BluetoothDevice.FromIdAsync.
             var pairedSelector = BluetoothDevice.GetDeviceSelectorFromPairingState(true);
-            var pairedDevices = await DeviceInformation.FindAllAsync(
-                pairedSelector,
-                new[] { "System.Devices.Aep.Bluetooth.ClassOfDevice" });
+            var pairedDevices = await DeviceInformation.FindAllAsync(pairedSelector);
 
-            // 3. Build candidate list: paired audio devices not currently connected
-            var candidates = new List<BluetoothDeviceInfo>();
-            lock (_lock)
-            {
-                foreach (var paired in pairedDevices)
+            // 3. Categorize each paired device using the reliable WinRT Bluetooth API.
+            //    Run in parallel so the total wait is bounded by the slowest single lookup.
+            HashSet<string> connectedIds;
+            lock (_lock) { connectedIds = _connectedDevices.Keys.ToHashSet(); }
+
+            var categoryTasks = pairedDevices
+                .Where(d => !connectedIds.Contains(d.Id))
+                .Select(async d => (
+                    device: d,
+                    category: await GetCategoryAsync(d.Id, d.Name)))
+                .ToList();
+
+            var categorized = await Task.WhenAll(categoryTasks);
+
+            var candidates = categorized
+                .Where(r => r.category == BluetoothDeviceCategory.Audio)
+                .Select(r => new BluetoothDeviceInfo
                 {
-                    if (_connectedDevices.ContainsKey(paired.Id)) continue;
-
-                    var category = CategorizeDevice(paired);
-                    if (category != BluetoothDeviceCategory.Audio) continue;
-
-                    candidates.Add(new BluetoothDeviceInfo
-                    {
-                        Id = paired.Id,
-                        Name = string.IsNullOrEmpty(paired.Name) ? "Unknown Device" : paired.Name,
-                        Category = category,
-                        IsConnected = false,
-                        LastUsedUtc = timestamps.GetValueOrDefault(paired.Id, DateTime.MinValue),
-                    });
-                }
-            }
+                    Id = r.device.Id,
+                    Name = string.IsNullOrEmpty(r.device.Name) ? "Unknown Device" : r.device.Name,
+                    Category = r.category,
+                    IsConnected = false,
+                    LastUsedUtc = timestamps.GetValueOrDefault(r.device.Id, DateTime.MinValue),
+                })
+                .ToList();
 
             // 4. Most-recently-used first; devices with no history go last
             var sorted = candidates
@@ -338,15 +352,31 @@ public sealed class BluetoothService : IDisposable
 
     private void OnDeviceAdded(DeviceWatcher sender, DeviceInformation device)
     {
-        var info = CreateDeviceInfo(device, isConnected: true);
-        bool recentChanged;
+        // Fire async categorization and device registration without blocking the watcher thread
+        _ = OnDeviceAddedAsync(device);
+    }
 
+    private async Task OnDeviceAddedAsync(DeviceInformation device)
+    {
+        var name = string.IsNullOrEmpty(device.Name) ? "Unknown Device" : device.Name;
+        var category = await GetCategoryAsync(device.Id, device.Name);
+
+        var info = new BluetoothDeviceInfo
+        {
+            Id = device.Id,
+            Name = name,
+            Category = category,
+            IsConnected = true,
+            BatteryPercent = null,
+            LastUsedUtc = DateTime.UtcNow,
+        };
+
+        bool recentChanged;
         lock (_lock)
         {
             _connectedDevices[device.Id] = info;
             ConnectedDeviceCount = _connectedDevices.Count;
             recentChanged = _recentAudioDevices.RemoveAll(d => d.Id == device.Id) > 0;
-            // Also remove from nearby if it just paired+connected
             _nearbyDevices.Remove(device.Id);
             if (recentChanged) SaveRecentDevices();
             UpdateIconState();
@@ -354,7 +384,7 @@ public sealed class BluetoothService : IDisposable
 
         RaiseBluetoothChanged();
         DevicesChanged?.Invoke(this, EventArgs.Empty);
-        Trace.WriteLine($"[Harbor] BluetoothService: Device connected: {info.Name} (category: {info.Category})");
+        Trace.WriteLine($"[Harbor] BluetoothService: Device connected: {name} (category: {category})");
     }
 
     private void OnDeviceRemoved(DeviceWatcher sender, DeviceInformationUpdate device)
@@ -446,7 +476,7 @@ public sealed class BluetoothService : IDisposable
 
         _discoveryWatcher = DeviceInformation.CreateWatcher(
             selector,
-            new[] { "System.Devices.Aep.Bluetooth.ClassOfDevice", "System.Devices.Aep.IsPaired" },
+            new[] { "System.Devices.Aep.IsPaired" },
             DeviceInformationKind.AssociationEndpoint);
 
         _discoveryWatcher.Added += OnDiscoveryAdded;
@@ -493,11 +523,13 @@ public sealed class BluetoothService : IDisposable
     {
         if (string.IsNullOrEmpty(device.Name)) return; // skip nameless advertisements
 
+        // Use name-based categorization for discovery — devices may not be paired yet,
+        // so BluetoothDevice.FromIdAsync is unlikely to return CoD for unknown devices.
         var info = new BluetoothDeviceInfo
         {
             Id = device.Id,
             Name = device.Name,
-            Category = CategorizeDevice(device),
+            Category = CategorizeByName(device.Name),
             IsConnected = false,
             LastUsedUtc = DateTime.MinValue,
         };
@@ -551,7 +583,11 @@ public sealed class BluetoothService : IDisposable
 
     public async Task<bool> ConnectDeviceAsync(BluetoothDeviceInfo device)
     {
-        return await BluetoothAudioConnector.ConnectAsync(device.Name);
+        var ok = await BluetoothAudioConnector.ConnectAsync(device.Name);
+        if (ok) return true;
+
+        Trace.WriteLine($"[Harbor] BluetoothService: KsControl connect found no endpoints for '{device.Name}', trying BluetoothSetServiceState.");
+        return await ConnectViaSetServiceStateAsync(device.Id);
     }
 
     public async Task<bool> DisconnectDeviceAsync(BluetoothDeviceInfo device)
@@ -599,6 +635,72 @@ public sealed class BluetoothService : IDisposable
         {
             Trace.WriteLine($"[Harbor] BluetoothService: PairAndConnect failed for {device.Name}: {ex.Message}");
             return false;
+        }
+    }
+
+    // ─── BluetoothSetServiceState fallback connect ────────────────────────────
+
+    /// <summary>
+    /// Reconnects a paired BT audio device using BluetoothSetServiceState, which
+    /// operates at the Bluetooth stack level and works even when the audio kernel
+    /// filter (btha2dp.sys) is not loaded. Enables both A2DP and HFP services so
+    /// either profile can bring up the ACL link.
+    /// </summary>
+    private static async Task<bool> ConnectViaSetServiceStateAsync(string deviceId)
+    {
+        ulong address;
+        try
+        {
+            using var btDevice = await BluetoothDevice.FromIdAsync(deviceId);
+            if (btDevice is null) return false;
+            address = btDevice.BluetoothAddress;
+        }
+        catch (Exception ex)
+        {
+            Trace.WriteLine($"[Harbor] BluetoothService: Could not resolve BT address: {ex.Message}");
+            return false;
+        }
+
+        return await Task.Run(() => SendSetServiceState(address));
+    }
+
+    private static bool SendSetServiceState(ulong bluetoothAddress)
+    {
+        var radioParams = new BluetoothNative.BLUETOOTH_FIND_RADIO_PARAMS
+        {
+            dwSize = (uint)Marshal.SizeOf<BluetoothNative.BLUETOOTH_FIND_RADIO_PARAMS>()
+        };
+
+        var radioFind = BluetoothNative.BluetoothFindFirstRadio(ref radioParams, out var radioHandle);
+        if (radioFind == IntPtr.Zero) return false;
+
+        try
+        {
+            var deviceInfo = new BluetoothNative.BLUETOOTH_DEVICE_INFO
+            {
+                dwSize = (uint)Marshal.SizeOf<BluetoothNative.BLUETOOTH_DEVICE_INFO>(),
+                Address = new BluetoothNative.BLUETOOTH_ADDRESS { ullLong = bluetoothAddress },
+                szName = string.Empty,
+            };
+
+            var a2dp = BluetoothNative.A2dpSinkService;
+            var a2dpResult = BluetoothNative.BluetoothSetServiceState(
+                radioHandle, ref deviceInfo, ref a2dp, BluetoothNative.BLUETOOTH_SERVICE_ENABLE);
+            if (a2dpResult != 0)
+                Trace.WriteLine($"[Harbor] BluetoothService: BluetoothSetServiceState(A2DP) failed, error={a2dpResult}");
+
+            var hfp = BluetoothNative.HandsFreeService;
+            var hfpResult = BluetoothNative.BluetoothSetServiceState(
+                radioHandle, ref deviceInfo, ref hfp, BluetoothNative.BLUETOOTH_SERVICE_ENABLE);
+            if (hfpResult != 0)
+                Trace.WriteLine($"[Harbor] BluetoothService: BluetoothSetServiceState(HFP) failed, error={hfpResult}");
+
+            return a2dpResult == 0 || hfpResult == 0;
+        }
+        finally
+        {
+            BluetoothNative.BluetoothFindRadioClose(radioFind);
+            BluetoothNative.CloseHandle(radioHandle);
         }
     }
 
@@ -656,19 +758,6 @@ public sealed class BluetoothService : IDisposable
     }
 
     // ─── Helpers ──────────────────────────────────────────────────────────────
-
-    private static BluetoothDeviceInfo CreateDeviceInfo(DeviceInformation device, bool isConnected)
-    {
-        return new BluetoothDeviceInfo
-        {
-            Id = device.Id,
-            Name = string.IsNullOrEmpty(device.Name) ? "Unknown Device" : device.Name,
-            Category = CategorizeDevice(device),
-            IsConnected = isConnected,
-            BatteryPercent = null,
-            LastUsedUtc = DateTime.UtcNow,
-        };
-    }
 
     private void UpdateIconState()
     {

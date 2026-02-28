@@ -70,8 +70,8 @@ internal static class BluetoothAudioConnector
         {
             var enumerator = (IMMDeviceEnumerator)new MMDeviceEnumeratorComObject();
 
-            // eAll=2 covers both render and capture; active|unplugged covers BT
-            // devices that are paired but not currently connected.
+            // eAll=2 covers both render and capture; active|notpresent|unplugged covers BT
+            // devices that are paired but not currently connected (UNPLUGGED=0x8, NOTPRESENT=0x4).
             var hr = enumerator.EnumAudioEndpoints(
                 AudioComInterop.DataFlowAll,
                 AudioComInterop.DeviceStateActiveUnplugged,
@@ -100,7 +100,7 @@ internal static class BluetoothAudioConnector
                     if (!name.Contains(deviceName, StringComparison.OrdinalIgnoreCase))
                         continue;
 
-                    var ksControl = GetKsControl(device);
+                    var ksControl = GetKsControl(device, enumerator);
                     if (ksControl is not null)
                     {
                         Trace.WriteLine($"[Harbor] BluetoothAudioConnector: Found KsControl for endpoint '{name}'");
@@ -122,11 +122,19 @@ internal static class BluetoothAudioConnector
     }
 
     /// <summary>
-    /// Navigates the audio topology from an IMMDevice to the kernel filter's
-    /// IKsControl: IMMDevice → IDeviceTopology → IConnector[0] → GetConnectedTo
-    /// → QueryInterface for IKsControl.
+    /// Navigates the audio topology from an IMMDevice to the kernel filter's IKsControl.
+    ///
+    /// Primary path (device ACTIVE/connected):
+    ///   IMMDevice → IDeviceTopology → IConnector[0] → GetConnectedTo → QI IKsControl
+    ///
+    /// Fallback path (device UNPLUGGED/disconnected):
+    ///   GetConnectedTo fails with ERROR_PATH_NOT_FOUND because the live cross-device
+    ///   connection doesn't exist. GetDeviceIdConnectedTo reads static topology data
+    ///   from the registry and returns the hardware KS filter's endpoint ID even when
+    ///   disconnected. We then activate IDeviceTopology on the hardware filter and QI
+    ///   one of its connectors for IKsControl (implemented by btha2dp.sys/bthhfenum.sys).
     /// </summary>
-    private static IKsControl? GetKsControl(IMMDevice device)
+    private static IKsControl? GetKsControl(IMMDevice device, IMMDeviceEnumerator enumerator)
     {
         var iidTopology = typeof(IDeviceTopology).GUID;
         var hr = device.Activate(ref iidTopology, AudioComInterop.ClsctxAll,
@@ -140,14 +148,50 @@ internal static class BluetoothAudioConnector
         if (hr != 0)
             return null;
 
-        // GetConnectedTo returns the connector on the hardware (KS filter) side.
-        // For BT audio endpoints this is implemented by btha2dp.sys or bthhfenum.sys,
-        // which expose IKsControl.
+        // Primary path: works when BT device is connected (ACTIVE).
         hr = connector.GetConnectedTo(out var connectedTo);
+        if (hr == 0)
+            return connectedTo as IKsControl;
+
+        // Fallback for disconnected (UNPLUGGED) BT devices:
+        // GetDeviceIdConnectedTo reads static topology data (persisted in the registry)
+        // and returns the hardware KS filter's endpoint ID without requiring a live connection.
+        hr = connector.GetDeviceIdConnectedTo(out var hwDevId);
         if (hr != 0)
+        {
+            Trace.WriteLine($"[Harbor] BluetoothAudioConnector: GetDeviceIdConnectedTo failed hr=0x{hr:X8}");
+            return null;
+        }
+
+        hr = enumerator.GetDevice(hwDevId, out var hwDevice);
+        if (hr != 0)
+        {
+            Trace.WriteLine($"[Harbor] BluetoothAudioConnector: GetDevice for hw filter failed hr=0x{hr:X8}");
+            return null;
+        }
+
+        hr = hwDevice.Activate(ref iidTopology, AudioComInterop.ClsctxAll,
+            IntPtr.Zero, out var hwTopologyObj);
+        if (hr != 0)
+        {
+            Trace.WriteLine($"[Harbor] BluetoothAudioConnector: Activate hw topology failed hr=0x{hr:X8}");
+            return null;
+        }
+
+        var hwTopology = (IDeviceTopology)hwTopologyObj;
+        hr = hwTopology.GetConnectorCount(out var connCount);
+        if (hr != 0 || connCount == 0)
             return null;
 
-        return connectedTo as IKsControl;
+        // The hardware KS filter connector implements IKsControl (btha2dp.sys/bthhfenum.sys).
+        for (uint j = 0; j < connCount; j++)
+        {
+            hr = hwTopology.GetConnector(j, out var hwConn);
+            if (hr == 0 && hwConn is IKsControl ks)
+                return ks;
+        }
+
+        return null;
     }
 
     /// <summary>

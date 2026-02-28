@@ -111,4 +111,26 @@ internal static class BluetoothNative
     [DllImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static extern bool CloseHandle(IntPtr hObject);
+
+    // ─── IOCTL disconnect (HCI-level, used as fallback) ──────────────────────
+
+    // CTL_CODE(FILE_DEVICE_BLUETOOTH=0x41, 0x03, METHOD_BUFFERED=0, FILE_ANY_ACCESS=0) = 0x0041000C
+    internal const uint IOCTL_BTH_DISCONNECT_DEVICE = 0x0041000C;
+
+    /// <summary>
+    /// Sends IOCTL_BTH_DISCONNECT_DEVICE to the Bluetooth radio. Input buffer
+    /// is the 8-byte BTH_ADDR (ULONGLONG) of the device to disconnect. This
+    /// operates at the HCI link layer and disconnects all active profiles.
+    /// </summary>
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool DeviceIoControl(
+        IntPtr hDevice,
+        uint dwIoControlCode,
+        ref ulong lpInBuffer,
+        uint nInBufferSize,
+        IntPtr lpOutBuffer,
+        uint nOutBufferSize,
+        out uint lpBytesReturned,
+        IntPtr lpOverlapped);
 }

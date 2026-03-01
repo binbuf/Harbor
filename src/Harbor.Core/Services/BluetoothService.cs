@@ -583,19 +583,23 @@ public sealed class BluetoothService : IDisposable
 
     public async Task<bool> ConnectDeviceAsync(BluetoothDeviceInfo device)
     {
-        var ok = await BluetoothAudioConnector.ConnectAsync(device.Name);
+        var ok = await ConnectViaSetServiceStateAsync(device.Id);
         if (ok) return true;
 
-        Trace.WriteLine($"[Harbor] BluetoothService: KsControl connect found no endpoints for '{device.Name}', trying BluetoothSetServiceState.");
-        return await ConnectViaSetServiceStateAsync(device.Id);
+        Trace.WriteLine($"[Harbor] BluetoothService: BluetoothSetServiceState connect failed for '{device.Name}', trying KsControl.");
+        return await BluetoothAudioConnector.ConnectAsync(device.Name);
     }
 
     public async Task<bool> DisconnectDeviceAsync(BluetoothDeviceInfo device)
     {
-        var ok = await BluetoothAudioConnector.DisconnectAsync(device.Name);
+        var ok = await DisconnectViaSetServiceStateAsync(device.Id);
         if (ok) return true;
 
-        Trace.WriteLine($"[Harbor] BluetoothService: IKsControl disconnect found no endpoints for '{device.Name}', trying IOCTL.");
+        Trace.WriteLine($"[Harbor] BluetoothService: BluetoothSetServiceState disconnect failed for '{device.Name}', trying KsControl.");
+        ok = await BluetoothAudioConnector.DisconnectAsync(device.Name);
+        if (ok) return true;
+
+        Trace.WriteLine($"[Harbor] BluetoothService: KsControl disconnect failed for '{device.Name}', trying IOCTL.");
         return await DisconnectViaIoctlAsync(device.Id);
     }
 
@@ -696,6 +700,98 @@ public sealed class BluetoothService : IDisposable
                 Trace.WriteLine($"[Harbor] BluetoothService: BluetoothSetServiceState(HFP) failed, error={hfpResult}");
 
             return a2dpResult == 0 || hfpResult == 0;
+        }
+        finally
+        {
+            BluetoothNative.BluetoothFindRadioClose(radioFind);
+            BluetoothNative.CloseHandle(radioHandle);
+        }
+    }
+
+    // ─── BluetoothSetServiceState disconnect ────────────────────────────────────
+
+    private static async Task<bool> DisconnectViaSetServiceStateAsync(string deviceId)
+    {
+        ulong address;
+        try
+        {
+            using var btDevice = await BluetoothDevice.FromIdAsync(deviceId);
+            if (btDevice is null) return false;
+            address = btDevice.BluetoothAddress;
+        }
+        catch (Exception ex)
+        {
+            Trace.WriteLine($"[Harbor] BluetoothService: Could not resolve BT address: {ex.Message}");
+            return false;
+        }
+
+        return await Task.Run(() => SendDisableServiceState(address));
+    }
+
+    private static bool SendDisableServiceState(ulong bluetoothAddress)
+    {
+        var radioParams = new BluetoothNative.BLUETOOTH_FIND_RADIO_PARAMS
+        {
+            dwSize = (uint)Marshal.SizeOf<BluetoothNative.BLUETOOTH_FIND_RADIO_PARAMS>()
+        };
+
+        var radioFind = BluetoothNative.BluetoothFindFirstRadio(ref radioParams, out var radioHandle);
+        if (radioFind == IntPtr.Zero) return false;
+
+        try
+        {
+            var deviceInfo = new BluetoothNative.BLUETOOTH_DEVICE_INFO
+            {
+                dwSize = (uint)Marshal.SizeOf<BluetoothNative.BLUETOOTH_DEVICE_INFO>(),
+                Address = new BluetoothNative.BLUETOOTH_ADDRESS { ullLong = bluetoothAddress },
+                szName = string.Empty,
+            };
+
+            var a2dp = BluetoothNative.A2dpSinkService;
+            var a2dpResult = BluetoothNative.BluetoothSetServiceState(
+                radioHandle, ref deviceInfo, ref a2dp, BluetoothNative.BLUETOOTH_SERVICE_DISABLE);
+            if (a2dpResult != 0)
+                Trace.WriteLine($"[Harbor] BluetoothService: BluetoothSetServiceState DISABLE(A2DP) failed, error={a2dpResult}");
+
+            var hfp = BluetoothNative.HandsFreeService;
+            var hfpResult = BluetoothNative.BluetoothSetServiceState(
+                radioHandle, ref deviceInfo, ref hfp, BluetoothNative.BLUETOOTH_SERVICE_DISABLE);
+            if (hfpResult != 0)
+                Trace.WriteLine($"[Harbor] BluetoothService: BluetoothSetServiceState DISABLE(HFP) failed, error={hfpResult}");
+
+            return a2dpResult == 0 || hfpResult == 0;
+        }
+        finally
+        {
+            BluetoothNative.BluetoothFindRadioClose(radioFind);
+            BluetoothNative.CloseHandle(radioHandle);
+        }
+    }
+
+    // ─── Local discoverability ────────────────────────────────────────────────
+
+    public void EnableLocalDiscovery() => _ = Task.Run(() => SetLocalDiscoverability(true));
+
+    public void DisableLocalDiscovery() => _ = Task.Run(() => SetLocalDiscoverability(false));
+
+    private static void SetLocalDiscoverability(bool enabled)
+    {
+        var radioParams = new BluetoothNative.BLUETOOTH_FIND_RADIO_PARAMS
+        {
+            dwSize = (uint)Marshal.SizeOf<BluetoothNative.BLUETOOTH_FIND_RADIO_PARAMS>()
+        };
+
+        var radioFind = BluetoothNative.BluetoothFindFirstRadio(ref radioParams, out var radioHandle);
+        if (radioFind == IntPtr.Zero)
+        {
+            Trace.WriteLine("[Harbor] BluetoothService: BluetoothEnableDiscovery — no radio found.");
+            return;
+        }
+
+        try
+        {
+            var result = BluetoothNative.BluetoothEnableDiscovery(radioHandle, enabled);
+            Trace.WriteLine($"[Harbor] BluetoothService: BluetoothEnableDiscovery({enabled}) = {result}");
         }
         finally
         {

@@ -108,6 +108,12 @@ internal static class BluetoothNative
         ref Guid pGuidService,
         uint dwServiceFlags);
 
+    [DllImport("BluetoothAPIs.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool BluetoothEnableDiscovery(
+        IntPtr hRadio,
+        [MarshalAs(UnmanagedType.Bool)] bool fEnabled);
+
     [DllImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static extern bool CloseHandle(IntPtr hObject);

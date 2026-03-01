@@ -37,6 +37,8 @@ public partial class BluetoothFlyout : Window
         Loaded += (_, _) =>
         {
             _mouseHook = new FlyoutMouseHook(this, Close);
+            // Make local PC discoverable while flyout is open
+            _bluetoothService.EnableLocalDiscovery();
             // Start BT inquiry scan so nearby devices appear as the flyout opens
             _bluetoothService.StartDiscovery();
             UpdateNearbySection();
@@ -49,29 +51,39 @@ public partial class BluetoothFlyout : Window
     {
         public BluetoothDeviceInfo Device { get; }
         public string Name => Device.Name;
+        public BluetoothDeviceCategory Category { get; }
+        public Geometry? IconGeometry { get; }
         public bool IsPending { get; }
         public bool ShowStatus { get; }
         public string StatusText { get; }
+        public Brush StatusForeground { get; }
 
-        public DeviceViewModel(BluetoothDeviceInfo device, bool isPending)
+        public DeviceViewModel(BluetoothDeviceInfo device, bool isPending, FrameworkElement resourceHost)
         {
             Device = device;
             IsPending = isPending;
+            Category = device.Category;
+
+            var iconKey = $"DeviceCategory{device.Category}Icon";
+            IconGeometry = resourceHost.TryFindResource(iconKey) as Geometry;
 
             if (isPending)
             {
                 StatusText = device.IsConnected ? "Disconnecting..." : "Connecting...";
                 ShowStatus = true;
+                StatusForeground = (Brush)resourceHost.FindResource("FlyoutSecondaryText");
             }
             else if (device.IsConnected)
             {
                 StatusText = "Connected";
                 ShowStatus = true;
+                StatusForeground = (Brush)resourceHost.FindResource("FlyoutCheckmarkBrush");
             }
             else
             {
-                StatusText = string.Empty;
-                ShowStatus = false;
+                StatusText = "Not Connected";
+                ShowStatus = true;
+                StatusForeground = (Brush)resourceHost.FindResource("FlyoutSecondaryText");
             }
         }
     }
@@ -81,11 +93,11 @@ public partial class BluetoothFlyout : Window
     private void UpdateDeviceLists()
     {
         ConnectedDeviceList.ItemsSource = _bluetoothService.ConnectedDevices
-            .Select(d => new DeviceViewModel(d, _pendingDeviceIds.Contains(d.Id)))
+            .Select(d => new DeviceViewModel(d, _pendingDeviceIds.Contains(d.Id), this))
             .ToList();
 
         var recent = _bluetoothService.RecentAudioDevices
-            .Select(d => new DeviceViewModel(d, _pendingDeviceIds.Contains(d.Id)))
+            .Select(d => new DeviceViewModel(d, _pendingDeviceIds.Contains(d.Id), this))
             .ToList();
 
         RecentDeviceList.ItemsSource = recent;
@@ -116,7 +128,7 @@ public partial class BluetoothFlyout : Window
         }
 
         var nearby = _bluetoothService.NearbyDevices
-            .Select(d => new DeviceViewModel(d, _pendingDeviceIds.Contains(d.Id)))
+            .Select(d => new DeviceViewModel(d, _pendingDeviceIds.Contains(d.Id), this))
             .ToList();
 
         NearbyDeviceList.ItemsSource = nearby;
@@ -312,6 +324,7 @@ public partial class BluetoothFlyout : Window
     protected override void OnClosed(EventArgs e)
     {
         _bluetoothService.StopDiscovery();
+        _bluetoothService.DisableLocalDiscovery();
         _mouseHook?.Dispose();
         _mouseHook = null;
         _bluetoothService.BluetoothChanged -= OnBluetoothChanged;

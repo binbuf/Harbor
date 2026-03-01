@@ -583,10 +583,23 @@ public sealed class BluetoothService : IDisposable
 
     public async Task<bool> ConnectDeviceAsync(BluetoothDeviceInfo device)
     {
-        var ok = await ConnectViaSetServiceStateAsync(device.Id);
-        if (ok) return true;
+        // Step A: Ensure service drivers are present (result discarded — this only
+        // writes registry flags; it does NOT trigger a radio page).
+        await ConnectViaSetServiceStateAsync(device.Id);
 
-        Trace.WriteLine($"[Harbor] BluetoothService: BluetoothSetServiceState connect failed for '{device.Name}', trying KsControl.");
+        // Step B: Winsock Radio Wakeup — force the radio to physically page the
+        // device by attempting an RFCOMM socket connection. The connect() call
+        // triggers an ACL link regardless of whether the socket-level handshake
+        // succeeds.
+        var woke = await ConnectViaWinsockAsync(device.Id);
+        if (woke)
+        {
+            Trace.WriteLine($"[Harbor] BluetoothService: Winsock radio wakeup sent for '{device.Name}'.");
+            return true;
+        }
+
+        // Step C (fallback): KsControl KSPROPERTY_ONESHOT_RECONNECT
+        Trace.WriteLine($"[Harbor] BluetoothService: Winsock wakeup failed for '{device.Name}', trying KsControl.");
         return await BluetoothAudioConnector.ConnectAsync(device.Name);
     }
 
@@ -705,6 +718,95 @@ public sealed class BluetoothService : IDisposable
         {
             BluetoothNative.BluetoothFindRadioClose(radioFind);
             BluetoothNative.CloseHandle(radioHandle);
+        }
+    }
+
+    // ─── Winsock Radio Wakeup ───────────────────────────────────────────────────
+
+    /// <summary>
+    /// Resolves the Bluetooth address via WinRT and issues a Winsock RFCOMM
+    /// connect attempt. The connect() syscall forces the radio to page the
+    /// remote device (creating an ACL link), which is enough to trigger
+    /// profile-level reconnection even if the socket itself is refused.
+    /// </summary>
+    private static async Task<bool> ConnectViaWinsockAsync(string deviceId)
+    {
+        ulong address;
+        try
+        {
+            using var btDevice = await BluetoothDevice.FromIdAsync(deviceId);
+            if (btDevice is null) return false;
+            address = btDevice.BluetoothAddress;
+        }
+        catch (Exception ex)
+        {
+            Trace.WriteLine($"[Harbor] BluetoothService: Could not resolve BT address for Winsock: {ex.Message}");
+            return false;
+        }
+
+        return await Task.Run(() => SendWinsockConnect(address));
+    }
+
+    /// <summary>
+    /// Creates an AF_BTH/RFCOMM socket and attempts to connect to the device's
+    /// HandsFree service UUID. The connect() call forces the radio to physically
+    /// page the device regardless of whether the RFCOMM channel is actually
+    /// reachable. Returns true if the socket was created successfully (the
+    /// connect result itself doesn't matter — the radio page is the goal).
+    /// </summary>
+    private static bool SendWinsockConnect(ulong bluetoothAddress)
+    {
+        var startupResult = BluetoothNative.WSAStartup(0x0202, out _);
+        if (startupResult != 0)
+        {
+            Trace.WriteLine($"[Harbor] BluetoothService: WSAStartup failed, error={startupResult}");
+            return false;
+        }
+
+        try
+        {
+            var sock = BluetoothNative.socket(
+                BluetoothNative.AF_BTH,
+                BluetoothNative.SOCK_STREAM,
+                BluetoothNative.BTHPROTO_RFCOMM);
+
+            if (sock == BluetoothNative.INVALID_SOCKET)
+            {
+                Trace.WriteLine($"[Harbor] BluetoothService: Winsock socket() failed, WSA error={BluetoothNative.WSAGetLastError()}");
+                return false;
+            }
+
+            try
+            {
+                var addr = new BluetoothNative.SOCKADDR_BTH
+                {
+                    addressFamily = (ushort)BluetoothNative.AF_BTH,
+                    btAddr = bluetoothAddress,
+                    serviceClassId = BluetoothNative.HandsFreeService,
+                    port = 0, // SDP lookup
+                };
+
+                var connectResult = BluetoothNative.connect(
+                    sock,
+                    ref addr,
+                    Marshal.SizeOf<BluetoothNative.SOCKADDR_BTH>());
+
+                // connect() result doesn't matter — the radio page already happened.
+                if (connectResult == BluetoothNative.SOCKET_ERROR)
+                    Trace.WriteLine($"[Harbor] BluetoothService: Winsock connect() returned error (expected) WSA={BluetoothNative.WSAGetLastError()}");
+                else
+                    Trace.WriteLine("[Harbor] BluetoothService: Winsock connect() succeeded.");
+
+                return true;
+            }
+            finally
+            {
+                BluetoothNative.closesocket(sock);
+            }
+        }
+        finally
+        {
+            BluetoothNative.WSACleanup();
         }
     }
 

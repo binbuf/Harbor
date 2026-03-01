@@ -139,4 +139,58 @@ internal static class BluetoothNative
         uint nOutBufferSize,
         out uint lpBytesReturned,
         IntPtr lpOverlapped);
+
+    // ─── Winsock (radio wakeup via RFCOMM socket) ────────────────────────────
+
+    internal const int AF_BTH = 32;
+    internal const int BTHPROTO_RFCOMM = 3;
+    internal const int SOCK_STREAM = 1;
+    internal const int SOCKET_ERROR = -1;
+    internal static readonly IntPtr INVALID_SOCKET = new(-1);
+
+    /// <summary>
+    /// SOCKADDR_BTH — Winsock address structure for Bluetooth RFCOMM connections.
+    /// Total size: 30 bytes (2 + 6-pad + 8 + 16 + 4 = 30 with Pack=1,
+    /// but the CLR pads to satisfy alignment; we use explicit Pack=1).
+    /// </summary>
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
+    internal struct SOCKADDR_BTH
+    {
+        internal ushort addressFamily;  // AF_BTH (32)
+        internal ulong btAddr;          // 8-byte Bluetooth address
+        internal Guid serviceClassId;   // 16-byte service UUID
+        internal uint port;             // RFCOMM channel (0 = SDP lookup)
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct WSAData
+    {
+        internal ushort wVersion;
+        internal ushort wHighVersion;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 257)]
+        internal string szDescription;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 129)]
+        internal string szSystemStatus;
+        internal ushort iMaxSockets;
+        internal ushort iMaxUdpDg;
+        internal IntPtr lpVendorInfo;
+    }
+
+    [DllImport("ws2_32.dll", SetLastError = true)]
+    internal static extern int WSAStartup(ushort wVersionRequested, out WSAData lpWSAData);
+
+    [DllImport("ws2_32.dll", SetLastError = true)]
+    internal static extern int WSACleanup();
+
+    [DllImport("ws2_32.dll", SetLastError = true)]
+    internal static extern IntPtr socket(int af, int type, int protocol);
+
+    [DllImport("ws2_32.dll", SetLastError = true)]
+    internal static extern int connect(IntPtr s, ref SOCKADDR_BTH name, int namelen);
+
+    [DllImport("ws2_32.dll", SetLastError = true)]
+    internal static extern int closesocket(IntPtr s);
+
+    [DllImport("ws2_32.dll", SetLastError = true)]
+    internal static extern int WSAGetLastError();
 }

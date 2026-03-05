@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using Harbor.Core.Services;
 
 namespace Harbor.Shell.Flyouts;
@@ -12,9 +13,6 @@ public partial class BluetoothFlyout : Window
     private readonly BluetoothService _bluetoothService;
     private FlyoutMouseHook? _mouseHook;
     private bool _suppressToggleEvent;
-
-    // Tracks device IDs that have a connect/disconnect operation in flight.
-    // The list is rebuilt whenever this changes so the "Connecting..." label appears.
     private readonly HashSet<string> _pendingDeviceIds = new();
 
     public BluetoothFlyout(BluetoothService bluetoothService)
@@ -23,7 +21,6 @@ public partial class BluetoothFlyout : Window
 
         _bluetoothService = bluetoothService;
 
-        // Set initial state
         _suppressToggleEvent = true;
         BluetoothToggle.IsChecked = _bluetoothService.IsEnabled;
         _suppressToggleEvent = false;
@@ -31,64 +28,76 @@ public partial class BluetoothFlyout : Window
         UpdateDeviceLists();
         UpdateDevicesVisibility();
 
-        // Subscribe to live changes
         _bluetoothService.BluetoothChanged += OnBluetoothChanged;
         _bluetoothService.DevicesChanged += OnDevicesChanged;
+        _bluetoothService.NearbyDevicesChanged += OnNearbyDevicesChanged;
 
-        // Clamp position to monitor bounds once layout is known
         ContentRendered += OnContentRendered;
 
-        // Install global mouse hook to dismiss on click-outside
-        Loaded += (_, _) => _mouseHook = new FlyoutMouseHook(this, Close);
+        Loaded += (_, _) =>
+        {
+            _mouseHook = new FlyoutMouseHook(this, Close);
+            // Make local PC discoverable while flyout is open
+            _bluetoothService.EnableLocalDiscovery();
+            // Start BT inquiry scan so nearby devices appear as the flyout opens
+            _bluetoothService.StartDiscovery();
+            UpdateNearbySection();
+        };
     }
 
-    // ─── View model ─────────────────────────────────────────────────────────
+    // ─── View model ───────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// Thin wrapper around <see cref="BluetoothDeviceInfo"/> that adds UI state
-    /// (pending status, status text) without requiring a full MVVM framework.
-    /// </summary>
     private sealed class DeviceViewModel
     {
         public BluetoothDeviceInfo Device { get; }
         public string Name => Device.Name;
+        public BluetoothDeviceCategory Category { get; }
+        public Geometry? IconGeometry { get; }
         public bool IsPending { get; }
         public bool ShowStatus { get; }
         public string StatusText { get; }
+        public Brush StatusForeground { get; }
 
-        public DeviceViewModel(BluetoothDeviceInfo device, bool isPending)
+        public DeviceViewModel(BluetoothDeviceInfo device, bool isPending, FrameworkElement resourceHost)
         {
             Device = device;
             IsPending = isPending;
+            Category = device.Category;
+
+            var iconKey = $"DeviceCategory{device.Category}Icon";
+            IconGeometry = resourceHost.TryFindResource(iconKey) as Geometry;
 
             if (isPending)
             {
                 StatusText = device.IsConnected ? "Disconnecting..." : "Connecting...";
                 ShowStatus = true;
+                StatusForeground = (Brush)resourceHost.FindResource("FlyoutSecondaryText");
             }
             else if (device.IsConnected)
             {
                 StatusText = "Connected";
                 ShowStatus = true;
+                StatusForeground = (Brush)resourceHost.FindResource("FlyoutCheckmarkBrush");
             }
             else
             {
-                StatusText = string.Empty;
-                ShowStatus = false;
+                StatusText = "Not Connected";
+                ShowStatus = true;
+                StatusForeground = (Brush)resourceHost.FindResource("FlyoutSecondaryText");
             }
         }
     }
 
-    // ─── List updates ────────────────────────────────────────────────────────
+    // ─── List updates ─────────────────────────────────────────────────────────
 
     private void UpdateDeviceLists()
     {
         ConnectedDeviceList.ItemsSource = _bluetoothService.ConnectedDevices
-            .Select(d => new DeviceViewModel(d, _pendingDeviceIds.Contains(d.Id)))
+            .Select(d => new DeviceViewModel(d, _pendingDeviceIds.Contains(d.Id), this))
             .ToList();
 
         var recent = _bluetoothService.RecentAudioDevices
-            .Select(d => new DeviceViewModel(d, _pendingDeviceIds.Contains(d.Id)))
+            .Select(d => new DeviceViewModel(d, _pendingDeviceIds.Contains(d.Id), this))
             .ToList();
 
         RecentDeviceList.ItemsSource = recent;
@@ -100,14 +109,48 @@ public partial class BluetoothFlyout : Window
         var isEnabled = _bluetoothService.IsEnabled;
         var hasConnected = _bluetoothService.ConnectedDeviceCount > 0;
         var hasRecent = _bluetoothService.RecentAudioDevices.Count > 0;
+        var hasNearby = _bluetoothService.NearbyDevices.Count > 0;
+        var isDiscovering = _bluetoothService.IsDiscovering;
 
         DevicesLabel.Visibility = isEnabled ? Visibility.Visible : Visibility.Collapsed;
         ConnectedDeviceList.Visibility = isEnabled && hasConnected ? Visibility.Visible : Visibility.Collapsed;
         RecentSection.Visibility = isEnabled && hasRecent ? Visibility.Visible : Visibility.Collapsed;
-        NoDevicesText.Visibility = isEnabled && !hasConnected && !hasRecent ? Visibility.Visible : Visibility.Collapsed;
+        NoDevicesText.Visibility = isEnabled && !hasConnected && !hasRecent && !hasNearby && !isDiscovering
+            ? Visibility.Visible : Visibility.Collapsed;
     }
 
-    // ─── Event handlers (service events) ────────────────────────────────────
+    private void UpdateNearbySection()
+    {
+        if (!_bluetoothService.IsEnabled)
+        {
+            NearbySection.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        var nearby = _bluetoothService.NearbyDevices
+            .Select(d => new DeviceViewModel(d, _pendingDeviceIds.Contains(d.Id), this))
+            .ToList();
+
+        NearbyDeviceList.ItemsSource = nearby;
+
+        var isDiscovering = _bluetoothService.IsDiscovering;
+        NearbySection.Visibility = isDiscovering || nearby.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        ScanningPlaceholder.Visibility = isDiscovering && nearby.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+
+        // Animate the scan dot while discovering
+        if (isDiscovering)
+        {
+            var storyboard = (Storyboard)FindResource("SpinAnimation");
+            storyboard.Begin();
+        }
+        else
+        {
+            var storyboard = (Storyboard)FindResource("SpinAnimation");
+            storyboard.Stop();
+        }
+    }
+
+    // ─── Service event handlers ───────────────────────────────────────────────
 
     private void OnBluetoothChanged(object? sender, BluetoothChangedEventArgs e)
     {
@@ -118,6 +161,7 @@ public partial class BluetoothFlyout : Window
             _suppressToggleEvent = false;
 
             UpdateDevicesVisibility();
+            UpdateNearbySection();
         });
     }
 
@@ -125,8 +169,7 @@ public partial class BluetoothFlyout : Window
     {
         Dispatcher.Invoke(() =>
         {
-            // Clear pending state for any device that has finished connecting/disconnecting
-            // (it will now appear in the correct list, so the pending label is no longer needed)
+            // Clear pending state for devices that have finished transitioning
             var connectedIds = _bluetoothService.ConnectedDevices.Select(d => d.Id).ToHashSet();
             var recentIds = _bluetoothService.RecentAudioDevices.Select(d => d.Id).ToHashSet();
             _pendingDeviceIds.RemoveWhere(id => connectedIds.Contains(id) || recentIds.Contains(id));
@@ -136,86 +179,101 @@ public partial class BluetoothFlyout : Window
         });
     }
 
-    // ─── Event handlers (UI interaction) ────────────────────────────────────
+    private void OnNearbyDevicesChanged(object? sender, EventArgs e)
+    {
+        Dispatcher.Invoke(() =>
+        {
+            // Clear pending for nearby devices that became paired
+            var nearbyIds = _bluetoothService.NearbyDevices.Select(d => d.Id).ToHashSet();
+            _pendingDeviceIds.RemoveWhere(id => !nearbyIds.Contains(id));
+
+            UpdateNearbySection();
+            UpdateDevicesVisibility();
+        });
+    }
+
+    // ─── UI interaction ───────────────────────────────────────────────────────
 
     private void BluetoothToggle_Changed(object sender, RoutedEventArgs e)
     {
         if (_suppressToggleEvent) return;
-
-        var enabled = BluetoothToggle.IsChecked == true;
-        _ = _bluetoothService.SetEnabledAsync(enabled);
+        _ = _bluetoothService.SetEnabledAsync(BluetoothToggle.IsChecked == true);
     }
 
     private void ConnectedDevice_Click(object sender, MouseButtonEventArgs e)
     {
         if (sender is not FrameworkElement fe || fe.DataContext is not DeviceViewModel vm) return;
-        if (vm.IsPending) return; // already in flight
+        if (vm.IsPending) return;
 
         var device = vm.Device;
         _pendingDeviceIds.Add(device.Id);
         UpdateDeviceLists();
 
-        _ = DisconnectAndClearAsync(device);
+        _ = RunWithTimeout(
+            _bluetoothService.DisconnectDeviceAsync(device),
+            device.Id,
+            timeoutMs: 10_000);
     }
 
     private void RecentDevice_Click(object sender, MouseButtonEventArgs e)
     {
         if (sender is not FrameworkElement fe || fe.DataContext is not DeviceViewModel vm) return;
-        if (vm.IsPending) return; // already in flight
+        if (vm.IsPending) return;
 
         var device = vm.Device;
         _pendingDeviceIds.Add(device.Id);
         UpdateDeviceLists();
 
-        _ = ConnectAndClearAsync(device);
+        _ = RunWithTimeout(
+            _bluetoothService.ConnectDeviceAsync(device),
+            device.Id,
+            timeoutMs: 10_000);
     }
 
-    private async Task DisconnectAndClearAsync(BluetoothDeviceInfo device)
+    private void NearbyDevice_Click(object sender, MouseButtonEventArgs e)
     {
-        await _bluetoothService.DisconnectDeviceAsync(device);
+        if (sender is not FrameworkElement fe || fe.DataContext is not DeviceViewModel vm) return;
+        if (vm.IsPending) return;
 
-        // The DevicesChanged event will clear pending state once the watcher sees
-        // the disconnect. As a safety net, also clear after a timeout.
-        await ClearPendingAfterTimeoutAsync(device.Id);
-    }
+        var device = vm.Device;
+        _pendingDeviceIds.Add(device.Id);
+        UpdateNearbySection();
 
-    private async Task ConnectAndClearAsync(BluetoothDeviceInfo device)
-    {
-        await _bluetoothService.ConnectDeviceAsync(device);
-
-        // Same safety-net timeout as above
-        await ClearPendingAfterTimeoutAsync(device.Id);
+        // Longer timeout for pairing (may involve user confirmation on the device)
+        _ = RunWithTimeout(
+            _bluetoothService.PairAndConnectDeviceAsync(device),
+            device.Id,
+            timeoutMs: 30_000);
     }
 
     /// <summary>
-    /// Removes the pending state for a device after a timeout in case the
-    /// DevicesChanged event never fires (e.g., device is out of range).
+    /// Awaits the given task and then clears the device's pending state after
+    /// it completes or after a timeout, whichever comes first.
     /// </summary>
-    private async Task ClearPendingAfterTimeoutAsync(string deviceId, int timeoutMs = 10_000)
+    private async Task RunWithTimeout(Task<bool> operation, string deviceId, int timeoutMs)
     {
-        await Task.Delay(timeoutMs);
+        await Task.WhenAny(operation, Task.Delay(timeoutMs));
 
         Dispatcher.Invoke(() =>
         {
             if (_pendingDeviceIds.Remove(deviceId))
+            {
                 UpdateDeviceLists();
+                UpdateNearbySection();
+            }
         });
     }
 
     private void DeviceRow_MouseEnter(object sender, MouseEventArgs e)
     {
         if (sender is Border border)
-        {
             border.Background = (Brush)FindResource("FlyoutItemHoverBackground");
-        }
     }
 
     private void DeviceRow_MouseLeave(object sender, MouseEventArgs e)
     {
         if (sender is Border border)
-        {
             border.Background = Brushes.Transparent;
-        }
     }
 
     private void BluetoothSettings_Click(object sender, MouseButtonEventArgs e)
@@ -231,7 +289,7 @@ public partial class BluetoothFlyout : Window
         Close();
     }
 
-    // ─── Positioning ─────────────────────────────────────────────────────────
+    // ─── Positioning ──────────────────────────────────────────────────────────
 
     private void OnContentRendered(object? sender, EventArgs e)
     {
@@ -244,21 +302,12 @@ public partial class BluetoothFlyout : Window
         var screen = System.Windows.Forms.Screen.FromPoint(
             new System.Drawing.Point((int)(Left * DpiScale), (int)(Top * DpiScale)));
         var workArea = screen.WorkingArea;
-
         var dpi = DpiScale;
-        var waLeft = workArea.Left / dpi;
-        var waTop = workArea.Top / dpi;
-        var waRight = workArea.Right / dpi;
-        var waBottom = workArea.Bottom / dpi;
 
-        if (Left + ActualWidth > waRight)
-            Left = waRight - ActualWidth;
-        if (Left < waLeft)
-            Left = waLeft;
-        if (Top + ActualHeight > waBottom)
-            Top = waBottom - ActualHeight;
-        if (Top < waTop)
-            Top = waTop;
+        if (Left + ActualWidth > workArea.Right / dpi)   Left = workArea.Right / dpi - ActualWidth;
+        if (Left < workArea.Left / dpi)                   Left = workArea.Left / dpi;
+        if (Top + ActualHeight > workArea.Bottom / dpi)   Top = workArea.Bottom / dpi - ActualHeight;
+        if (Top < workArea.Top / dpi)                     Top = workArea.Top / dpi;
     }
 
     private double DpiScale
@@ -274,10 +323,13 @@ public partial class BluetoothFlyout : Window
 
     protected override void OnClosed(EventArgs e)
     {
+        _bluetoothService.StopDiscovery();
+        _bluetoothService.DisableLocalDiscovery();
         _mouseHook?.Dispose();
         _mouseHook = null;
         _bluetoothService.BluetoothChanged -= OnBluetoothChanged;
         _bluetoothService.DevicesChanged -= OnDevicesChanged;
+        _bluetoothService.NearbyDevicesChanged -= OnNearbyDevicesChanged;
         base.OnClosed(e);
     }
 }

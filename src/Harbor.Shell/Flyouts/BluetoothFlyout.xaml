@@ -10,6 +10,55 @@
         SizeToContent="WidthAndHeight"
         ResizeMode="NoResize">
 
+    <Window.Resources>
+        <!-- Rotating animation for the scan indicator dot -->
+        <Storyboard x:Key="SpinAnimation" RepeatBehavior="Forever">
+            <DoubleAnimation Storyboard.TargetName="ScanDot"
+                             Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)"
+                             From="0" To="360" Duration="0:0:1" />
+        </Storyboard>
+
+        <!-- macOS-style pill toggle switch for flyout -->
+        <Style x:Key="FlyoutToggleSwitchStyle" TargetType="CheckBox">
+            <Setter Property="Height" Value="20" />
+            <Setter Property="Width" Value="38" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <Grid>
+                            <Border x:Name="Track"
+                                    Width="38" Height="20"
+                                    CornerRadius="10"
+                                    Background="{DynamicResource FlyoutSecondaryText}">
+                                <Ellipse x:Name="Thumb"
+                                         Width="16" Height="16"
+                                         Fill="White"
+                                         HorizontalAlignment="Left"
+                                         Margin="2,0,0,0" />
+                            </Border>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Track" Property="Background"
+                                        Value="{DynamicResource FlyoutCheckmarkBrush}" />
+                                <Setter TargetName="Thumb" Property="HorizontalAlignment" Value="Right" />
+                                <Setter TargetName="Thumb" Property="Margin" Value="0,0,2,0" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Device category icons -->
+        <PathGeometry x:Key="DeviceCategoryAudioIcon" Figures="M12,1C7,1 3,5 3,10V17A3,3 0 0,0 6,20H9V12H5V10A7,7 0 0,1 12,3A7,7 0 0,1 19,10V12H15V20H18A3,3 0 0,0 21,17V10C21,5 17,1 12,1Z" />
+        <PathGeometry x:Key="DeviceCategoryKeyboardIcon" Figures="M19,10H17V8H19M19,13H17V11H19M16,10H14V8H16M16,13H14V11H16M16,17H8V15H16M7,10H5V8H7M7,13H5V11H7M8,11H10V13H8M8,8H10V10H8M11,11H13V13H11M11,8H13V10H11M20,5H4C2.89,5 2,5.89 2,7V17A2,2 0 0,0 4,19H20A2,2 0 0,0 22,17V7C22,5.89 21.1,5 20,5Z" />
+        <PathGeometry x:Key="DeviceCategoryMouseIcon" Figures="M11,1.07C7.05,1.56 4,4.92 4,9V15A4,4 0 0,0 8,19H16A4,4 0 0,0 20,15V9C20,4.92 16.94,1.56 13,1.07V9H11V1.07Z" />
+        <PathGeometry x:Key="DeviceCategoryPhoneIcon" Figures="M17,19H7V5H17M17,1H7C5.89,1 5,1.89 5,3V21A2,2 0 0,0 7,23H17A2,2 0 0,0 19,21V3C19,1.89 18.1,1 17,1Z" />
+        <PathGeometry x:Key="DeviceCategoryOtherIcon" Figures="M14.88,16.29L13,18.17L14.88,20.06L13.47,21.47L11.59,19.59L9.71,21.47L8.29,20.06L10.17,18.17L8.29,16.29L9.71,14.88L11.59,16.76L13.47,14.88L14.88,16.29M13,5.83L14.47,4.36L15.88,5.77L14.41,7.24L15.88,8.71L14.47,10.12L13,8.65L11.53,10.12L10.12,8.71L11.59,7.24L10.12,5.77L11.53,4.36L13,5.83M17,3A2,2 0 0,1 19,5V19A2,2 0 0,1 17,21H7A2,2 0 0,1 5,19V5A2,2 0 0,1 7,3H17Z" />
+    </Window.Resources>
+
     <Border Background="{DynamicResource FlyoutBackground}"
             BorderBrush="{DynamicResource FlyoutBorderBrush}"
             BorderThickness="1"
@@ -31,86 +80,67 @@
                        Margin="4,0,0,12" />
 
             <!-- Toggle row -->
-            <Border CornerRadius="8"
-                    Padding="8,6"
-                    Margin="0,0,0,8"
-                    Background="Transparent">
+            <Border CornerRadius="8" Padding="8,6" Margin="0,0,0,8" Background="Transparent">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-
-                    <TextBlock Grid.Column="0"
-                               Text="Bluetooth"
-                               FontFamily="Segoe UI Variable"
-                               FontSize="13"
+                    <TextBlock Grid.Column="0" Text="Bluetooth"
+                               FontFamily="Segoe UI Variable" FontSize="13"
                                Foreground="{DynamicResource FlyoutHeaderForeground}"
                                VerticalAlignment="Center" />
-
-                    <CheckBox x:Name="BluetoothToggle"
-                              Grid.Column="1"
-                              VerticalAlignment="Center"
-                              Checked="BluetoothToggle_Changed"
-                              Unchecked="BluetoothToggle_Changed" />
+                    <CheckBox x:Name="BluetoothToggle" Grid.Column="1" VerticalAlignment="Center"
+                              Style="{StaticResource FlyoutToggleSwitchStyle}"
+                              Checked="BluetoothToggle_Changed" Unchecked="BluetoothToggle_Changed" />
                 </Grid>
             </Border>
 
             <!-- Separator -->
-            <Border Height="1"
-                    Background="{DynamicResource FlyoutBorderBrush}"
-                    Margin="0,0,0,8" />
+            <Border Height="1" Background="{DynamicResource FlyoutBorderBrush}" Margin="0,0,0,8" />
 
-            <!-- Devices label — "My Devices" when BT is on -->
+            <!-- ── MY DEVICES ─────────────────────────────────────────── -->
+
             <TextBlock x:Name="DevicesLabel"
                        Text="My Devices"
-                       FontFamily="Segoe UI Variable"
-                       FontSize="11"
+                       FontFamily="Segoe UI Variable" FontSize="11"
                        Foreground="{DynamicResource FlyoutSecondaryText}"
                        Margin="4,0,0,6" />
 
-            <!-- No devices message — shown when BT on but no connected or recent devices -->
+            <!-- No devices message -->
             <TextBlock x:Name="NoDevicesText"
                        Text="No Devices Connected"
-                       FontFamily="Segoe UI Variable"
-                       FontSize="12"
+                       FontFamily="Segoe UI Variable" FontSize="12"
                        Foreground="{DynamicResource FlyoutSecondaryText}"
-                       Margin="4,0,0,8"
-                       Visibility="Collapsed" />
+                       Margin="4,0,0,8" Visibility="Collapsed" />
 
             <!-- Connected devices — click to disconnect -->
             <ItemsControl x:Name="ConnectedDeviceList">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
-                        <Border CornerRadius="8"
-                                Padding="8,6"
-                                Margin="0,1"
-                                Background="Transparent"
-                                Cursor="Hand"
+                        <Border CornerRadius="8" Padding="8,6" Margin="0,1"
+                                Background="Transparent" Cursor="Hand"
                                 MouseEnter="DeviceRow_MouseEnter"
                                 MouseLeave="DeviceRow_MouseLeave"
                                 MouseLeftButtonUp="ConnectedDevice_Click">
                             <Grid>
                                 <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-
-                                <TextBlock Grid.Column="0"
-                                           Text="{Binding Name}"
-                                           FontFamily="Segoe UI Variable"
-                                           FontSize="13"
+                                <Path Grid.Column="0" Data="{Binding IconGeometry}"
+                                      Fill="{DynamicResource FlyoutHeaderForeground}"
+                                      Width="16" Height="16" Stretch="Uniform"
+                                      VerticalAlignment="Center" Margin="0,0,8,0" />
+                                <TextBlock Grid.Column="1" Text="{Binding Name}"
+                                           FontFamily="Segoe UI Variable" FontSize="13"
                                            Foreground="{DynamicResource FlyoutHeaderForeground}"
-                                           TextTrimming="CharacterEllipsis"
-                                           VerticalAlignment="Center" />
-
-                                <TextBlock Grid.Column="1"
-                                           Text="{Binding StatusText}"
-                                           FontFamily="Segoe UI Variable"
-                                           FontSize="11"
-                                           Foreground="{DynamicResource FlyoutSecondaryText}"
-                                           VerticalAlignment="Center"
-                                           Margin="8,0,0,0">
+                                           TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="2" Text="{Binding StatusText}"
+                                           FontFamily="Segoe UI Variable" FontSize="11"
+                                           Foreground="{Binding StatusForeground}"
+                                           VerticalAlignment="Center" Margin="8,0,0,0">
                                     <TextBlock.Style>
                                         <Style TargetType="TextBlock">
                                             <Setter Property="Visibility" Value="Visible" />
@@ -128,49 +158,36 @@
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
 
-            <!-- Recent audio devices section — only shown when there are recent devices -->
+            <!-- Recent paired devices (disconnected) — click to connect -->
             <StackPanel x:Name="RecentSection" Visibility="Collapsed">
-                <!-- Thin separator between connected and recent -->
-                <Border Height="1"
-                        Background="{DynamicResource FlyoutBorderBrush}"
-                        Margin="0,4,0,4"
-                        Opacity="0.5" />
-
-                <!-- Recently disconnected audio devices — dimmed; click to connect -->
+                <Border Height="1" Background="{DynamicResource FlyoutBorderBrush}"
+                        Margin="0,4,0,4" Opacity="0.5" />
                 <ItemsControl x:Name="RecentDeviceList">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <Border CornerRadius="8"
-                                    Padding="8,6"
-                                    Margin="0,1"
-                                    Background="Transparent"
-                                    Opacity="0.6"
-                                    Cursor="Hand"
+                            <Border CornerRadius="8" Padding="8,6" Margin="0,1"
+                                    Background="Transparent" Opacity="0.6" Cursor="Hand"
                                     MouseEnter="DeviceRow_MouseEnter"
                                     MouseLeave="DeviceRow_MouseLeave"
                                     MouseLeftButtonUp="RecentDevice_Click">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
-
-                                    <TextBlock Grid.Column="0"
-                                               Text="{Binding Name}"
-                                               FontFamily="Segoe UI Variable"
-                                               FontSize="13"
+                                    <Path Grid.Column="0" Data="{Binding IconGeometry}"
+                                          Fill="{DynamicResource FlyoutHeaderForeground}"
+                                          Width="16" Height="16" Stretch="Uniform"
+                                          VerticalAlignment="Center" Margin="0,0,8,0" />
+                                    <TextBlock Grid.Column="1" Text="{Binding Name}"
+                                               FontFamily="Segoe UI Variable" FontSize="13"
                                                Foreground="{DynamicResource FlyoutHeaderForeground}"
-                                               TextTrimming="CharacterEllipsis"
-                                               VerticalAlignment="Center" />
-
-                                    <!-- "Connecting..." shown while connection is pending -->
-                                    <TextBlock Grid.Column="1"
-                                               Text="{Binding StatusText}"
-                                               FontFamily="Segoe UI Variable"
-                                               FontSize="11"
-                                               Foreground="{DynamicResource FlyoutSecondaryText}"
-                                               VerticalAlignment="Center"
-                                               Margin="8,0,0,0">
+                                               TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="2" Text="{Binding StatusText}"
+                                               FontFamily="Segoe UI Variable" FontSize="11"
+                                               Foreground="{Binding StatusForeground}"
+                                               VerticalAlignment="Center" Margin="8,0,0,0">
                                         <TextBlock.Style>
                                             <Style TargetType="TextBlock">
                                                 <Setter Property="Visibility" Value="Collapsed" />
@@ -189,22 +206,100 @@
                 </ItemsControl>
             </StackPanel>
 
-            <!-- Separator -->
-            <Border Height="1"
-                    Background="{DynamicResource FlyoutBorderBrush}"
-                    Margin="0,8,0,4" />
+            <!-- ── NEARBY DEVICES (discovery scan) ───────────────────── -->
+
+            <StackPanel x:Name="NearbySection" Visibility="Collapsed">
+                <Border Height="1" Background="{DynamicResource FlyoutBorderBrush}"
+                        Margin="0,8,0,4" />
+
+                <!-- Section header with spinning scan indicator -->
+                <Grid Margin="4,0,0,6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Column="0" Text="Nearby Devices"
+                               FontFamily="Segoe UI Variable" FontSize="11"
+                               Foreground="{DynamicResource FlyoutSecondaryText}"
+                               VerticalAlignment="Center" />
+
+                    <!-- Spinning dot shown while scan is active -->
+                    <Ellipse x:Name="ScanDot" Grid.Column="1"
+                             Width="7" Height="7"
+                             Fill="{DynamicResource FlyoutSecondaryText}"
+                             Opacity="0.5"
+                             RenderTransformOrigin="0.5,0.5"
+                             Margin="6,0,0,0">
+                        <Ellipse.RenderTransform>
+                            <RotateTransform />
+                        </Ellipse.RenderTransform>
+                    </Ellipse>
+                </Grid>
+
+                <!-- "Looking for devices..." shown while scanning with no results yet -->
+                <TextBlock x:Name="ScanningPlaceholder"
+                           Text="Looking for devices..."
+                           FontFamily="Segoe UI Variable" FontSize="12"
+                           Foreground="{DynamicResource FlyoutSecondaryText}"
+                           Margin="8,0,0,6" Visibility="Collapsed" />
+
+                <!-- Nearby (unpaired) devices — click to pair + connect -->
+                <ItemsControl x:Name="NearbyDeviceList">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border CornerRadius="8" Padding="8,6" Margin="0,1"
+                                    Background="Transparent" Cursor="Hand"
+                                    MouseEnter="DeviceRow_MouseEnter"
+                                    MouseLeave="DeviceRow_MouseLeave"
+                                    MouseLeftButtonUp="NearbyDevice_Click">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <Path Grid.Column="0" Data="{Binding IconGeometry}"
+                                          Fill="{DynamicResource FlyoutHeaderForeground}"
+                                          Width="16" Height="16" Stretch="Uniform"
+                                          VerticalAlignment="Center" Margin="0,0,8,0" />
+                                    <TextBlock Grid.Column="1" Text="{Binding Name}"
+                                               FontFamily="Segoe UI Variable" FontSize="13"
+                                               Foreground="{DynamicResource FlyoutHeaderForeground}"
+                                               TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="2" Text="{Binding StatusText}"
+                                               FontFamily="Segoe UI Variable" FontSize="11"
+                                               Foreground="{Binding StatusForeground}"
+                                               VerticalAlignment="Center" Margin="8,0,0,0">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding ShowStatus}" Value="True">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+
+            <!-- Bottom separator -->
+            <Border Height="1" Background="{DynamicResource FlyoutBorderBrush}" Margin="0,8,0,4" />
 
             <!-- Bluetooth Settings link -->
-            <Border CornerRadius="8"
-                    Padding="8,6"
-                    Cursor="Hand"
+            <Border CornerRadius="8" Padding="8,6" Cursor="Hand"
                     Background="Transparent"
                     MouseLeftButtonUp="BluetoothSettings_Click"
                     MouseEnter="DeviceRow_MouseEnter"
                     MouseLeave="DeviceRow_MouseLeave">
                 <TextBlock Text="Bluetooth Settings..."
-                           FontFamily="Segoe UI Variable"
-                           FontSize="13"
+                           FontFamily="Segoe UI Variable" FontSize="13"
                            Foreground="{DynamicResource FlyoutHeaderForeground}" />
             </Border>
         </StackPanel>

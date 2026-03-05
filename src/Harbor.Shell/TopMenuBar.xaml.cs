@@ -235,9 +235,14 @@ public partial class TopMenuBar : AppBarWindow
             Source = new Uri("Resources/SystemIndicatorIcons.xaml", UriKind.Relative),
         };
 
-        // Set initial icon state and visibility
+        // Load initial icon geometry (will be Off until the radio is detected)
         UpdateBluetoothIcon(_bluetoothService.IconState);
-        BluetoothIcon.Visibility = _bluetoothService.IsAvailable ? Visibility.Visible : Visibility.Collapsed;
+
+        // Do NOT set visibility here. IsAvailable is always false at call time because
+        // InitializeAsync runs asynchronously. The BluetoothChanged event fires once the
+        // radio is enumerated and sets the correct visibility at that point.
+        // BluetoothIcon starts Visible (the XAML default); on machines without Bluetooth
+        // hardware it will be hidden when the event fires with IsAvailable=false.
 
         // Wire click handler
         BluetoothIcon.Clicked += OnBluetoothIconClicked;

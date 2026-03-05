@@ -37,6 +37,8 @@ public partial class App : Application
     private WindowCycleService? _windowCycleService;
     private AppSwitcherService? _appSwitcherService;
     private AppSwitcherOverlay? _appSwitcherOverlay;
+    private AppNavigatorService? _appNavigatorService;
+    private AppNavigatorOverlay? _appNavigatorOverlay;
     private HarborTrayIcon? _harborTrayIcon;
     private RecycleBinService? _recycleBinService;
     private WallpaperService? _wallpaperService;
@@ -214,6 +216,21 @@ public partial class App : Application
             Dispatcher.Invoke(() => _appSwitcherOverlay.UpdateSelectedIndex(index));
         _appSwitcherService.HideRequested += () =>
             Dispatcher.Invoke(() => _appSwitcherOverlay.Hide());
+
+        // Create App Navigator service and overlay
+        _appNavigatorService = new AppNavigatorService(
+            _lowLevelKeyboardHook,
+            _shellServices.Tasks,
+            hotkey: _shellSettingsService.AppNavigatorHotkey,
+            enabled: _shellSettingsService.AppNavigatorEnabled);
+
+        _appNavigatorOverlay = new AppNavigatorOverlay();
+        _appNavigatorOverlay.BindService(_appNavigatorService);
+
+        _appNavigatorService.ShowRequested += (groups) =>
+            Dispatcher.Invoke(() => _appNavigatorOverlay.ShowAppNavigator(groups));
+        _appNavigatorService.HideRequested += (hwnd) =>
+            Dispatcher.Invoke(() => _appNavigatorOverlay.DismissAppNavigator(hwnd));
 
         // Create installed app service and apps launcher
         _installedAppService = new InstalledAppService(_shellSettingsService);
@@ -551,6 +568,12 @@ public partial class App : Application
 
         _appSwitcherOverlay?.Close();
         _appSwitcherOverlay = null;
+
+        _appNavigatorService?.Dispose();
+        _appNavigatorService = null;
+
+        _appNavigatorOverlay?.Close();
+        _appNavigatorOverlay = null;
 
         _windowCycleService?.Dispose();
         _windowCycleService = null;

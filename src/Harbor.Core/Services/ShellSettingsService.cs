@@ -89,6 +89,26 @@ public class ShellSettings
     /// Use Harbor's custom app switcher instead of the default Windows ALT+TAB.
     /// </summary>
     public bool UseCustomAppSwitcher { get; set; } = true;
+
+    /// <summary>
+    /// Enable App Navigator (F3 / Ctrl+Up / 3-finger swipe).
+    /// </summary>
+    public bool AppNavigatorEnabled { get; set; } = true;
+
+    /// <summary>
+    /// Virtual key code for the App Navigator hotkey (default 0x72 = F3).
+    /// </summary>
+    public int AppNavigatorHotkey { get; set; } = 0x72;
+
+    /// <summary>
+    /// Number of fingers required for the swipe-up touchpad gesture (3 or 4).
+    /// </summary>
+    public int AppNavigatorGestureFingers { get; set; } = 3;
+
+    /// <summary>
+    /// Group windows by application in App Navigator.
+    /// </summary>
+    public bool AppNavigatorGroupByApp { get; set; } = true;
 }
 
 /// <summary>
@@ -363,6 +383,36 @@ public class ShellSettingsService : IDisposable
         }
     }
 
+    public bool AppNavigatorEnabled
+    {
+        get { lock (_lock) return _settings.AppNavigatorEnabled; }
+        set
+        {
+            lock (_lock)
+            {
+                if (_settings.AppNavigatorEnabled == value) return;
+                _settings.AppNavigatorEnabled = value;
+            }
+            Save();
+            SettingsChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    public int AppNavigatorHotkey
+    {
+        get { lock (_lock) return _settings.AppNavigatorHotkey; }
+    }
+
+    public int AppNavigatorGestureFingers
+    {
+        get { lock (_lock) return _settings.AppNavigatorGestureFingers; }
+    }
+
+    public bool AppNavigatorGroupByApp
+    {
+        get { lock (_lock) return _settings.AppNavigatorGroupByApp; }
+    }
+
     /// <summary>
     /// Raised when any setting changes.
     /// </summary>
@@ -423,6 +473,10 @@ public class ShellSettingsService : IDisposable
                     FilterAppsFolder = _settings.FilterAppsFolder,
                     HideRecycleBin = _settings.HideRecycleBin,
                     UseCustomAppSwitcher = _settings.UseCustomAppSwitcher,
+                    AppNavigatorEnabled = _settings.AppNavigatorEnabled,
+                    AppNavigatorHotkey = _settings.AppNavigatorHotkey,
+                    AppNavigatorGestureFingers = _settings.AppNavigatorGestureFingers,
+                    AppNavigatorGroupByApp = _settings.AppNavigatorGroupByApp,
                 };
             }
 

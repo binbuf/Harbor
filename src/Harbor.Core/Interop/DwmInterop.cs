@@ -67,4 +67,32 @@ public static class DwmInterop
             return PInvoke.DwmSetWindowAttribute(hwnd, attribute, ptr, (uint)Marshal.SizeOf<T>());
         }
     }
+
+    // DWM_THUMBNAIL_PROPERTIES flag constants
+    private const uint DWM_TNP_RECTDESTINATION = 0x00000001;
+    private const uint DWM_TNP_OPACITY = 0x00000004;
+    private const uint DWM_TNP_VISIBLE = 0x00000008;
+
+    /// <summary>
+    /// Simplified thumbnail update: sets the destination rect (in physical pixels relative to
+    /// the destination HWND), opacity to 255, and fVisible to true.
+    /// Called by NavThumbnailSlot on each layout change.
+    /// </summary>
+    public static HRESULT UpdateThumbnailDestination(nint thumbnailId, int destWidth, int destHeight)
+    {
+        var props = new Windows.Win32.Graphics.Dwm.DWM_THUMBNAIL_PROPERTIES
+        {
+            dwFlags = DWM_TNP_RECTDESTINATION | DWM_TNP_OPACITY | DWM_TNP_VISIBLE,
+            rcDestination = new Windows.Win32.Foundation.RECT
+            {
+                left = 0,
+                top = 0,
+                right = destWidth,
+                bottom = destHeight,
+            },
+            opacity = 255,
+            fVisible = true,
+        };
+        return UpdateThumbnailProperties(thumbnailId, in props);
+    }
 }

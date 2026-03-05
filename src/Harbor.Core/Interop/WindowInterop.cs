@@ -181,4 +181,44 @@ public static class WindowInterop
         }
         return z;
     }
+
+    // Win32 constants for child window creation
+    private const uint WS_CHILD = 0x40000000;
+    private const uint WS_VISIBLE = 0x10000000;
+    private const uint WS_EX_TRANSPARENT_STYLE = 0x00000020;
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true, CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+    private static extern nint CreateWindowExW(
+        uint dwExStyle, string lpClassName, string? lpWindowName,
+        uint dwStyle, int x, int y, int nWidth, int nHeight,
+        nint hWndParent, nint hMenu, nint hInstance, nint lpParam);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
+    private static extern bool DestroyWindow(nint hwnd);
+
+    /// <summary>
+    /// Creates a transparent Win32 child HWND using the built-in "STATIC" window class.
+    /// Used by HwndHost-based controls (NavThumbnailSlot) to host DWM thumbnails.
+    /// WS_EX_TRANSPARENT lets mouse input pass through to WPF siblings.
+    /// </summary>
+    public static unsafe HWND CreateChildWindow(HWND hwndParent, int width, int height)
+    {
+        var handle = CreateWindowExW(
+            WS_EX_TRANSPARENT_STYLE,
+            "STATIC",
+            null,
+            WS_CHILD | WS_VISIBLE,
+            0, 0, width, height,
+            (nint)hwndParent.Value,
+            nint.Zero,
+            nint.Zero,
+            nint.Zero);
+        return new HWND((void*)handle);
+    }
+
+    /// <summary>Destroys a Win32 window (e.g. child HWND created by CreateChildWindow).</summary>
+    public static unsafe bool DestroyWindowHandle(HWND hwnd)
+    {
+        return DestroyWindow((nint)hwnd.Value);
+    }
 }

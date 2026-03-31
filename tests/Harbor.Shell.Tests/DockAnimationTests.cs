@@ -57,15 +57,15 @@ public class DockAnimationTests
     }
 
     [Fact]
-    public void ShowAnimationDuration_Is250ms()
+    public void ShowAnimationDuration_Is400ms()
     {
-        Assert.Equal(TimeSpan.FromMilliseconds(250), Dock.ShowAnimationDuration.TimeSpan);
+        Assert.Equal(TimeSpan.FromMilliseconds(400), Dock.ShowAnimationDuration.TimeSpan);
     }
 
     [Fact]
-    public void HideAnimationDuration_Is200ms()
+    public void HideAnimationDuration_Is350ms()
     {
-        Assert.Equal(TimeSpan.FromMilliseconds(200), Dock.HideAnimationDuration.TimeSpan);
+        Assert.Equal(TimeSpan.FromMilliseconds(350), Dock.HideAnimationDuration.TimeSpan);
     }
 
     [Fact]

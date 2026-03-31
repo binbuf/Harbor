@@ -18,21 +18,21 @@ public class DockAutoHideServiceTests
     }
 
     [Fact]
-    public void HideDelay_Is1000ms()
+    public void HideDelay_Is300ms()
     {
-        Assert.Equal(TimeSpan.FromMilliseconds(1000), DockAutoHideService.HideDelay);
+        Assert.Equal(TimeSpan.FromMilliseconds(300), DockAutoHideService.HideDelay);
     }
 
     [Fact]
-    public void ShowAnimationDuration_Is250ms()
+    public void ShowAnimationDuration_Is400ms()
     {
-        Assert.Equal(TimeSpan.FromMilliseconds(250), DockAutoHideService.ShowAnimationDuration);
+        Assert.Equal(TimeSpan.FromMilliseconds(400), DockAutoHideService.ShowAnimationDuration);
     }
 
     [Fact]
-    public void HideAnimationDuration_Is200ms()
+    public void HideAnimationDuration_Is350ms()
     {
-        Assert.Equal(TimeSpan.FromMilliseconds(200), DockAutoHideService.HideAnimationDuration);
+        Assert.Equal(TimeSpan.FromMilliseconds(350), DockAutoHideService.HideAnimationDuration);
     }
 
     [Fact]

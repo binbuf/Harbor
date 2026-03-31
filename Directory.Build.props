@@ -1,0 +1,12 @@
+<Project>
+
+  <PropertyGroup>
+    <VersionPrefix>0.0.0</VersionPrefix>
+    <Authors>binbuf</Authors>
+    <Company>binbuf</Company>
+    <Product>Harbor</Product>
+    <Copyright>Copyright (c) binbuf</Copyright>
+    <RepositoryUrl>https://github.com/binbuf/Harbor</RepositoryUrl>
+  </PropertyGroup>
+
+</Project>
